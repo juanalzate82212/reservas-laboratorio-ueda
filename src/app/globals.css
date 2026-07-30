@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Tokens de marca — Universidad Católica Luis Amigó.
+ * Copiados del §12.1 de identidad-visual-ucla-ui-ux.md.
+ *
+ * Estos valores existen para CSS crudo (theming de FullCalendar, plantillas de
+ * correo). Para componentes usa SIEMPRE las utilidades de Tailwind
+ * (bg-primary, text-accent, border-borde…), nunca un hex suelto.
+ * Si cambias un valor aquí, cámbialo también en tailwind.config.ts.
+ */
+:root {
+  /* Marca (oficial) */
+  --color-azul: #007b99;
+  --color-naranja: #f39200;
+  --color-gris: #848585;
+  --color-blanco: #ffffff;
+
+  /* Azul (derivado) */
+  --azul-900: #004e61;
+  --azul-700: #00647d;
+  --azul-500: #007b99;
+  --azul-200: #99cbd6;
+  --azul-50: #e6f2f5;
+
+  /* Naranja (derivado) */
+  --naranja-700: #c77700;
+  --naranja-500: #f39200;
+  --naranja-100: #fde6c7;
+
+  /* Neutrales (derivado) */
+  --texto: #2e2e2e;
+  --texto-secundario: #848585;
+  --borde: #e1e1e1;
+  --superficie: #f5f5f5;
+  --fondo: #ffffff;
+  --negro: #111111;
+
+  /* Estados (derivado, fuera de marca) */
+  --exito: #2e7d5b;
+  --error: #c0392b;
+  --advertencia: #f39200;
+  --info: #007b99;
+
+  /* Semánticos de UI */
+  --primary: var(--azul-500);
+  --primary-hover: var(--azul-700);
+  --primary-active: var(--azul-900);
+  --accent: var(--naranja-500);
+  --accent-hover: var(--naranja-700);
+
+  /* Radios y sombra */
+  --radius: 8px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 3px rgb(0 0 0 / 0.08), 0 4px 12px rgb(0 0 0 / 0.06);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-fondo font-body text-body text-texto antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display text-texto;
+    line-height: 1.2;
+  }
+
+  /*
+   * Foco de teclado siempre visible (WCAG AA, §8 del plan).
+   * :focus-visible no dispara en click de ratón, así que no ensucia la UI.
+   */
+  :focus-visible {
+    @apply outline-none ring-2 ring-azul-500 ring-offset-2 ring-offset-fondo;
+  }
+}
+
+/* La marca no define tema oscuro: el fondo por defecto es blanco. */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
