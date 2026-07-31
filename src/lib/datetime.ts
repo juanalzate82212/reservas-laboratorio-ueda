@@ -178,6 +178,16 @@ export function formatDateTime(instant: Date): string {
   });
 }
 
+/**
+ * ISO "de pared" en hora de Bogotá, sin sufijo de zona: "2026-08-03T08:00:00".
+ * Solo para alimentar a FullCalendar (ver src/lib/fullcalendar.ts), que se
+ * configura con timeZone="UTC" para tratar esta cadena como literal en vez de
+ * reconvertirla según la zona del navegador de quien mira la pantalla.
+ */
+export function toBogotaWallClockIso(instant: Date): string {
+  return formatInTimeZone(instant, TZ, "yyyy-MM-dd'T'HH:mm:ss");
+}
+
 export type ClosedDay = {
   /** Clave de día en hora de Bogotá: "2026-08-08". */
   date: string;

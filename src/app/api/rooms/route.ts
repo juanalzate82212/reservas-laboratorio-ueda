@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { prisma } from "@/lib/db";
+import { getActiveRooms } from "@/lib/rooms";
 
 /*
  * Sin request ni cookies/headers, Next.js trataría este handler como
@@ -13,19 +13,6 @@ import { prisma } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const rooms = await prisma.room.findMany({
-    where: { isActive: true },
-    orderBy: { slug: "asc" },
-    select: {
-      id: true,
-      slug: true,
-      name: true,
-      description: true,
-      capacity: true,
-      hasComputers: true,
-      colorToken: true,
-    },
-  });
-
+  const rooms = await getActiveRooms();
   return NextResponse.json(rooms);
 }
