@@ -177,3 +177,38 @@ export function formatDateTime(instant: Date): string {
     locale: es,
   });
 }
+
+export type ClosedDay = {
+  /** Clave de día en hora de Bogotá: "2026-08-08". */
+  date: string;
+  /** Categoría, no prosa — a diferencia de TimeBlock.reason, que sí es libre. */
+  reason: "WEEKEND" | "HOLIDAY";
+};
+
+/**
+ * Días sin atención (fin de semana u festivo) dentro de [from, to).
+ * Usado por GET /api/availability para que el calendario los etiquete.
+ */
+export function getClosedDaysInRange(from: Date, to: Date): ClosedDay[] {
+  const closedDays: ClosedDay[] = [];
+  const seen = new Set<string>();
+  let cursor = from;
+
+  while (cursor < to) {
+    const dayKey = toBogotaDayKey(cursor);
+    if (!seen.has(dayKey)) {
+      seen.add(dayKey);
+      if (!isOpenDay(cursor)) {
+        closedDays.push({
+          date: dayKey,
+          reason: isHoliday(cursor) ? "HOLIDAY" : "WEEKEND",
+        });
+      }
+    }
+    // Colombia no tiene horario de verano, así que sumar 24h en UTC siempre
+    // avanza exactamente un día calendario en Bogotá.
+    cursor = addDays(cursor, 1);
+  }
+
+  return closedDays;
+}
