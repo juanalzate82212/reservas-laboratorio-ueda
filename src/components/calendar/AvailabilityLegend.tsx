@@ -35,25 +35,31 @@ const ITEMS: Array<{
 
 export function AvailabilityLegend() {
   return (
-    <ul
-      aria-label="Leyenda del calendario"
-      className="flex flex-wrap gap-x-5 gap-y-2"
-    >
-      {ITEMS.map((item) => (
-        <li
-          key={item.etiqueta}
-          className="flex items-center gap-2 text-caption text-texto"
-        >
-          <span
-            aria-hidden
-            className={cn("h-4 w-4 shrink-0 rounded-sm", item.swatch)}
-          />
-          {item.icono && (
-            <item.icono aria-hidden className="h-3.5 w-3.5 text-texto-secundario" />
-          )}
-          {item.etiqueta}
-        </li>
-      ))}
-    </ul>
+    <div className="flex flex-col gap-2">
+      <p className="text-caption text-texto-secundario">
+        Cada bloque del calendario representa 30 minutos. Toca un horario
+        disponible para solicitarlo.
+      </p>
+      <ul
+        aria-label="Leyenda del calendario"
+        className="flex flex-wrap gap-x-5 gap-y-2"
+      >
+        {ITEMS.map((item) => (
+          <li
+            key={item.etiqueta}
+            className="flex items-center gap-2 text-caption text-texto"
+          >
+            <span
+              aria-hidden
+              className={cn("h-4 w-4 shrink-0 rounded-sm", item.swatch)}
+            />
+            {item.icono && (
+              <item.icono aria-hidden className="h-3.5 w-3.5 text-texto-secundario" />
+            )}
+            {item.etiqueta}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

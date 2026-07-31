@@ -4,9 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Estado actual
 
-**Fases 0 a 4 completas.** Andamiaje Next + Tailwind con la marca aplicada, `components/ui/`, `components/brand/`, [/kitchen-sink](src/app/kitchen-sink/page.tsx) (temporal, se borra en la Fase 10), schema de Prisma migrado contra Supabase, semilla con datos de demo, las capas de fecha/hora y disponibilidad, la API pública de lectura, la landing (`/`) con los dos calendarios de FullCalendar, y el wizard de solicitud de reserva (`/reservar`, `POST /api/reservations`, `/reserva/[codigo]`). `npm run build`, `npm run lint`, `npm run typecheck` y `npm run check:datetime` pasan limpios.
+**Fases 0 a 4 completas**, más una ronda de ajustes post-Fase-3/4 pedida por el usuario tras revisar el resultado en el navegador (ver nota en el §9 del plan, Fases 3 y 4). Andamiaje Next + Tailwind con la marca aplicada, `components/ui/`, `components/brand/`, [/kitchen-sink](src/app/kitchen-sink/page.tsx) (temporal, se borra en la Fase 10), schema de Prisma migrado contra Supabase, semilla con datos de demo, las capas de fecha/hora y disponibilidad, la API pública de lectura, la landing (`/`) con los dos calendarios de FullCalendar (ahora plegables y clicables), y el wizard de solicitud de reserva (`/reservar`, `POST /api/reservations`, `/reserva/[codigo]`, con soporte para llegar prellenado desde un clic en el calendario). `npm run build`, `npm run lint`, `npm run typecheck` y `npm run check:datetime` pasan limpios.
 
 **Siguiente: Fase 5** (autenticación del admin y shell de `/admin`).
+
+## El calendario es clicable: AVISO va de fondo, no en primer plano
+
+`RoomCalendar` usa `@fullcalendar/interaction` (`dateClick`/`eventClick`) para abrir `/reservar?roomId=&startsAt=` al tocar una franja disponible. Esto obligó a un cambio de diseño: los `TimeBlock` de tipo `WARNING` (reservables, según §5) se renderizan como evento de **fondo** (`display: "background"`), no de primer plano como `RESERVADO`/`EN_REVISION`/`BLOQUEADO`. Un evento de fondo no intercepta el clic, así que `dateClick` sigue disparando con la franja exacta de 30 min tocada — si `AVISO` fuera de primer plano, `eventClick` solo entregaría el rango completo del `TimeBlock` (que puede durar varias horas), perdiendo qué media hora concreta se tocó.
+
+**Trampa evitada, no inventada:** un evento de fondo **no tiene** el wrapper `.fc-event-main` que sí tienen los de primer plano — el contenido de `eventContent` se inserta directo dentro de `.fc-bg-event`. El tinte de color va en `background-color` con alpha, nunca en la propiedad `opacity`: `opacity` en ese elemento habría atenuado también el icono y el texto, que viven en el mismo nodo. Verificado leyendo `@fullcalendar/core/internal-common.js`, no asumido por la documentación.
+
+**Bug real encontrado y corregido en el camino** (preexistente desde la Fase 3, nunca detectado porque no hay navegador en este entorno): `renderEventContent` hacía `const tipo = arg.event.extendedProps.tipo as EventoTipo` — un *cast*, no una comprobación. Los eventos de festivo no llevan `extendedProps.tipo`, así que `tipo` era `undefined` en runtime; `ICONOS[undefined]` da `undefined`; y `<Icono .../>` con un tipo de componente `undefined` hace que **React truene** ("Element type is invalid… got: undefined") en cualquier semana que mostrara un festivo. TypeScript nunca lo vio venir porque el `as` se lo ocultó. Confirmado reproduciendo el error con `react-dom/server` en un script aislado (no solo por inspección), y corregido con un guard (`if (!tipo) return null`).
 
 ## Validación de reservas: qué vive en Zod y qué vive en el Route Handler
 

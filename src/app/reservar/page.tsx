@@ -7,7 +7,11 @@ import { getActiveRooms } from "@/lib/rooms";
 // y ejecuta la consulta a Prisma durante `next build`, no por petición.
 export const dynamic = "force-dynamic";
 
-export default async function ReservarPage() {
+export default async function ReservarPage({
+  searchParams,
+}: {
+  searchParams: { roomId?: string; startsAt?: string };
+}) {
   const rooms = await getActiveRooms();
 
   return (
@@ -25,7 +29,10 @@ export default async function ReservarPage() {
         </div>
 
         {rooms.length > 0 ? (
-          <ReservationWizard rooms={rooms} />
+          <ReservationWizard
+            rooms={rooms}
+            initial={{ roomId: searchParams.roomId, startsAt: searchParams.startsAt }}
+          />
         ) : (
           <p className="text-body text-texto-secundario">
             No hay salas disponibles para reservar en este momento.

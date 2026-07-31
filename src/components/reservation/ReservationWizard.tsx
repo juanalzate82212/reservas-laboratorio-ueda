@@ -27,7 +27,45 @@ type ErrorApi = { error: { code: string; message: string } };
 
 const TITULOS_PASO = ["Espacio y horario", "Tus datos", "Revisión"] as const;
 
-export function ReservationWizard({ rooms }: { rooms: ActiveRoom[] }) {
+export interface ReservationWizardInitial {
+  roomId?: string;
+  startsAt?: string;
+}
+
+/*
+ * Al llegar desde un clic en el calendario (?roomId=&startsAt=), valida el
+ * prellenado antes de confiarlo: un enlace viejo o manipulado a mano no debe
+ * poder colar una sala inexistente o una fecha ilegible. Si algo no cuadra,
+ * el wizard simplemente arranca vacío — la validación normal del paso 1 se
+ * encarga del resto.
+ */
+function resolveInitial(
+  initial: ReservationWizardInitial | undefined,
+  rooms: ActiveRoom[],
+): { roomId: string; startsAt: string; selectedDate: string } {
+  const vacio = { roomId: "", startsAt: "", selectedDate: "" };
+  if (!initial?.roomId || !initial.startsAt) return vacio;
+  if (!rooms.some((r) => r.id === initial.roomId)) return vacio;
+
+  const fecha = new Date(initial.startsAt);
+  if (Number.isNaN(fecha.getTime())) return vacio;
+
+  return {
+    roomId: initial.roomId,
+    startsAt: fecha.toISOString(),
+    selectedDate: toBogotaDayKey(fecha),
+  };
+}
+
+export function ReservationWizard({
+  rooms,
+  initial,
+}: {
+  rooms: ActiveRoom[];
+  initial?: ReservationWizardInitial;
+}) {
+  const prellenado = resolveInitial(initial, rooms);
+
   const [paso, setPaso] = useState(0);
   const [enviando, setEnviando] = useState(false);
   const [warning, setWarning] = useState<string | null>(null);
@@ -37,8 +75,8 @@ export function ReservationWizard({ rooms }: { rooms: ActiveRoom[] }) {
     resolver: zodResolver(createReservationSchema),
     mode: "onTouched",
     defaultValues: {
-      roomId: "",
-      startsAt: "",
+      roomId: prellenado.roomId,
+      startsAt: prellenado.startsAt,
       endsAt: "",
       requesterName: "",
       requesterRole: "",
@@ -61,7 +99,7 @@ export function ReservationWizard({ rooms }: { rooms: ActiveRoom[] }) {
   const roomId = watch("roomId");
   const startsAt = watch("startsAt");
   const endsAt = watch("endsAt");
-  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedDate, setSelectedDate] = useState(prellenado.selectedDate);
   const room = rooms.find((r) => r.id === roomId) ?? null;
 
   const hoyBogota = toBogotaDayKey(new Date());

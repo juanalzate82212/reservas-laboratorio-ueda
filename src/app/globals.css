@@ -171,10 +171,23 @@
   color: var(--texto);
 }
 
-/* Texto sobre naranja siempre oscuro, nunca blanco (identidad de marca). */
-.fc-timegrid-event.fc-evento-aviso {
-  border-color: var(--naranja-500);
-  background-color: var(--naranja-500);
+/*
+ * AVISO va como evento de fondo (display:"background"), no de primer plano:
+ * así no intercepta el clic y la grilla sigue abriendo el wizard con la
+ * franja exacta de 30 min tocada, igual que en una zona libre — la franja
+ * sigue siendo reservable (§5 del plan), solo lleva un aviso.
+ *
+ * Los bg-event de FullCalendar NO tienen el wrapper .fc-event-main: nuestro
+ * contenido (icono + motivo) se inserta directo dentro de .fc-bg-event
+ * (verificado contra @fullcalendar/core/internal-common.js). Por eso el tinte
+ * va en background-color con alpha, no en `opacity`: `opacity` atenuaría
+ * también el texto que vive en el mismo elemento.
+ * Texto sobre naranja siempre oscuro, nunca blanco (identidad de marca).
+ */
+.fc-bg-event.fc-evento-aviso {
+  opacity: 1; /* anula --fc-bg-event-opacity, que también atenuaría el texto */
+  border: 1px dashed var(--naranja-700);
+  background-color: rgb(243 146 0 / 0.22); /* naranja-500 al 22% */
   color: var(--texto);
 }
 
@@ -210,4 +223,9 @@
   font-weight: 600;
   color: var(--naranja-700);
   text-transform: none;
+}
+
+/* Clicar una franja libre (o con aviso) abre el wizard con esa hora. */
+.fc-timegrid-slot-lane {
+  cursor: pointer;
 }

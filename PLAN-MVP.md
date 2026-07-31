@@ -563,16 +563,18 @@ Diez fases. **Cada una termina en un estado ejecutable y verificable.** No empez
 
 ### Fase 3 — Landing pública con los dos calendarios
 1. `app/page.tsx`: cabecera de marca con el arco, título, texto breve, leyenda de colores, dos `RoomCalendar` lado a lado en escritorio y apilados en móvil.
-2. `components/calendar/RoomCalendar.tsx` (`"use client"`): FullCalendar en `timeGridWeek`, `slotMinTime: "08:00"` / `slotMaxTime: "17:00"`, `locale` es, `allDaySlot: false`, `weekends: false` (el laboratorio no abre), sin edición. El receso 12:00–13:00 se pinta como no disponible. Los días festivos se atenúan y se etiquetan "Festivo" en la cabecera del día. Colores según §8.
+2. `components/calendar/RoomCalendar.tsx` (`"use client"`): FullCalendar en `timeGridWeek`, `slotMinTime: "08:00"` / `slotMaxTime: "17:00"`, `locale` es, `allDaySlot: false`, `weekends: false` (el laboratorio no abre). El receso 12:00–13:00 se pinta como no disponible. Los días festivos se atenúan y se etiquetan "Festivo" en la cabecera del día. Colores según §8.
 3. Botón destacado **"Reservar espacio"** (única acción en naranja de la pantalla).
 4. Responsive: **la landing se abre desde un QR, así que móvil es el caso principal.** En pantallas pequeñas, vista por defecto `timeGridDay` con navegación por días.
 
 **Aceptación:** a 390 px de ancho se ven ambos calendarios legibles con la disponibilidad y la leyenda; no hay scroll horizontal; el receso se distingue de una franja bloqueada; una semana que contenga un festivo lo muestra atenuado y etiquetado.
 
+> **Revisión post-Fase 3 (con la Fase 4 ya construida):** dos cambios de diseño sobre lo anterior, pedidos explícitamente por el usuario tras ver el resultado. (1) Los calendarios ya no se muestran de entrada: cada uno empieza plegado detrás de un botón "Ver disponibilidad de {sala}" — menos que cargar antes de decidir qué sala mirar, coherente con que la landing se abre desde un QR. (2) El calendario dejó de ser "sin edición": ahora es clicable (`@fullcalendar/interaction`). Clicar una franja libre o con `WARNING` navega a `/reservar?roomId=&startsAt=` con la hora ya elegida — ver Fase 4.
+
 ---
 
 ### Fase 4 — Flujo de solicitud de reserva
-Wizard de 3 pasos + confirmación, en un `Dialog` de Radix (o página `/reservar` en móvil).
+Wizard de 3 pasos + confirmación, en página `/reservar`.
 
 1. **Paso 1 — Espacio y horario:** selector de sala, selector de día, grilla de horas disponibles (deshabilitando ocupadas, bloqueadas y las que no caben en la jornada), selector de duración. Las franjas `WARNING` son seleccionables con el aviso visible.
 2. **Paso 2 — Datos del solicitante:** nombre completo, cargo, número de documento, correo institucional, motivo (opcional), n.º de asistentes (opcional). Validación en vivo con RHF + Zod, mensajes en español y en voz de marca.
@@ -582,6 +584,8 @@ Wizard de 3 pasos + confirmación, en un `Dialog` de Radix (o página `/reservar
 6. Error de carrera: si la franja se ocupó mientras el usuario llenaba el formulario → mensaje claro ("Esa franja acaba de ser reservada, elige otra") y vuelta al paso 1 con el calendario refrescado.
 
 **Aceptación:** una reserva válida aparece como `PENDING` en Prisma Studio y como "En revisión" en el calendario. Un correo `@gmail.com` se rechaza con el mensaje del §5, regla 2. Una franja bloqueada no es seleccionable. Una reserva 11:00–14:00 se rechaza por cruzar el receso. Un festivo y un fin de semana no ofrecen ninguna franja. Enviar dos veces la misma franja falla la segunda vez.
+
+> **Revisión post-Fase 3/4:** `/reservar` acepta `?roomId=&startsAt=` para llegar con la sala y la hora ya elegidas (validado contra las salas reales antes de confiar en la URL; si no cuadra, el wizard arranca vacío sin romper nada). El Paso 1 sigue existiendo — sala, día y franja se ven pre-seleccionados y editables —, pero con esos dos parámetros el selector de duración queda visible de inmediato, sin repetir la elección de horario que ya se hizo en el calendario.
 
 ---
 

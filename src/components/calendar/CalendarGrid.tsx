@@ -1,8 +1,12 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import dynamic from "next/dynamic";
+import { useState } from "react";
 
+import { Button } from "@/components/ui/Button";
 import type { ActiveRoom } from "@/lib/rooms";
+import { cn } from "@/lib/utils";
 
 /*
  * FullCalendar manipula el DOM directamente y no está pensado para
@@ -28,12 +32,50 @@ function CalendarSkeleton() {
   );
 }
 
+/*
+ * Cada calendario empieza plegado detrás de un botón "Ver disponibilidad":
+ * la landing se abre desde un QR, así que llegar con menos que cargar y
+ * desplazar antes de decidir qué sala mirar es preferible a mostrar ambos
+ * calendarios de entrada. Cada uno se abre y cierra por separado.
+ */
 export function CalendarGrid({ rooms }: { rooms: ActiveRoom[] }) {
+  const [abiertas, setAbiertas] = useState<Set<string>>(new Set());
+
+  function alternar(roomId: string) {
+    setAbiertas((prev) => {
+      const siguiente = new Set(prev);
+      if (siguiente.has(roomId)) {
+        siguiente.delete(roomId);
+      } else {
+        siguiente.add(roomId);
+      }
+      return siguiente;
+    });
+  }
+
   return (
-    <div className="grid gap-6 md:grid-cols-2">
-      {rooms.map((room) => (
-        <RoomCalendar key={room.id} room={room} />
-      ))}
+    <div className="grid gap-4 md:grid-cols-2">
+      {rooms.map((room) => {
+        const abierta = abiertas.has(room.id);
+        return (
+          <div key={room.id} className="flex flex-col gap-3">
+            <Button
+              type="button"
+              variante="secondary"
+              onClick={() => alternar(room.id)}
+              aria-expanded={abierta}
+              className="justify-between"
+            >
+              Ver disponibilidad de {room.name}
+              <ChevronDown
+                aria-hidden
+                className={cn("h-4 w-4 transition-transform", abierta && "rotate-180")}
+              />
+            </Button>
+            {abierta && <RoomCalendar room={room} />}
+          </div>
+        );
+      })}
     </div>
   );
 }
