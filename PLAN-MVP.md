@@ -671,7 +671,7 @@ Para eso necesita cuatro datos:
 |------|--------|-----------------------------|
 | **Host** | Dirección del servidor de envío | `smtp.gmail.com` |
 | **Puerto** | Puerto de conexión | `587` (con STARTTLS) o `465` (con SSL directo) |
-| **Usuario** | La dirección de correo completa | ej. `laboratorio.ueda@amigo.edu.co` |
+| **Usuario** | La dirección de correo completa | ej. `lab.analitica@amigo.edu.co` |
 | **Contraseña** | Credencial de acceso | ⚠️ **No la contraseña normal** — ver 10.2 |
 
 Los correos salidos **aparecen enviados desde ese buzón** y quedan en su carpeta "Enviados". Si alguien responde a un correo de confirmación, la respuesta llega a ese mismo buzón. Por eso conviene usar la cuenta del laboratorio y no una cuenta personal.
@@ -701,9 +701,9 @@ Google **bloquea el acceso SMTP con la contraseña normal de la cuenta** desde 2
 SMTP_HOST="smtp.gmail.com"
 SMTP_PORT="587"
 SMTP_SECURE="false"                          # false con 587 (STARTTLS); true con 465
-SMTP_USER="laboratorio.ueda@amigo.edu.co"    # la cuenta del laboratorio
+SMTP_USER="lab.analitica@amigo.edu.co"    # la cuenta del laboratorio
 SMTP_PASSWORD="abcdefghijklmnop"             # contraseña de aplicación, sin espacios
-MAIL_FROM="Laboratorio UEDA <laboratorio.ueda@amigo.edu.co>"
+MAIL_FROM="Laboratorio UEDA <lab.analitica@amigo.edu.co>"
 ```
 
 > ⚠️ **La dirección de `MAIL_FROM` debe ser la misma de `SMTP_USER`** (o un alias configurado en esa cuenta). Gmail rechaza remitentes arbitrarios; poner un `no-responder@...` que no exista hace fallar el envío.
@@ -768,9 +768,9 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"  # en Vercel: https://<proyecto>.ver
 SMTP_HOST="smtp.gmail.com"
 SMTP_PORT="587"
 SMTP_SECURE="false"
-SMTP_USER="laboratorio.ueda@amigo.edu.co"
+SMTP_USER="lab.analitica@amigo.edu.co"
 SMTP_PASSWORD=""                             # contraseña de aplicación de 16 caracteres, sin espacios
-MAIL_FROM="Laboratorio UEDA <laboratorio.ueda@amigo.edu.co>"
+MAIL_FROM="Laboratorio UEDA <lab.analitica@amigo.edu.co>"
 ```
 
 ---
@@ -796,7 +796,7 @@ MAIL_FROM="Laboratorio UEDA <laboratorio.ueda@amigo.edu.co>"
 
 | # | Asunto | Impacto | Manejo |
 |---|--------|---------|--------|
-| **P1** | **Dirección real del correo del laboratorio** desde la que saldrán las notificaciones. | Bloquea la Fase 7. | Provisional en todo el plan: `laboratorio.ueda@amigo.edu.co`. **Confirmar la dirección real y arrancar el trámite de la contraseña de aplicación en la Fase 0** — es un valor de `.env`, cambiarlo después no cuesta nada, pero el trámite sí toma tiempo. |
+| ~~P1~~ | ~~**Dirección real del correo del laboratorio**~~ | ~~Bloquea la Fase 7.~~ | **RESUELTO.** La dirección confirmada es `lab.analitica@amigo.edu.co` y está aplicada en todo el plan y en `.env.example`. Queda pendiente solo el trámite de la contraseña de aplicación (riesgo R1). |
 | **P2** | **La lista de festivos de 2026 está calculada, no verificada** contra fuente oficial. | Se aceptarían reservas un día festivo. | Verificar antes de cerrar la Fase 1 (§5.1). |
 | R1 | Google Workspace institucional puede tener deshabilitadas las contraseñas de aplicación. | El correo no sale. | Escribir a TI en la Fase 0. Respaldo: `EmailLog` visible en el panel como evidencia funcional. |
 | R2 | La lista de festivos se queda sin años. | El sistema abriría festivos de 2027 en silencio. | `console.warn` al arrancar + aviso en el panel si el año en curso no está en `HOLIDAYS_CO` (§5.1). |
