@@ -4,9 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Estado actual
 
-**Fases 0, 1 y 2 completas.** Andamiaje Next + Tailwind con la marca aplicada, `components/ui/`, `components/brand/`, [/kitchen-sink](src/app/kitchen-sink/page.tsx) (temporal, se borra en la Fase 10), schema de Prisma migrado contra Supabase, semilla con datos de demo, las capas de fecha/hora y disponibilidad, y la API pública de lectura (`GET /api/rooms`, `GET /api/availability`). `npm run build`, `npm run lint`, `npm run typecheck` y `npm run check:datetime` pasan limpios.
+**Fases 0 a 3 completas.** Andamiaje Next + Tailwind con la marca aplicada, `components/ui/`, `components/brand/`, [/kitchen-sink](src/app/kitchen-sink/page.tsx) (temporal, se borra en la Fase 10), schema de Prisma migrado contra Supabase, semilla con datos de demo, las capas de fecha/hora y disponibilidad, la API pública de lectura, y la landing (`/`) con los dos calendarios de FullCalendar. `npm run build`, `npm run lint`, `npm run typecheck` y `npm run check:datetime` pasan limpios.
 
-**Siguiente: Fase 3** (landing pública con los dos calendarios, FullCalendar).
+**Siguiente: Fase 4** (flujo de solicitud de reserva: wizard de 3 pasos + `POST /api/reservations`).
+
+## FullCalendar: el mismo truco de zona horaria, para el navegador
+
+`RoomCalendar` configura FullCalendar con `timeZone="UTC"` y le pasa cadenas ISO **sin sufijo de zona** que ya representan hora de Bogotá (`toBogotaWallClockIso()` en `lib/datetime.ts`). Así el calendario se ve igual sin importar en qué zona horaria esté el navegador de quien lo mira — la alternativa (`timeZone="local"` con instantes UTC reales) delegaría la corrección en la zona del dispositivo del visitante, exactamente el tipo de dependencia ambiental que la Fase 1 eliminó del servidor.
+
+Contrapartida: los `Date` que construye FullCalendar internamente (`datesSet`, `dayHeaderClassNames`) tienen los campos de Bogotá metidos en los *getters* UTC. `src/lib/fullcalendar.ts` (`fullCalendarDateToInstant`, `fullCalendarDayKey`) deshace el truco para recuperar el instante real antes de llamar a la API. **No usar esas funciones fuera del límite con FullCalendar** — son un adaptador de un solo sentido, no utilidades generales de fecha.
+
+Por la misma razón, el prop `now` de FullCalendar también se sobreescribe (`now={() => toBogotaWallClockIso(new Date())}`): sin eso, el indicador de hora actual usaría la hora real del sistema, desalineada 5 h de la grilla.
 
 ## Git y GitHub
 
@@ -96,7 +104,7 @@ Supabase se usa **solo como PostgreSQL alojado** — nada de su SDK, Auth ni Sto
 4. **`"postinstall": "prisma generate"`** en `package.json`; Vercel cachea `node_modules` y sin esto el build falla con errores de tipos confusos tras cambiar el schema.
 5. **Supabase free pausa el proyecto tras 7 días sin actividad.** Verificar que esté despierto el día antes de cualquier demostración.
 6. **`NEXT_PUBLIC_APP_URL` es lo que codifica el QR.** Un valor incorrecto rompe la funcionalidad principal.
-7. **Un Route Handler `GET` que no lea `request`, `cookies()` ni `headers()` se pre-renderiza en build time.** Next.js lo trata como candidato a estático y ejecuta el handler durante `next build`, no por petición — si consulta la base de datos, el build queda acoplado a que la BD esté disponible en ese momento (y en CI, a las credenciales falsas de `ci.yml`). Todo Route Handler que use Prisma sin depender de `request` necesita `export const dynamic = "force-dynamic";` explícito (ver `src/app/api/rooms/route.ts`). Los que sí leen `request.nextUrl` (como `/api/availability`) ya salen dinámicos solos, pero conviene revisar cada handler nuevo contra este caso.
+7. **Un Route Handler `GET` o un Server Component que no lea `request`, `searchParams`, `cookies()` ni `headers()` se pre-renderiza en build time.** Next.js lo trata como candidato a estático y lo ejecuta durante `next build`, no por petición — si consulta la base de datos, el build queda acoplado a que la BD esté disponible en ese momento (y en CI, a las credenciales falsas de `ci.yml`). Pasó dos veces en la Fase 3: en `/api/rooms/route.ts` y en `app/page.tsx` (Server Component que llama a Prisma directo). Ambos necesitan `export const dynamic = "force-dynamic";` explícito. Los que sí leen `request.nextUrl` (como `/api/availability`) ya salen dinámicos solos, pero conviene revisar cada página o handler nuevo que toque la base de datos contra este caso — es más fácil olvidarlo en una página que en un handler.
 8. **La lista de festivos puede cambiar por ley a mitad de año.** Verificada en la Fase 1: las 18 fechas del plan eran correctas, pero faltaba una. La **Ley 2578 de 2026** creó el festivo de la Virgen de Chiquinquirá (9 jul → lunes 13 jul en 2026). Son **19**. Al añadir 2027 a `HOLIDAYS_CO`, **no basta con calcular Pascua y aplicar la Ley Emiliani**: hay que comprobar si se creó algún festivo nuevo. `holidays.ts` ya emite `console.warn` si falta el año en curso.
 
 ## Capa de UI: convenciones ya establecidas
