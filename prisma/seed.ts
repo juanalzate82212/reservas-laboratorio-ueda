@@ -2,6 +2,7 @@ import { PrismaClient, type ReservationStatus } from "@prisma/client";
 import { addDays } from "date-fns";
 
 import { fromBogota, isOpenDay, toBogotaDayKey } from "../src/lib/datetime";
+import { generateReservationCode } from "../src/lib/reservation-code";
 
 /*
  * Datos de demostración. Se ancla a los próximos días hábiles para que la
@@ -9,16 +10,6 @@ import { fromBogota, isOpenDay, toBogotaDayKey } from "../src/lib/datetime";
  * al poco tiempo todo quedaría en el pasado y el calendario aparecería vacío.
  */
 const prisma = new PrismaClient();
-
-const ALFABETO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // sin I, O, 0, 1
-
-function generarCodigo(): string {
-  let salida = "";
-  for (let i = 0; i < 5; i += 1) {
-    salida += ALFABETO[Math.floor(Math.random() * ALFABETO.length)];
-  }
-  return `UEDA-${salida}`;
-}
 
 /** Claves de día ("2026-08-03") de los próximos `cantidad` días abiertos. */
 function proximosDiasHabiles(cantidad: number): string[] {
@@ -170,7 +161,7 @@ async function main() {
   for (const r of reservas) {
     await prisma.reservation.create({
       data: {
-        code: generarCodigo(),
+        code: generateReservationCode(),
         roomId: r.roomId,
         startsAt: fromBogota(r.dia, r.desde),
         endsAt: fromBogota(r.dia, r.hasta),

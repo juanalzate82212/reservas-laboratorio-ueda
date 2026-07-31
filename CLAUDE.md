@@ -4,9 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Estado actual
 
-**Fases 0 a 3 completas.** Andamiaje Next + Tailwind con la marca aplicada, `components/ui/`, `components/brand/`, [/kitchen-sink](src/app/kitchen-sink/page.tsx) (temporal, se borra en la Fase 10), schema de Prisma migrado contra Supabase, semilla con datos de demo, las capas de fecha/hora y disponibilidad, la API pública de lectura, y la landing (`/`) con los dos calendarios de FullCalendar. `npm run build`, `npm run lint`, `npm run typecheck` y `npm run check:datetime` pasan limpios.
+**Fases 0 a 4 completas.** Andamiaje Next + Tailwind con la marca aplicada, `components/ui/`, `components/brand/`, [/kitchen-sink](src/app/kitchen-sink/page.tsx) (temporal, se borra en la Fase 10), schema de Prisma migrado contra Supabase, semilla con datos de demo, las capas de fecha/hora y disponibilidad, la API pública de lectura, la landing (`/`) con los dos calendarios de FullCalendar, y el wizard de solicitud de reserva (`/reservar`, `POST /api/reservations`, `/reserva/[codigo]`). `npm run build`, `npm run lint`, `npm run typecheck` y `npm run check:datetime` pasan limpios.
 
-**Siguiente: Fase 4** (flujo de solicitud de reserva: wizard de 3 pasos + `POST /api/reservations`).
+**Siguiente: Fase 5** (autenticación del admin y shell de `/admin`).
+
+## Validación de reservas: qué vive en Zod y qué vive en el Route Handler
+
+`lib/validation/reservation.ts` (compartido cliente/servidor) cubre las reglas del §5 que son puras funciones de los campos —formato, dominio del correo, duración, alineación a la grilla, receso, anticipación mínima/máxima— reutilizando `lib/datetime.ts` en vez de reimplementar la aritmética. Las reglas que necesitan la base de datos —sala activa, solapamiento con otras reservas, bloqueos del admin, límite de pendientes por correo— viven en `POST /api/reservations`, dentro de la misma `prisma.$transaction` que crea el registro (así lo exige el §5: la comprobación de choque y la creación no pueden ir separadas).
+
+**Trampa evitada, no inventada:** `z.coerce.number()` sobre un campo opcional vacío. Un `<input type="number">` sin valor llega como `""`, y `Number("")` da **`0`, no `NaN`** — sin un `z.preprocess` que convierta `""` a `undefined` antes de coercionar, dejar en blanco un campo opcional como `attendees` fallaba la validación de "mayor que cero" en vez de aceptarse vacío. Se detectó con un script de verificación aislado antes de llegar al wizard real, no navegando la UI.
 
 ## FullCalendar: el mismo truco de zona horaria, para el navegador
 
