@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Estado actual
 
-**Fases 0 y 1 completas.** Andamiaje Next + Tailwind con la marca aplicada, `components/ui/`, `components/brand/`, [/kitchen-sink](src/app/kitchen-sink/page.tsx) (temporal, se borra en la Fase 10), schema de Prisma migrado contra Supabase, semilla con datos de demo, y las capas de fecha/hora y disponibilidad. `npm run build`, `npm run lint`, `npm run typecheck` y `npm run check:datetime` pasan limpios.
+**Fases 0, 1 y 2 completas.** Andamiaje Next + Tailwind con la marca aplicada, `components/ui/`, `components/brand/`, [/kitchen-sink](src/app/kitchen-sink/page.tsx) (temporal, se borra en la Fase 10), schema de Prisma migrado contra Supabase, semilla con datos de demo, las capas de fecha/hora y disponibilidad, y la API pública de lectura (`GET /api/rooms`, `GET /api/availability`). `npm run build`, `npm run lint`, `npm run typecheck` y `npm run check:datetime` pasan limpios.
 
-**Siguiente: Fase 2** (API de lectura: `GET /api/rooms` y `GET /api/availability`).
+**Siguiente: Fase 3** (landing pública con los dos calendarios, FullCalendar).
 
 ## Git y GitHub
 
@@ -96,7 +96,8 @@ Supabase se usa **solo como PostgreSQL alojado** — nada de su SDK, Auth ni Sto
 4. **`"postinstall": "prisma generate"`** en `package.json`; Vercel cachea `node_modules` y sin esto el build falla con errores de tipos confusos tras cambiar el schema.
 5. **Supabase free pausa el proyecto tras 7 días sin actividad.** Verificar que esté despierto el día antes de cualquier demostración.
 6. **`NEXT_PUBLIC_APP_URL` es lo que codifica el QR.** Un valor incorrecto rompe la funcionalidad principal.
-7. **La lista de festivos puede cambiar por ley a mitad de año.** Verificada en la Fase 1: las 18 fechas del plan eran correctas, pero faltaba una. La **Ley 2578 de 2026** creó el festivo de la Virgen de Chiquinquirá (9 jul → lunes 13 jul en 2026). Son **19**. Al añadir 2027 a `HOLIDAYS_CO`, **no basta con calcular Pascua y aplicar la Ley Emiliani**: hay que comprobar si se creó algún festivo nuevo. `holidays.ts` ya emite `console.warn` si falta el año en curso.
+7. **Un Route Handler `GET` que no lea `request`, `cookies()` ni `headers()` se pre-renderiza en build time.** Next.js lo trata como candidato a estático y ejecuta el handler durante `next build`, no por petición — si consulta la base de datos, el build queda acoplado a que la BD esté disponible en ese momento (y en CI, a las credenciales falsas de `ci.yml`). Todo Route Handler que use Prisma sin depender de `request` necesita `export const dynamic = "force-dynamic";` explícito (ver `src/app/api/rooms/route.ts`). Los que sí leen `request.nextUrl` (como `/api/availability`) ya salen dinámicos solos, pero conviene revisar cada handler nuevo contra este caso.
+8. **La lista de festivos puede cambiar por ley a mitad de año.** Verificada en la Fase 1: las 18 fechas del plan eran correctas, pero faltaba una. La **Ley 2578 de 2026** creó el festivo de la Virgen de Chiquinquirá (9 jul → lunes 13 jul en 2026). Son **19**. Al añadir 2027 a `HOLIDAYS_CO`, **no basta con calcular Pascua y aplicar la Ley Emiliani**: hay que comprobar si se creó algún festivo nuevo. `holidays.ts` ya emite `console.warn` si falta el año en curso.
 
 ## Capa de UI: convenciones ya establecidas
 
