@@ -4,11 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Estado actual
 
-**Fase 0 completa.** Existe el andamiaje Next + Tailwind con la marca aplicada, `components/ui/` y `components/brand/`, y [/kitchen-sink](src/app/kitchen-sink/page.tsx) (temporal, se borra en la Fase 10). `npm run build`, `npm run lint` y `npm run typecheck` pasan limpios.
+**Fases 0 y 1 completas.** Andamiaje Next + Tailwind con la marca aplicada, `components/ui/`, `components/brand/`, [/kitchen-sink](src/app/kitchen-sink/page.tsx) (temporal, se borra en la Fase 10), schema de Prisma migrado contra Supabase, semilla con datos de demo, y las capas de fecha/hora y disponibilidad. `npm run build`, `npm run lint`, `npm run typecheck` y `npm run check:datetime` pasan limpios.
 
-**Siguiente: Fase 1** (modelo de datos y semilla). No hay `prisma/`, ni base de datos, ni proyecto de Supabase creado todavía. Tampoco hay repositorio git inicializado.
+**Siguiente: Fase 2** (API de lectura: `GET /api/rooms` y `GET /api/availability`).
 
-**Pendiente explícito de la Fase 1:** añadir `"postinstall": "prisma generate"` a `package.json`. Se omitió a propósito en la Fase 0 porque sin `prisma/schema.prisma` el comando falla y rompe `npm install`. Debe añadirse en el mismo paso que crea el schema — es requisito de Vercel (§11.2 del plan).
+## Git y GitHub
+
+`main` es producción y solo admite PR con CI en verde; `develop` es la rama por defecto e integración; cada fase va en `feat/fase-N-*`. Los rulesets bloquean push directo, force-push y borrado en ambas. El workflow [ci.yml](.github/workflows/ci.yml) corre lint + typecheck + build y es el status check obligatorio.
+
+**Antes de cerrar una fase, correr también `npm run check:datetime`** — el CI todavía no lo incluye porque no necesita base de datos, pero es la red de seguridad de la capa horaria.
 
 ## Entorno local
 
@@ -84,13 +88,15 @@ Supabase se usa **solo como PostgreSQL alojado** — nada de su SDK, Auth ni Sto
 
 ## Trampas que ya costaron análisis
 
-1. **Dos URLs de base de datos.** `DATABASE_URL` = pooler puerto **6543** con `?pgbouncer=true&connection_limit=1` (runtime); `DIRECT_URL` = conexión directa puerto **5432** (solo migraciones). Ambas declaradas en el bloque `datasource`. Omitirlo produce *"prepared statement already exists"* o agotamiento de conexiones, y típicamente **solo después de desplegar**.
+1. **Dos URLs de base de datos.** `DATABASE_URL` = pooler puerto **6543** con `?pgbouncer=true&connection_limit=1` (runtime); `DIRECT_URL` = puerto **5432** (solo migraciones). Ambas declaradas en el bloque `datasource`. Omitirlo produce *"prepared statement already exists"* o agotamiento de conexiones, y típicamente **solo después de desplegar**.
+
+   ⚠️ **Pendiente sin resolver:** en esta máquina el puerto **6543 acepta TCP pero no completa el handshake de Postgres**, con las mismas credenciales que sí funcionan en 5432 (probado sin parámetros, con `pgbouncer=true`, con `sslmode=require` y con `connect_timeout=30`). Las migraciones y la semilla se ejecutan con la URL de 5432, que es lo correcto en local de todos modos: el pooler de transacción existe para serverless, no para un proceso único. **Hay que resolverlo antes de desplegar (Fase 9)** — en Vercel, sin el pooler de transacción, se agotan las conexiones. Primer paso: copiar la cadena *Transaction pooler* literalmente del panel de Supabase en vez de derivarla cambiándole el puerto a la de sesión.
 2. **El servidor corre en UTC, no en hora de Colombia.** Todo se almacena en UTC y se presenta en `America/Bogota`. Nunca `new Date("2026-08-01 08:00")` sin zona explícita. Un desfase de 5 h aparece en la anticipación mínima y en el horario de atención, y funciona bien en local antes de fallar en producción.
 3. **Nodemailer no corre en Edge Runtime.** Los handlers que envían correo necesitan `export const runtime = "nodejs"`.
 4. **`"postinstall": "prisma generate"`** en `package.json`; Vercel cachea `node_modules` y sin esto el build falla con errores de tipos confusos tras cambiar el schema.
 5. **Supabase free pausa el proyecto tras 7 días sin actividad.** Verificar que esté despierto el día antes de cualquier demostración.
 6. **`NEXT_PUBLIC_APP_URL` es lo que codifica el QR.** Un valor incorrecto rompe la funcionalidad principal.
-7. **Los festivos de 2026 en el plan están calculados, no verificados** contra fuente oficial (riesgo P2). Verificar antes de cerrar la Fase 1. Si el año en curso no está en `HOLIDAYS_CO`, hay que emitir `console.warn` al arrancar y avisar en el panel.
+7. **La lista de festivos puede cambiar por ley a mitad de año.** Verificada en la Fase 1: las 18 fechas del plan eran correctas, pero faltaba una. La **Ley 2578 de 2026** creó el festivo de la Virgen de Chiquinquirá (9 jul → lunes 13 jul en 2026). Son **19**. Al añadir 2027 a `HOLIDAYS_CO`, **no basta con calcular Pascua y aplicar la Ley Emiliani**: hay que comprobar si se creó algún festivo nuevo. `holidays.ts` ya emite `console.warn` si falta el año en curso.
 
 ## Capa de UI: convenciones ya establecidas
 

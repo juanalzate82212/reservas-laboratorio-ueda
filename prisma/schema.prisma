@@ -1,0 +1,95 @@
+// Modelo de datos del §4 del plan.
+//
+// Todas las fechas se guardan en UTC y se presentan en America/Bogota. El
+// servidor de Vercel corre en UTC: nunca construir un Date a partir de una
+// cadena sin zona explícita. Ver src/lib/datetime.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // pooler :6543 — runtime
+  directUrl = env("DIRECT_URL") // directa/session :5432 — migraciones
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+  CANCELLED
+}
+
+enum TimeBlockKind {
+  BLOCKED
+  WARNING
+}
+
+model Room {
+  id           String        @id @default(cuid())
+  slug         String        @unique // "sala-principal" | "sala-reuniones"
+  name         String
+  description  String?
+  capacity     Int
+  hasComputers Boolean       @default(true)
+  colorToken   String        @default("azul") // "azul" | "naranja"
+  isActive     Boolean       @default(true)
+  reservations Reservation[]
+  timeBlocks   TimeBlock[]
+  createdAt    DateTime      @default(now())
+}
+
+model Reservation {
+  id     String @id @default(cuid())
+  code   String @unique // código corto legible: "UEDA-7F3K2"
+  roomId String
+  room   Room   @relation(fields: [roomId], references: [id])
+
+  startsAt DateTime // UTC
+  endsAt   DateTime // UTC
+
+  // Datos del solicitante. Nunca se exponen por GET /api/availability.
+  requesterName  String
+  requesterRole  String // cargo
+  requesterDocId String // número de documento
+  requesterEmail String // debe terminar en @amigo.edu.co
+  purpose        String? // motivo (opcional)
+  attendees      Int?
+
+  status    ReservationStatus @default(PENDING)
+  adminNote String? // razón de rechazo/cancelación
+  decidedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([roomId, startsAt])
+  @@index([status])
+}
+
+model TimeBlock {
+  id     String  @id @default(cuid())
+  roomId String? // null = aplica a TODAS las salas
+  room   Room?   @relation(fields: [roomId], references: [id])
+
+  startsAt DateTime // UTC
+  endsAt   DateTime // UTC
+  kind     TimeBlockKind
+  reason   String // se muestra al usuario
+
+  createdAt DateTime @default(now())
+
+  @@index([roomId, startsAt])
+}
+
+model EmailLog {
+  id            String   @id @default(cuid())
+  reservationId String?
+  to            String
+  subject       String
+  body          String   @db.Text
+  status        String // "SENT" | "FAILED" | "LOGGED"
+  error         String?
+  sentAt        DateTime @default(now())
+}
