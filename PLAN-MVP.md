@@ -379,6 +379,7 @@ export const HOLIDAYS_CO: Record<number, string[]> = {
     "2026-06-08", // Corpus Christi (trasladado)
     "2026-06-15", // Sagrado Corazón (trasladado)
     "2026-06-29", // San Pedro y San Pablo
+    "2026-07-13", // Virgen de Chiquinquirá (9 jul → lunes) — Ley 2578 de 2026
     "2026-07-20", // Independencia
     "2026-08-07", // Batalla de Boyacá
     "2026-08-17", // Asunción (trasladado)
@@ -797,7 +798,7 @@ MAIL_FROM="Laboratorio UEDA <lab.analitica@amigo.edu.co>"
 | # | Asunto | Impacto | Manejo |
 |---|--------|---------|--------|
 | ~~P1~~ | ~~**Dirección real del correo del laboratorio**~~ | ~~Bloquea la Fase 7.~~ | **RESUELTO.** La dirección confirmada es `lab.analitica@amigo.edu.co` y está aplicada en todo el plan y en `.env.example`. Queda pendiente solo el trámite de la contraseña de aplicación (riesgo R1). |
-| **P2** | **La lista de festivos de 2026 está calculada, no verificada** contra fuente oficial. | Se aceptarían reservas un día festivo. | Verificar antes de cerrar la Fase 1 (§5.1). |
+| ~~P2~~ | ~~**La lista de festivos de 2026 está calculada, no verificada**~~ | ~~Se aceptarían reservas un día festivo.~~ | **RESUELTO en la Fase 1, y la sospecha estaba justificada: faltaba un festivo.** Se recalculó la Pascua (5 abr 2026) y se revisó traslado por traslado; las 18 fechas originales son correctas, pero la **Ley 2578 de 2026** (sancionada el 1 de junio de 2026) creó el Día de Nuestra Señora del Rosario de Chiquinquirá: 9 de julio, trasladado al **lunes 13 de julio de 2026**. Son **19 festivos**, no 18. Lección para 2027: el calendario puede cambiar por ley dentro del mismo año, así que la lista se revisa al añadir cada año nuevo, no una sola vez. |
 | R1 | Google Workspace institucional puede tener deshabilitadas las contraseñas de aplicación. | El correo no sale. | Escribir a TI en la Fase 0. Respaldo: `EmailLog` visible en el panel como evidencia funcional. |
 | R2 | La lista de festivos se queda sin años. | El sistema abriría festivos de 2027 en silencio. | `console.warn` al arrancar + aviso en el panel si el año en curso no está en `HOLIDAYS_CO` (§5.1). |
 | R3 | No hay logo oficial en SVG. | Incumplimiento de marca. | Solicitarlo a la Oficina de Comunicaciones. Placeholder tipográfico mientras tanto; nunca recolorear ni reescalar un PNG. |
