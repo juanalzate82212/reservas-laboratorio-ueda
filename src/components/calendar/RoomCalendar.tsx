@@ -68,6 +68,17 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
   const [festivos, setFestivos] = useState<Set<string>>(new Set());
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Calculado una sola vez, antes del primer render: ver el comentario del
+  // useEffect de más abajo sobre por qué esto no puede decidirse después.
+  // `window` sin guard es seguro SOLO porque este componente se monta
+  // exclusivamente a través de CalendarGrid.tsx, con next/dynamic
+  // ssr:false — nunca se renderiza en el servidor. No importar
+  // RoomCalendar directamente en un Server Component.
+  const [vistaInicial] = useState<"timeGridWeek" | "timeGridDay">(() =>
+    window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches
+      ? "timeGridDay"
+      : "timeGridWeek",
+  );
 
   const cargarDisponibilidad = useCallback(
     async (from: Date, to: Date) => {
@@ -203,7 +214,13 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
     if (mensaje) toast.info(mensaje);
   }, []);
 
-  // Vista por defecto según el ancho de pantalla, y al cruzar el punto de corte.
+  // Solo reacciona a cambios de ancho DESPUÉS de montado (girar la pantalla,
+  // achicar la ventana). La vista inicial se decide aparte, antes del primer
+  // render: si aquí también se decidiera la inicial con un changeView() en
+  // useEffect, ese cambio de vista dispara datesSet igual que si el usuario
+  // navegara, y RoomCalendar pedía la disponibilidad DOS veces en cada carga
+  // en móvil — una para la semana por defecto que nunca se llega a mostrar,
+  // y otra para el día correcto.
   useEffect(() => {
     const mq = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`);
     const aplicarVista = () => {
@@ -212,7 +229,6 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
       const vistaDeseada = mq.matches ? "timeGridDay" : "timeGridWeek";
       if (api.view.type !== vistaDeseada) api.changeView(vistaDeseada);
     };
-    aplicarVista();
     mq.addEventListener("change", aplicarVista);
     return () => mq.removeEventListener("change", aplicarVista);
   }, []);
@@ -241,7 +257,7 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
         <FullCalendar
           ref={calendarRef}
           plugins={[timeGridPlugin, interactionPlugin]}
-          initialView="timeGridWeek"
+          initialView={vistaInicial}
           headerToolbar={{ left: "prev,next", center: "title", right: "today" }}
           locale={esLocale}
           timeZone="UTC"
