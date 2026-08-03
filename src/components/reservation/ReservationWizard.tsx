@@ -82,13 +82,17 @@ export function ReservationWizard({
       requesterRole: "",
       requesterDocId: "",
       requesterEmail: "",
-      purpose: "",
+      academicProgram: undefined,
+      activityType: undefined,
+      activityTypeOther: "",
       attendees: undefined,
+      responsibilityAccepted: false,
     },
   });
 
   const {
     register,
+    control,
     watch,
     setValue,
     trigger,
@@ -117,8 +121,11 @@ export function ReservationWizard({
         "requesterRole",
         "requesterDocId",
         "requesterEmail",
-        "purpose",
+        "academicProgram",
+        "activityType",
+        "activityTypeOther",
         "attendees",
+        "responsibilityAccepted",
       ]);
       if (ok) setPaso(2);
     }
@@ -210,7 +217,9 @@ export function ReservationWizard({
           </>
         )}
 
-        {paso === 1 && <StepRequester register={register} errors={errors} />}
+        {paso === 1 && (
+          <StepRequester register={register} control={control} errors={errors} />
+        )}
 
         {paso === 2 && (
           <StepReview
@@ -221,7 +230,9 @@ export function ReservationWizard({
             requesterRole={watch("requesterRole")}
             requesterDocId={watch("requesterDocId")}
             requesterEmail={watch("requesterEmail")}
-            purpose={watch("purpose")}
+            academicProgram={watch("academicProgram")}
+            activityType={watch("activityType")}
+            activityTypeOther={watch("activityTypeOther")}
             attendees={watch("attendees")}
             warning={warning}
           />

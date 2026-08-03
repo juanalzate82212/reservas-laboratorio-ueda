@@ -2,6 +2,10 @@ import { AlertTriangle } from "lucide-react";
 
 import { formatRange } from "@/lib/datetime";
 import type { ActiveRoom } from "@/lib/rooms";
+import {
+  labelForAcademicProgram,
+  labelForActivityType,
+} from "@/config/reservationOptions";
 
 export interface StepReviewProps {
   room: ActiveRoom | null;
@@ -11,7 +15,9 @@ export interface StepReviewProps {
   requesterRole: string;
   requesterDocId: string;
   requesterEmail: string;
-  purpose?: string;
+  academicProgram?: string;
+  activityType?: string;
+  activityTypeOther?: string;
   attendees?: number;
   warning: string | null;
 }
@@ -33,10 +39,19 @@ export function StepReview({
   requesterRole,
   requesterDocId,
   requesterEmail,
-  purpose,
+  academicProgram,
+  activityType,
+  activityTypeOther,
   attendees,
   warning,
 }: StepReviewProps) {
+  const actividad =
+    activityType === "OTRO" && activityTypeOther
+      ? activityTypeOther
+      : activityType
+        ? labelForActivityType(activityType)
+        : "—";
+
   return (
     <div className="flex flex-col gap-5">
       <dl className="grid gap-4 sm:grid-cols-2">
@@ -53,8 +68,12 @@ export function StepReview({
         <Dato etiqueta="Cargo" valor={requesterRole} />
         <Dato etiqueta="Documento" valor={requesterDocId} />
         <Dato etiqueta="Correo" valor={requesterEmail} />
-        {attendees && <Dato etiqueta="Asistentes" valor={String(attendees)} />}
-        {purpose && <Dato etiqueta="Motivo" valor={purpose} />}
+        <Dato
+          etiqueta="Programa académico"
+          valor={academicProgram ? labelForAcademicProgram(academicProgram) : "—"}
+        />
+        <Dato etiqueta="Tipo de actividad" valor={actividad} />
+        <Dato etiqueta="Asistentes estimados" valor={attendees ? String(attendees) : "—"} />
       </dl>
 
       {warning && (

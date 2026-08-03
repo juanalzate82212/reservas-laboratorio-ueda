@@ -41,8 +41,11 @@ export async function POST(request: NextRequest) {
     requesterRole,
     requesterDocId,
     requesterEmail,
-    purpose,
+    academicProgram,
+    activityType,
+    activityTypeOther,
     attendees,
+    responsibilityAccepted,
   } = parsed.data;
   const start = new Date(startsAt);
   const end = new Date(endsAt);
@@ -119,8 +122,11 @@ export async function POST(request: NextRequest) {
               requesterRole,
               requesterDocId,
               requesterEmail,
-              purpose: purpose || null,
+              academicProgram,
+              activityType,
+              activityTypeOther: activityType === "OTRO" ? activityTypeOther || null : null,
               attendees,
+              responsibilityAccepted,
             },
           });
         } catch (error) {

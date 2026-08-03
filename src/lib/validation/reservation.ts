@@ -1,6 +1,12 @@
 import { z } from "zod";
 
 import { BOOKING_CONFIG } from "@/config/booking";
+import {
+  ACADEMIC_PROGRAMS,
+  ACTIVITY_TYPES,
+  type AcademicProgramValue,
+  type ActivityTypeValue,
+} from "@/config/reservationOptions";
 import { fitsInSingleRange, isAlignedToSlot, isWithinBookingWindow } from "@/lib/datetime";
 
 /*
@@ -20,6 +26,17 @@ const nombreTieneNombreYApellido = (valor: string) =>
   valor.trim().split(/\s+/).filter(Boolean).length >= 2;
 
 const DURACIONES_PERMITIDAS: readonly number[] = BOOKING_CONFIG.allowedDurations;
+
+// z.enum exige una tupla no vacía de literales — la derivamos de la misma
+// lista que alimenta el <select>, así los dos nunca se desincronizan.
+const PROGRAMAS_ACADEMICOS = ACADEMIC_PROGRAMS.map((p) => p.value) as [
+  AcademicProgramValue,
+  ...AcademicProgramValue[],
+];
+const TIPOS_ACTIVIDAD = ACTIVITY_TYPES.map((t) => t.value) as [
+  ActivityTypeValue,
+  ...ActivityTypeValue[],
+];
 
 export const createReservationSchema = z
   .object({
@@ -56,26 +73,50 @@ export const createReservationSchema = z
         (correo) => correo.endsWith(`@${BOOKING_CONFIG.emailDomain}`),
         `Usa tu correo institucional (@${BOOKING_CONFIG.emailDomain}) para solicitar una reserva.`,
       ),
-    purpose: z
+    academicProgram: z.enum(PROGRAMAS_ACADEMICOS, {
+      required_error: "Selecciona tu programa académico.",
+      invalid_type_error: "Selecciona tu programa académico.",
+    }),
+    activityType: z.enum(TIPOS_ACTIVIDAD, {
+      required_error: "Selecciona el tipo de actividad.",
+      invalid_type_error: "Selecciona el tipo de actividad.",
+    }),
+    activityTypeOther: z
       .string()
       .trim()
-      .max(500, "El motivo es demasiado largo.")
+      .max(200, "La descripción es demasiado larga.")
       .optional()
       .or(z.literal("")),
     // preprocess: un <input type="number"> vacío llega como "", y
-    // Number("") es 0 (no NaN) — sin este paso, dejar el campo opcional en
-    // blanco fallaría la validación de "positive" en vez de aceptarse vacío.
+    // Number("") es 0 (no NaN) — sin este paso, un campo vacío pasaría la
+    // coerción como 0 en vez de fallar la validación de obligatoriedad.
     attendees: z.preprocess(
       (valor) => (valor === "" || valor === null ? undefined : valor),
       z.coerce
-        .number({ invalid_type_error: "El número de asistentes debe ser un número." })
+        .number({
+          invalid_type_error: "Indica el número estimado de asistentes.",
+        })
         .int("El número de asistentes debe ser un número entero.")
         .positive("El número de asistentes debe ser mayor que cero.")
-        .max(200, "El número de asistentes parece demasiado alto.")
-        .optional(),
+        .max(200, "El número de asistentes parece demasiado alto."),
     ),
+    responsibilityAccepted: z
+      .boolean({
+        required_error: "Debes aceptar la responsabilidad sobre el uso del espacio.",
+      })
+      .refine((valor) => valor === true, {
+        message: "Debes aceptar la responsabilidad sobre el uso del espacio para continuar.",
+      }),
   })
   .superRefine((data, ctx) => {
+    if (data.activityType === "OTRO" && !data.activityTypeOther?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["activityTypeOther"],
+        message: "Describe brevemente la actividad.",
+      });
+    }
+
     const start = new Date(data.startsAt);
     const end = new Date(data.endsAt);
 

@@ -26,6 +26,26 @@ enum TimeBlockKind {
   WARNING
 }
 
+// Los `value` de src/config/reservationOptions.ts deben coincidir
+// exactamente con estos nombres.
+enum AcademicProgram {
+  INGENIERIA_SISTEMAS
+  INGENIERIA_CIVIL
+  ARQUITECTURA
+  TECNOLOGIA_DESARROLLO_SOFTWARE
+  ESPECIALIZACION_BIG_DATA_BI
+  INGENIERIA_SISTEMAS_APARTADO
+}
+
+enum ActivityType {
+  CLASE_PRACTICA
+  TALLER
+  EVALUACION
+  PROYECTO_AULA
+  SEMILLERO_INVESTIGACION
+  OTRO
+}
+
 model Room {
   id           String        @id @default(cuid())
   slug         String        @unique // "sala-principal" | "sala-reuniones"
@@ -54,8 +74,12 @@ model Reservation {
   requesterRole  String // cargo
   requesterDocId String // número de documento
   requesterEmail String // debe terminar en @amigo.edu.co
-  purpose        String? // motivo (opcional)
-  attendees      Int?
+
+  academicProgram        AcademicProgram
+  activityType           ActivityType
+  activityTypeOther      String? // solo cuando activityType = OTRO
+  attendees              Int // estimado, obligatorio
+  responsibilityAccepted Boolean         @default(false) // aceptación del cuadro de responsabilidad
 
   status    ReservationStatus @default(PENDING)
   adminNote String? // razón de rechazo/cancelación
