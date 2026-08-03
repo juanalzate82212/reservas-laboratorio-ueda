@@ -4,9 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Estado actual
 
-**Fases 0 a 4 completas**, más una ronda de ajustes post-Fase-3/4 pedida por el usuario tras revisar el resultado en el navegador (ver nota en el §9 del plan, Fases 3 y 4). Andamiaje Next + Tailwind con la marca aplicada, `components/ui/`, `components/brand/`, [/kitchen-sink](src/app/kitchen-sink/page.tsx) (temporal, se borra en la Fase 10), schema de Prisma migrado contra Supabase, semilla con datos de demo, las capas de fecha/hora y disponibilidad, la API pública de lectura, la landing (`/`) con los dos calendarios de FullCalendar (ahora plegables y clicables), y el wizard de solicitud de reserva (`/reservar`, `POST /api/reservations`, `/reserva/[codigo]`, con soporte para llegar prellenado desde un clic en el calendario). `npm run build`, `npm run lint`, `npm run typecheck` y `npm run check:datetime` pasan limpios.
+**Fases 0 a 5 completas**, más una ronda de ajustes post-Fase-3/4 pedida por el usuario tras revisar el resultado en el navegador (ver nota en el §9 del plan, Fases 3 y 4). Andamiaje Next + Tailwind con la marca aplicada, `components/ui/`, `components/brand/`, [/kitchen-sink](src/app/kitchen-sink/page.tsx) (temporal, se borra en la Fase 10), schema de Prisma migrado contra Supabase, semilla con datos de demo, las capas de fecha/hora y disponibilidad, la API pública de lectura, la landing (`/`) con los dos calendarios de FullCalendar (plegables y clicables), el wizard de solicitud de reserva (`/reservar`, `POST /api/reservations`, `/reserva/[codigo]`, con soporte para llegar prellenado desde un clic en el calendario), y la autenticación del admin (`/admin/login`, `middleware.ts`, shell de `/admin` con nav y logout). `npm run build`, `npm run lint`, `npm run typecheck` y `npm run check:datetime` pasan limpios.
 
-**Siguiente: Fase 5** (autenticación del admin y shell de `/admin`).
+**Siguiente: Fase 6** (bandeja de solicitudes: `app/admin/page.tsx` real, `GET/PATCH /api/admin/reservations`).
+
+## Sesión de admin: dos runtimes, un solo archivo `lib/auth.ts`
+
+`middleware.ts` corre en **Edge** y solo puede importar `signAdminToken`/`verifyAdminToken`/`ADMIN_SESSION_COOKIE` de `lib/auth.ts` — nunca `getAdminSession()`, que depende de `next/headers` (Node) para leer la cookie en Route Handlers. Para que ambos convivan en el mismo archivo sin arriesgar que el bundler de Edge se lleve por delante un import de Node solo por estar en el mismo módulo, `getAdminSession()` importa `next/headers` de forma **dinámica** (`await import("next/headers")`) dentro de su propio cuerpo — así no puede quedar atrapado en el grafo estático que arma el bundle de `middleware.ts`, sea cual sea el comportamiento real de tree-shaking. Verificado con `npm run build`: el bundle de Middleware compila limpio (35.5 kB).
+
+**El middleware no es la única defensa (regla explícita del plan):** cada handler de `/api/admin/**` debe llamar a `getAdminSession()` por su cuenta, empezando en la Fase 6. `middleware.ts` solo protege páginas.
 
 ## El calendario es clicable: AVISO va de fondo, no en primer plano
 
