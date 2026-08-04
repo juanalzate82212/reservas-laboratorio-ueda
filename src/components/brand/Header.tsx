@@ -7,7 +7,9 @@ import { cn } from "@/lib/utils";
 /*
  * El logo vive en la cabecera o en el pie, nunca flotando en el contenido
  * (§4.3). Dos tratamientos válidos: fondo blanco con logo en positivo, o banda
- * azul con logo en blanco.
+ * azul con logo en blanco. Por defecto "azul": pedido explícito del usuario
+ * para que el navbar público tenga el mismo estilo que el del admin (banda
+ * azul plena), que siempre usa ese tratamiento.
  */
 export interface HeaderProps {
   variante?: "blanco" | "azul";
@@ -17,7 +19,7 @@ export interface HeaderProps {
 }
 
 export function Header({
-  variante = "blanco",
+  variante = "azul",
   children,
   className,
 }: HeaderProps) {
@@ -36,7 +38,7 @@ export function Header({
         <Link
           href="/"
           className="rounded"
-          aria-label="Ir al inicio de Reservas Laboratorio de Estrategia del Dato y Analítica"
+          aria-label="Ir al inicio de Reservas Laboratorio de Analítica de Datos e Inteligencia Artificial"
         >
           <Logo
             variante={enAzul ? "blanco" : "positivo"}

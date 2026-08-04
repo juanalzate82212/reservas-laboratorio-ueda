@@ -69,6 +69,13 @@ function siguienteDia(dayKey: string): string {
 export function RoomCalendar({ room }: { room: ActiveRoom }) {
   const router = useRouter();
   const calendarRef = useRef<FullCalendar>(null);
+  // FullCalendar puede disparar datesSet más de una vez para el mismo rango
+  // (recalculo de vista, cambio de ancho, etc.), lanzando pedidos de
+  // disponibilidad solapados. Sin esto, un pedido viejo que resuelve DESPUÉS
+  // de uno nuevo podía dejar "cargando" pegado en true para siempre aunque
+  // los datos ya hubieran llegado — bug real reportado por el usuario. Solo
+  // el pedido más reciente puede tocar el estado; uno viejo se aborta.
+  const solicitudActualRef = useRef<AbortController | null>(null);
   const [events, setEvents] = useState<EventInput[]>([]);
   const [reservas, setReservas] = useState<ReservationLike[]>([]);
   const [bloqueos, setBloqueos] = useState<TimeBlockLike[]>([]);
@@ -89,6 +96,10 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
 
   const cargarDisponibilidad = useCallback(
     async (from: Date, to: Date) => {
+      solicitudActualRef.current?.abort();
+      const controller = new AbortController();
+      solicitudActualRef.current = controller;
+
       setCargando(true);
       setError(null);
       try {
@@ -97,7 +108,9 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
           from: from.toISOString(),
           to: to.toISOString(),
         });
-        const res = await fetch(`/api/availability?${params.toString()}`);
+        const res = await fetch(`/api/availability?${params.toString()}`, {
+          signal: controller.signal,
+        });
         if (!res.ok) {
           throw new Error("No se pudo cargar la disponibilidad.");
         }
@@ -172,16 +185,27 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
           ...eventosFestivos,
         ]);
         setFestivos(new Set(diasFestivos.map((d) => d.date)));
-      } catch {
+      } catch (err) {
+        // AbortError = una petición más nueva ya está en curso: esta ya no
+        // importa, y no debe pisar el estado (error o "cargando") de la que
+        // sí sigue viva.
+        if (err instanceof DOMException && err.name === "AbortError") return;
         setError(
           "No se pudo cargar la disponibilidad. Intenta de nuevo en un momento.",
         );
       } finally {
-        setCargando(false);
+        // Solo la petición todavía vigente puede apagar el spinner — una
+        // vieja que resuelve tarde (o que se abortó) no puede hacerlo,
+        // aunque su `finally` se ejecute igual.
+        if (solicitudActualRef.current === controller) setCargando(false);
       }
     },
     [room.id],
   );
+
+  useEffect(() => {
+    return () => solicitudActualRef.current?.abort();
+  }, []);
 
   const handleDatesSet = useCallback(
     (arg: DatesSetArg) => {

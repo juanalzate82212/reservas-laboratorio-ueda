@@ -740,7 +740,7 @@ SMTP_PORT="587"
 SMTP_SECURE="false"                          # false con 587 (STARTTLS); true con 465
 SMTP_USER="lab.analitica@amigo.edu.co"    # la cuenta del laboratorio
 SMTP_PASSWORD="abcdefghijklmnop"             # contraseña de aplicación, sin espacios
-MAIL_FROM="Laboratorio UEDA <lab.analitica@amigo.edu.co>"
+MAIL_FROM="Laboratorio de Analítica de Datos e Inteligencia Artificial <lab.analitica@amigo.edu.co>"
 ```
 
 > ⚠️ **La dirección de `MAIL_FROM` debe ser la misma de `SMTP_USER`** (o un alias configurado en esa cuenta). Gmail rechaza remitentes arbitrarios; poner un `no-responder@...` que no exista hace fallar el envío.
@@ -807,7 +807,7 @@ SMTP_PORT="587"
 SMTP_SECURE="false"
 SMTP_USER="lab.analitica@amigo.edu.co"
 SMTP_PASSWORD=""                             # contraseña de aplicación de 16 caracteres, sin espacios
-MAIL_FROM="Laboratorio UEDA <lab.analitica@amigo.edu.co>"
+MAIL_FROM="Laboratorio de Analítica de Datos e Inteligencia Artificial <lab.analitica@amigo.edu.co>"
 ```
 
 ---

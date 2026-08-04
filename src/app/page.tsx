@@ -35,7 +35,7 @@ export default async function Home() {
           />
           <div className="relative flex max-w-2xl flex-col gap-3">
             <p className="text-caption font-medium uppercase tracking-widest text-primary">
-              Laboratorio de Estrategia del Dato y Analítica
+              Laboratorio de Analítica de Datos e Inteligencia Artificial
             </p>
             <h1 className="font-display text-h1 font-semibold text-texto">
               Consulta la disponibilidad y solicita tu reserva
