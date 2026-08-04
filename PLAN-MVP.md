@@ -478,7 +478,7 @@ Formato de error uniforme:
 | `POST` | `/api/admin/login` | `{ password }` → setea cookie. |
 | `POST` | `/api/admin/logout` | Borra cookie. |
 | `GET` | `/api/admin/reservations?status=&roomId=` | Bandeja con datos del solicitante. |
-| `PATCH` | `/api/admin/reservations/[id]` | `{ action: "CONFIRM" \| "REJECT" \| "CANCEL", adminNote? }`. Cambia estado **y dispara el correo**. `REJECT` y `CANCEL` exigen `adminNote`. |
+| `PATCH` | `/api/admin/reservations/[id]` | `{ action: "CONFIRM" \| "REJECT" \| "CANCEL" }`. Cambia estado **y dispara el correo** (a partir de la Fase 7). ~~`REJECT` y `CANCEL` exigen `adminNote`~~ — ver revisión post-Fase-4/pre-Fase-6 más abajo. |
 | `GET` | `/api/admin/time-blocks` | Lista de franjas. |
 | `POST` | `/api/admin/time-blocks` | Crea una franja. Si es `BLOCKED` y solapa reservas existentes, responde `409` con la lista de conflictos. |
 | `DELETE` | `/api/admin/time-blocks/[id]` | Elimina la franja. |
@@ -490,6 +490,8 @@ CONFIRMED → CANCELLED
 REJECTED  → (final)
 CANCELLED → (final)
 ```
+
+> **Revisión pre-Fase 6:** el plan original exigía `adminNote` (motivo) al rechazar o cancelar. El usuario pidió explícitamente lo contrario antes de construir la Fase 6: esas acciones solo piden confirmación en la UI ("¿Estás seguro de...?"), sin capturar un motivo. `adminNote` sigue existiendo en el modelo (nullable) — la Fase 6 no lo escribe nunca, pero queda disponible por si una fase futura decide retomar la captura de motivo. Consecuencia para la Fase 7: el correo de rechazo no podrá incluir una razón específica, porque no se recoge.
 
 ---
 
@@ -630,12 +632,12 @@ Wizard de 3 pasos + confirmación, en página `/reservar`.
 ### Fase 6 — Bandeja de solicitudes
 1. `app/admin/page.tsx`: lista de reservas con filtros por estado y sala, ordenadas por fecha de inicio. Tarjetas en móvil, tabla en escritorio.
 2. Detalle expandible con todos los datos del solicitante.
-3. Acciones: **Confirmar** (con confirmación), **Rechazar** y **Cancelar** (ambas abren un diálogo que exige motivo).
+3. Acciones: **Confirmar**, **Rechazar** y **Cancelar**, cada una con un diálogo de confirmación simple ("¿Estás seguro de...?") — sin motivo, ver revisión pre-Fase 6 en el §6.
 4. `PATCH /api/admin/reservations/[id]` validando las transiciones permitidas.
 5. Toasts + revalidación de la lista tras cada acción.
 6. Contador de pendientes visible en la navegación.
 
-**Aceptación:** confirmar una solicitud la mueve a `CONFIRMED` y la pinta como reservada en el calendario público. Rechazar sin motivo es imposible. Confirmar una ya rechazada devuelve `409`.
+**Aceptación:** confirmar una solicitud la mueve a `CONFIRMED` y la pinta como reservada en el calendario público. Confirmar una ya rechazada devuelve `409`.
 
 ---
 

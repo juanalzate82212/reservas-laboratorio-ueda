@@ -4,24 +4,11 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatRange } from "@/lib/datetime";
 import { getPublicReservationByCode } from "@/lib/reservations";
+import { RESERVATION_STATUS_LABEL, RESERVATION_STATUS_TONE } from "@/lib/reservationStatus";
 
 // Ver app/page.tsx: sin esto, Next.js pre-renderiza en build time y ejecuta
 // la consulta a Prisma durante `next build`, no por petición.
 export const dynamic = "force-dynamic";
-
-const TONO_POR_ESTADO = {
-  PENDING: "revision",
-  CONFIRMED: "exito",
-  REJECTED: "error",
-  CANCELLED: "neutral",
-} as const;
-
-const ETIQUETA_POR_ESTADO = {
-  PENDING: "En revisión",
-  CONFIRMED: "Confirmada",
-  REJECTED: "Rechazada",
-  CANCELLED: "Cancelada",
-} as const;
 
 export default async function ReservaPage({
   params,
@@ -41,8 +28,8 @@ export default async function ReservaPage({
               <h1 className="font-display text-h2 font-semibold text-texto">
                 {reservation.code}
               </h1>
-              <Badge tono={TONO_POR_ESTADO[reservation.status]}>
-                {ETIQUETA_POR_ESTADO[reservation.status]}
+              <Badge tono={RESERVATION_STATUS_TONE[reservation.status]}>
+                {RESERVATION_STATUS_LABEL[reservation.status]}
               </Badge>
             </div>
 
