@@ -14,7 +14,7 @@ El laboratorio UEDA de la Universidad Católica Luis Amigó necesita gestionar l
 
 | # | Funcionalidad |
 |---|---------------|
-| F1 | Landing pública accesible por QR con dos calendarios de disponibilidad (Sala de Reuniones y Sala Principal) |
+| F1 | Landing pública accesible por QR con ~~dos calendarios de disponibilidad (Sala de Reuniones y Sala Principal)~~ **un calendario de disponibilidad (Sala Principal) — decisión de producto tras la Fase 8: se retiró Sala de Reuniones, ver §13 y `CLAUDE.md`** |
 | F2 | Flujo de solicitud de reserva: sala → día → hora → duración |
 | F3 | Formulario de datos del solicitante: nombre, cargo, número de documento, correo institucional |
 | F4 | Validación de dominio `@amigo.edu.co` y de todos los campos obligatorios |
@@ -573,13 +573,15 @@ Diez fases. **Cada una termina en un estado ejecutable y verificable.** No empez
    | Sala | `slug` | Aforo | Equipos de cómputo | `colorToken` |
    |------|--------|-------|--------------------|--------------|
    | Sala Principal | `sala-principal` | 20 | Sí | `azul` |
-   | Sala de Reuniones | `sala-reuniones` | 7 | No | `naranja` |
+   | ~~Sala de Reuniones~~ | ~~`sala-reuniones`~~ | ~~7~~ | ~~No~~ | ~~`naranja`~~ |
+
+   > **Actualización tras la Fase 8:** Sala de Reuniones se retiró por decisión de producto (§13). El modelo `Room` sigue siendo genérico — no se tocó el schema —, pero `prisma/seed.ts` ya no la crea y borró la fila existente; las dos reservas de demo que tenía se reasignaron a Sala Principal. Ver `CLAUDE.md`.
 
 4. `config/booking.ts` con `BOOKING_CONFIG` del §5 y `config/holidays.ts` con `HOLIDAYS_CO` del §5.1.
 5. `lib/datetime.ts`: `toBogota()`, `fromBogota()`, `generateSlots(date, room)`, `getOpeningRangesFor(date)`, `isHoliday(date)`, `fitsInSingleRange(start, end)`, `formatRange()`.
 6. `lib/availability.ts`: `overlaps(a, b)`, `getSlotState(slot, reservations, blocks)`, `findConflicts()`.
 
-**Aceptación:** `npx prisma studio` muestra las 2 salas con sus aforos y los datos de demo. Existe `scripts/check-datetime.ts` que imprime y verifica los casos límite: 08:00, 12:00, 13:00, 17:00, una reserva que intenta cruzar el receso, un sábado, un festivo trasladado (ej. 2026-01-12), y un cálculo de anticipación mínima corriendo con `TZ=UTC` (simulando Vercel).
+**Aceptación:** `npx prisma studio` muestra las 2 salas con sus aforos y los datos de demo. Existe `scripts/check-datetime.ts` que imprime y verifica los casos límite: 08:00, 12:00, 13:00, 17:00, una reserva que intenta cruzar el receso, un sábado, un festivo trasladado (ej. 2026-01-12), y un cálculo de anticipación mínima corriendo con `TZ=UTC` (simulando Vercel). *(Estado tras la Fase 8: `prisma studio` muestra 1 sala activa — ver actualización arriba.)*
 
 ---
 
@@ -616,6 +618,8 @@ Wizard de 3 pasos + confirmación, en página `/reservar`.
 **Aceptación:** una reserva válida aparece como `PENDING` en Prisma Studio y como "En revisión" en el calendario. Un correo `@gmail.com` se rechaza con el mensaje del §5, regla 2. Una franja bloqueada no es seleccionable. Una reserva 11:00–14:00 se rechaza por cruzar el receso. Un festivo y un fin de semana no ofrecen ninguna franja. Enviar dos veces la misma franja falla la segunda vez.
 
 > **Revisión post-Fase 3/4:** `/reservar` acepta `?roomId=&startsAt=` para llegar con la sala y la hora ya elegidas (validado contra las salas reales antes de confiar en la URL; si no cuadra, el wizard arranca vacío sin romper nada). El Paso 1 sigue existiendo — sala, día y franja se ven pre-seleccionados y editables —, pero con esos dos parámetros el selector de duración queda visible de inmediato, sin repetir la elección de horario que ya se hizo en el calendario.
+>
+> **Actualización tras la Fase 8:** con una sola sala reservable (ver §13), el Paso 1 ya no tiene selector de sala — solo día, hora y duración —, y el enlace desde el calendario quedó en `?startsAt=` sin `roomId` (redundante cuando solo hay una sala). Ver `CLAUDE.md`.
 
 ---
 
@@ -818,7 +822,7 @@ MAIL_FROM="Laboratorio de Analítica de Datos e Inteligencia Artificial <lab.ana
 |------|----------|
 | Horario de atención | **8:00–12:00 y 13:00–17:00**, de lunes a viernes. Receso de 12:00 a 13:00 no reservable. Una reserva no puede cruzarlo. |
 | Días cerrados | **Sábados, domingos y festivos colombianos.** Los festivos viven en `config/holidays.ts` (§5.1); los cierres excepcionales los crea el admin como `TimeBlock`. |
-| Salas | **Sala Principal**: aforo 20, con equipos de cómputo. **Sala de Reuniones**: aforo 7, sin equipos. |
+| Salas | **Sala Principal**: aforo 20, con equipos de cómputo. ~~**Sala de Reuniones**: aforo 7, sin equipos.~~ **Retirada tras la Fase 8** (decisión de producto: solo se reserva Sala Principal). El modelo `Room` se mantuvo genérico por si se reactiva una segunda sala; el wizard y la landing ya no muestran selector de sala. Ver `CLAUDE.md`. |
 | Duración de reservas | De **30 minutos a 4 horas**, en bloques de 30 min. |
 | Correo institucional | **Google Workspace** → SMTP de Gmail con contraseña de aplicación (§10). |
 | Acuse de recibo | **No se envía.** Solo hay correo al confirmar, rechazar o cancelar. La pantalla de éxito con el código cumple esa función. |

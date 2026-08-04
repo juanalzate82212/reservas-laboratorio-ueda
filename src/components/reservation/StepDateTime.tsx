@@ -5,6 +5,8 @@ import { AlertTriangle, Ban, CalendarCheck, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Field } from "@/components/ui/Field";
+import { Input } from "@/components/ui/Input";
 import { BOOKING_CONFIG } from "@/config/booking";
 import {
   findConflicts,
@@ -38,7 +40,10 @@ type RespuestaDisponibilidad = {
 
 export interface StepDateTimeProps {
   roomId: string;
-  selectedDate: string; // "2026-08-05"
+  selectedDate: string; // "2026-08-05", o "" si no hay día elegido
+  onDateChange: (dayKey: string) => void;
+  minDate: string;
+  maxDate: string;
   startsAt: string; // ISO, o "" si no hay hora elegida
   endsAt: string; // ISO, o "" si no hay duración elegida
   onChange: (args: { startsAt: string; endsAt: string; warning: string | null }) => void;
@@ -56,6 +61,9 @@ function formatDuracion(minutos: number): string {
 export function StepDateTime({
   roomId,
   selectedDate,
+  onDateChange,
+  minDate,
+  maxDate,
   startsAt,
   endsAt,
   onChange,
@@ -116,23 +124,49 @@ export function StepDateTime({
     };
   }, [roomId, selectedDate]);
 
-  if (!roomId || !selectedDate) {
+  const selectorDia = (
+    <Field
+      label="Día"
+      ayuda="Con un mínimo de 1 hora y un máximo de 60 días de anticipación."
+    >
+      <Input
+        type="date"
+        min={minDate}
+        max={maxDate}
+        value={selectedDate}
+        onChange={(e) => onDateChange(e.target.value)}
+      />
+    </Field>
+  );
+
+  if (!selectedDate) {
     return (
-      <p className="text-body text-texto-secundario">
-        Elige una sala y un día para ver los horarios disponibles.
-      </p>
+      <div className="flex flex-col gap-5">
+        {selectorDia}
+        <p className="text-body text-texto-secundario">
+          Elige un día para ver los horarios disponibles.
+        </p>
+      </div>
     );
   }
 
   if (cargando) {
-    return <p className="text-body text-texto-secundario">Cargando horarios…</p>;
+    return (
+      <div className="flex flex-col gap-5">
+        {selectorDia}
+        <p className="text-body text-texto-secundario">Cargando horarios…</p>
+      </div>
+    );
   }
 
   if (error) {
     return (
-      <p role="alert" className="text-caption text-error">
-        {error}
-      </p>
+      <div className="flex flex-col gap-5">
+        {selectorDia}
+        <p role="alert" className="text-caption text-error">
+          {error}
+        </p>
+      </div>
     );
   }
 
@@ -140,10 +174,13 @@ export function StepDateTime({
 
   if (slots.length === 0) {
     return (
-      <EmptyState
-        titulo="Ese día no hay atención"
-        descripcion="Es fin de semana o festivo. Elige otro día."
-      />
+      <div className="flex flex-col gap-5">
+        {selectorDia}
+        <EmptyState
+          titulo="Ese día no hay atención"
+          descripcion="Es fin de semana o festivo. Elige otro día."
+        />
+      </div>
     );
   }
 
@@ -152,6 +189,8 @@ export function StepDateTime({
 
   return (
     <div className="flex flex-col gap-5">
+      {selectorDia}
+
       <div className="flex flex-col gap-2">
         <span className="text-body font-medium text-texto">Elige la hora de inicio</span>
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
