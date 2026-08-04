@@ -24,9 +24,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Reservas Laboratorio UEDA",
+  title: "Reservas Laboratorio de Estrategia del Dato y Analítica",
   description:
-    "Consulta la disponibilidad de las salas del laboratorio UEDA y solicita tu reserva.",
+    "Consulta la disponibilidad de las salas del Laboratorio de Estrategia del Dato y Analítica y solicita tu reserva.",
 };
 
 export const viewport: Viewport = {

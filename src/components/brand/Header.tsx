@@ -36,7 +36,7 @@ export function Header({
         <Link
           href="/"
           className="rounded"
-          aria-label="Ir al inicio de Reservas Laboratorio UEDA"
+          aria-label="Ir al inicio de Reservas Laboratorio de Estrategia del Dato y Analítica"
         >
           <Logo
             variante={enAzul ? "blanco" : "positivo"}

@@ -18,7 +18,7 @@ export function Footer({ className }: { className?: string }) {
         </div>
 
         <div className="flex flex-col gap-1 text-caption text-texto-secundario sm:text-right">
-          <span>Laboratorio UEDA</span>
+          <span>Laboratorio de Estrategia del Dato y Analítica</span>
           <a
             href="https://www.ucatolicaluisamigo.edu.co"
             className="rounded text-primary hover:underline"

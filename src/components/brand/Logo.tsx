@@ -1,17 +1,18 @@
+import Image from "next/image";
+
 import { cn } from "@/lib/utils";
 
+import logoUclam from "./logo-uclam.png";
+
 /*
- * PLACEHOLDER TIPOGRÁFICO — riesgo R3 del plan.
- *
- * No tenemos el arte oficial en SVG. El documento de marca prohíbe recolorear,
- * deformar, pixelar o reconstruir el escudo, así que NO se dibuja aquí una
- * imitación de la cruz ni del escudo: se usa una composición tipográfica que
- * respeta la estructura del logotipo (función en peso ligero + nombre en peso
- * fuerte + elemento gráfico diagonal) y se declara como provisional.
- *
- * Al recibir los archivos de la Oficina de Comunicaciones, sustituir el interior
- * de este componente por el <svg> oficial y borrar este comentario. Nada más del
- * código debería necesitar cambios.
+ * Logo oficial (SVG solicitado a Comunicaciones, recibido como PNG —
+ * riesgo R3 del plan, ya resuelto). El archivo no trae transparencia
+ * (confirmado inspeccionando los chunks del PNG: sin tRNS), es decir que
+ * ya lleva su propio fondo blanco horneado en la imagen. Sobre una
+ * superficie azul (variante="blanco": cabecera del admin, splash de
+ * login) eso ya alcanza para verse bien — solo se le añade un poco de
+ * padding y esquinas redondeadas para que el fondo blanco se lea como una
+ * tarjeta deliberada, no como un recorte accidental.
  */
 export interface LogoProps {
   variante?: "positivo" | "blanco";
@@ -25,58 +26,24 @@ export function Logo({
   compacto = false,
   className,
 }: LogoProps) {
-  const enBlanco = variante === "blanco";
-  const etiqueta = "Universidad Católica Luis Amigó";
-
-  if (compacto) {
-    return (
-      <span
-        role="img"
-        aria-label={etiqueta}
-        className={cn(
-          "inline-flex h-10 w-10 items-center justify-center rounded font-display text-h3 font-bold",
-          enBlanco ? "bg-white text-primary" : "bg-primary text-white",
-          className,
-        )}
-      >
-        U
-      </span>
-    );
-  }
+  const sobreFondoAzul = variante === "blanco";
+  const alto = compacto ? 28 : 40;
 
   return (
     <span
-      role="img"
-      aria-label={etiqueta}
-      // min-w-[140px]: tamaño mínimo del logotipo horizontal (§4.2).
       className={cn(
-        "inline-flex min-w-[140px] items-center gap-2.5 leading-none",
+        "inline-flex items-center rounded",
+        sobreFondoAzul && "bg-white px-2 py-1 shadow-card",
         className,
       )}
     >
-      {/* Elemento gráfico: la barra diagonal del logotipo. */}
-      <span
-        aria-hidden
-        className="h-9 w-1.5 -skew-x-12 rounded-sm bg-accent"
+      <Image
+        src={logoUclam}
+        alt="Universidad Católica Luis Amigó"
+        height={alto}
+        style={{ height: alto, width: "auto" }}
+        priority
       />
-      <span className="flex flex-col gap-0.5">
-        <span
-          className={cn(
-            "font-display text-[0.6rem] font-medium uppercase tracking-[0.18em]",
-            enBlanco ? "text-white/80" : "text-texto-secundario",
-          )}
-        >
-          Universidad Católica
-        </span>
-        <span
-          className={cn(
-            "font-display text-[1.05rem] font-bold uppercase tracking-tight",
-            enBlanco ? "text-white" : "text-primary",
-          )}
-        >
-          Luis Amigó
-        </span>
-      </span>
     </span>
   );
 }

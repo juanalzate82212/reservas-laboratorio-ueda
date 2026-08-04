@@ -38,6 +38,15 @@
   --fondo: #ffffff;
   --negro: #111111;
 
+  /*
+   * Solo para el grid de FullCalendar (--fc-border-color más abajo): --borde
+   * resultó demasiado sutil para las líneas de una grilla de 30 min, pedido
+   * explícito del usuario tras verla en el navegador. No es un token de
+   * marca — no hace falta espejarlo en tailwind.config.ts, ningún
+   * componente lo usa como utilidad.
+   */
+  --borde-calendario: #c7c7c7;
+
   /* Estados (derivado, fuera de marca) */
   --exito: #2e7d5b;
   --error: #c0392b;
@@ -102,7 +111,7 @@
  * por defecto. Referencia de estados: §8 del plan.
  */
 .fc {
-  --fc-border-color: var(--borde);
+  --fc-border-color: var(--borde-calendario);
   --fc-neutral-bg-color: var(--superficie);
   --fc-page-bg-color: var(--fondo);
   --fc-today-bg-color: var(--azul-50);

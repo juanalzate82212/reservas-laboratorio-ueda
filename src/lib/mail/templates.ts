@@ -58,7 +58,7 @@ function layout({ titulo, cuerpoHtml }: { titulo: string; cuerpoHtml: string }):
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:${COLOR.fondo};border-radius:8px;overflow:hidden;">
             <tr>
               <td style="background-color:${COLOR.primary};padding:24px 32px;">
-                <span style="color:#ffffff;font-size:20px;font-weight:700;font-family:Arial,Helvetica,sans-serif;">Laboratorio UEDA</span>
+                <span style="color:#ffffff;font-size:20px;font-weight:700;font-family:Arial,Helvetica,sans-serif;">Laboratorio de Estrategia del Dato y Analítica</span>
               </td>
             </tr>
             <tr>

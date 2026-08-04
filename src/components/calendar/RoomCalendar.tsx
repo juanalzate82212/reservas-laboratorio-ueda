@@ -12,7 +12,14 @@ import interactionPlugin, { type DateClickArg } from "@fullcalendar/interaction"
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import { addMinutes } from "date-fns";
-import { AlertTriangle, Ban, CalendarCheck, Clock, type LucideIcon } from "lucide-react";
+import {
+  AlertTriangle,
+  Ban,
+  CalendarCheck,
+  Clock,
+  LoaderCircle,
+  type LucideIcon,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -248,44 +255,55 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
         </p>
       )}
 
-      <div
-        className={cn(
-          "overflow-hidden rounded border border-borde transition-opacity",
-          cargando && "opacity-60",
+      <div className="relative overflow-hidden rounded border border-borde">
+        {cargando && (
+          // El anillo girando es el mismo gesto de carga que Button.tsx (§5.1
+          // del documento de marca) — no un spinner distinto inventado aquí.
+          // La disponibilidad tarda un momento en llegar (consulta reservas +
+          // bloqueos), y el grid vacío de FullCalendar por sí solo no deja
+          // claro que todavía está cargando en vez de "sin nada agendado".
+          <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-fondo/70">
+            <LoaderCircle aria-hidden className="h-5 w-5 animate-spin text-primary" />
+            <span className="text-caption font-medium text-texto-secundario">
+              Cargando disponibilidad…
+            </span>
+          </div>
         )}
-      >
-        <FullCalendar
-          ref={calendarRef}
-          plugins={[timeGridPlugin, interactionPlugin]}
-          initialView={vistaInicial}
-          headerToolbar={{ left: "prev,next", center: "title", right: "today" }}
-          locale={esLocale}
-          timeZone="UTC"
-          // "now" también en hora de Bogotá disfrazada de UTC: si no, el
-          // indicador de hora actual y la vista inicial usarían la hora real
-          // del servidor/navegador, desalineada 5h del resto de la grilla.
-          now={() => toBogotaWallClockIso(new Date())}
-          nowIndicator
-          slotMinTime="08:00:00"
-          slotMaxTime="17:00:00"
-          allDaySlot={false}
-          weekends={false}
-          editable={false}
-          selectable={false}
-          height="auto"
-          businessHours={[
-            { daysOfWeek: [1, 2, 3, 4, 5], startTime: "08:00", endTime: "12:00" },
-            { daysOfWeek: [1, 2, 3, 4, 5], startTime: "13:00", endTime: "17:00" },
-          ]}
-          events={events}
-          eventContent={renderEventContent}
-          dayHeaderClassNames={(arg: DayHeaderContentArg) =>
-            festivos.has(fullCalendarDayKey(arg.date)) ? ["fc-dia-festivo-header"] : []
-          }
-          datesSet={handleDatesSet}
-          dateClick={handleDateClick}
-          eventClick={handleEventClick}
-        />
+
+        <div className={cn("transition-opacity", cargando && "opacity-60")}>
+          <FullCalendar
+            ref={calendarRef}
+            plugins={[timeGridPlugin, interactionPlugin]}
+            initialView={vistaInicial}
+            headerToolbar={{ left: "prev,next", center: "title", right: "today" }}
+            locale={esLocale}
+            timeZone="UTC"
+            // "now" también en hora de Bogotá disfrazada de UTC: si no, el
+            // indicador de hora actual y la vista inicial usarían la hora real
+            // del servidor/navegador, desalineada 5h del resto de la grilla.
+            now={() => toBogotaWallClockIso(new Date())}
+            nowIndicator
+            slotMinTime="08:00:00"
+            slotMaxTime="17:00:00"
+            allDaySlot={false}
+            weekends={false}
+            editable={false}
+            selectable={false}
+            height="auto"
+            businessHours={[
+              { daysOfWeek: [1, 2, 3, 4, 5], startTime: "08:00", endTime: "12:00" },
+              { daysOfWeek: [1, 2, 3, 4, 5], startTime: "13:00", endTime: "17:00" },
+            ]}
+            events={events}
+            eventContent={renderEventContent}
+            dayHeaderClassNames={(arg: DayHeaderContentArg) =>
+              festivos.has(fullCalendarDayKey(arg.date)) ? ["fc-dia-festivo-header"] : []
+            }
+            datesSet={handleDatesSet}
+            dateClick={handleDateClick}
+            eventClick={handleEventClick}
+          />
+        </div>
       </div>
     </div>
   );

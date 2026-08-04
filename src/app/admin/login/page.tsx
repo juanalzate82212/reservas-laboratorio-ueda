@@ -84,7 +84,7 @@ export default function AdminLoginPage() {
               Acceso de administrador
             </h1>
             <p className="text-caption text-texto-secundario">
-              Laboratorio UEDA
+              Laboratorio de Estrategia del Dato y Analítica
             </p>
           </div>
 
