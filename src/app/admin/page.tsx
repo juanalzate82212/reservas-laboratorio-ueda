@@ -94,7 +94,12 @@ export default function AdminHomePage() {
         return;
       }
 
-      toast.success("Solicitud actualizada.");
+      const { emailStatus } = (await res.json()) as { emailStatus?: string };
+      if (emailStatus === "FAILED") {
+        toast.warning("Solicitud actualizada, pero el correo no se pudo enviar. Revisa /admin/correos.");
+      } else {
+        toast.success("Solicitud actualizada.");
+      }
       setPendiente(null);
       await cargar();
       window.dispatchEvent(new Event(ADMIN_RESERVATIONS_CHANGED_EVENT));

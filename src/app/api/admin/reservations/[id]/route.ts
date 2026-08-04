@@ -4,6 +4,11 @@ import { z } from "zod";
 import { errorResponse, validationErrorResponse } from "@/lib/api/http";
 import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { enviarCorreo } from "@/lib/mail/mailer";
+import { cancelTemplate, confirmTemplate, rejectTemplate } from "@/lib/mail/templates";
+
+// Nodemailer no corre en Edge Runtime (§7 del plan).
+export const runtime = "nodejs";
 
 /*
  * Transiciones permitidas (§6 del plan):
@@ -77,7 +82,46 @@ export async function PATCH(
     include: { room: { select: { id: true, name: true, slug: true } } },
   });
 
-  // La Fase 7 conecta el envío de correo aquí, después de la escritura en BD.
+  // El correo nunca bloquea la transición: la reserva ya quedó escrita
+  // arriba. Si el envío falla, la respuesta sigue siendo 200 con
+  // emailStatus: "FAILED" — el admin puede reintentar desde /admin/correos.
+  const datosPlantilla = {
+    code: updated.code,
+    roomName: updated.room.name,
+    startsAt: updated.startsAt,
+    endsAt: updated.endsAt,
+    requesterName: updated.requesterName,
+    academicProgram: updated.academicProgram,
+    activityType: updated.activityType,
+    activityTypeOther: updated.activityTypeOther,
+    attendees: updated.attendees,
+    adminNote: updated.adminNote,
+  };
 
-  return NextResponse.json(updated);
+  let plantilla: { subject: string; html: string };
+  if (action === "CONFIRM") {
+    const avisoSolapado = await prisma.timeBlock.findFirst({
+      where: {
+        OR: [{ roomId: updated.roomId }, { roomId: null }],
+        kind: "WARNING",
+        startsAt: { lt: updated.endsAt },
+        endsAt: { gt: updated.startsAt },
+      },
+      select: { reason: true },
+    });
+    plantilla = confirmTemplate(datosPlantilla, avisoSolapado?.reason);
+  } else if (action === "REJECT") {
+    plantilla = rejectTemplate(datosPlantilla);
+  } else {
+    plantilla = cancelTemplate(datosPlantilla);
+  }
+
+  const emailStatus = await enviarCorreo({
+    reservationId: updated.id,
+    to: updated.requesterEmail,
+    subject: plantilla.subject,
+    html: plantilla.html,
+  });
+
+  return NextResponse.json({ ...updated, emailStatus });
 }
