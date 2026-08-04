@@ -4,15 +4,15 @@ import { ArcoDecorativo } from "@/components/brand/ArcoDecorativo";
 import { Footer } from "@/components/brand/Footer";
 import { Header } from "@/components/brand/Header";
 import { AvailabilityLegend } from "@/components/calendar/AvailabilityLegend";
-import { CalendarGrid } from "@/components/calendar/CalendarGrid";
+import { RoomAvailability } from "@/components/calendar/RoomAvailability";
 import { buttonVariants } from "@/components/ui/Button";
-import { getActiveRooms } from "@/lib/rooms";
+import { getActiveRoom } from "@/lib/rooms";
 
 /*
- * Server Component: consulta las salas directo con Prisma (sin llamarse a sí
+ * Server Component: consulta la sala directo con Prisma (sin llamarse a sí
  * mismo vía fetch a /api/rooms). La disponibilidad sí se pide desde el
  * navegador porque depende del rango visible del calendario, que cambia con
- * la navegación del usuario — ver CalendarGrid / RoomCalendar.
+ * la navegación del usuario — ver RoomAvailability / RoomCalendar.
  *
  * force-dynamic por la misma razón que en /api/rooms/route.ts: sin
  * searchParams/cookies/headers, Next.js trataría esta página como candidata a
@@ -22,7 +22,7 @@ import { getActiveRooms } from "@/lib/rooms";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const rooms = await getActiveRooms();
+  const room = await getActiveRoom();
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -41,9 +41,9 @@ export default async function Home() {
               Consulta la disponibilidad y solicita tu reserva
             </h1>
             <p className="text-body-l text-texto">
-              Dos salas, de lunes a viernes de 8:00 a. m. a 5:00 p. m. Elige un
-              horario disponible y envía tu solicitud: queda sujeta a
-              aprobación del administrador.
+              De lunes a viernes de 8:00 a. m. a 5:00 p. m. Elige un horario
+              disponible y envía tu solicitud: queda sujeta a aprobación del
+              administrador.
             </p>
             <div>
               <Link
@@ -58,8 +58,8 @@ export default async function Home() {
 
         <AvailabilityLegend />
 
-        {rooms.length > 0 ? (
-          <CalendarGrid rooms={rooms} />
+        {room ? (
+          <RoomAvailability room={room} />
         ) : (
           <p className="text-body text-texto-secundario">
             No hay salas disponibles en este momento.

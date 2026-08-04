@@ -1,7 +1,7 @@
 import { Footer } from "@/components/brand/Footer";
 import { Header } from "@/components/brand/Header";
 import { ReservationWizard } from "@/components/reservation/ReservationWizard";
-import { getActiveRooms } from "@/lib/rooms";
+import { getActiveRoom } from "@/lib/rooms";
 
 // Ver app/page.tsx: sin esto, Next.js pre-renderiza la página en build time
 // y ejecuta la consulta a Prisma durante `next build`, no por petición.
@@ -10,9 +10,9 @@ export const dynamic = "force-dynamic";
 export default async function ReservarPage({
   searchParams,
 }: {
-  searchParams: { roomId?: string; startsAt?: string };
+  searchParams: { startsAt?: string };
 }) {
-  const rooms = await getActiveRooms();
+  const room = await getActiveRoom();
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -28,10 +28,10 @@ export default async function ReservarPage({
           </h1>
         </div>
 
-        {rooms.length > 0 ? (
+        {room ? (
           <ReservationWizard
-            rooms={rooms}
-            initial={{ roomId: searchParams.roomId, startsAt: searchParams.startsAt }}
+            room={room}
+            initial={{ startsAt: searchParams.startsAt }}
           />
         ) : (
           <p className="text-body text-texto-secundario">

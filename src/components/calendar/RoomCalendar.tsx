@@ -85,7 +85,7 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
   // Calculado una sola vez, antes del primer render: ver el comentario del
   // useEffect de más abajo sobre por qué esto no puede decidirse después.
   // `window` sin guard es seguro SOLO porque este componente se monta
-  // exclusivamente a través de CalendarGrid.tsx, con next/dynamic
+  // exclusivamente a través de RoomAvailability.tsx, con next/dynamic
   // ssr:false — nunca se renderiza en el servidor. No importar
   // RoomCalendar directamente en un Server Component.
   const [vistaInicial] = useState<"timeGridWeek" | "timeGridDay">(() =>
@@ -230,11 +230,9 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
       const estado = getSlotState({ startsAt: inicio, endsAt: fin }, reservas, bloqueos);
       if (!estado.reservable) return;
 
-      router.push(
-        `/reservar?roomId=${encodeURIComponent(room.id)}&startsAt=${encodeURIComponent(inicio.toISOString())}`,
-      );
+      router.push(`/reservar?startsAt=${encodeURIComponent(inicio.toISOString())}`);
     },
-    [reservas, bloqueos, room.id, router],
+    [reservas, bloqueos, router],
   );
 
   // Clic en un evento en primer plano (reservado, en revisión o bloqueado):

@@ -21,50 +21,44 @@ import {
 import { StepDateTime } from "./StepDateTime";
 import { StepRequester } from "./StepRequester";
 import { StepReview } from "./StepReview";
-import { StepRoom } from "./StepRoom";
 
 type ErrorApi = { error: { code: string; message: string } };
 
-const TITULOS_PASO = ["Espacio y horario", "Tus datos", "Revisión"] as const;
+const TITULOS_PASO = ["Horario", "Tus datos", "Revisión"] as const;
 
 export interface ReservationWizardInitial {
-  roomId?: string;
   startsAt?: string;
 }
 
 /*
- * Al llegar desde un clic en el calendario (?roomId=&startsAt=), valida el
+ * Al llegar desde un clic en el calendario (?startsAt=), valida el
  * prellenado antes de confiarlo: un enlace viejo o manipulado a mano no debe
- * poder colar una sala inexistente o una fecha ilegible. Si algo no cuadra,
- * el wizard simplemente arranca vacío — la validación normal del paso 1 se
- * encarga del resto.
+ * poder colar una fecha ilegible. Si algo no cuadra, el wizard simplemente
+ * arranca vacío — la validación normal del paso 1 se encarga del resto.
  */
 function resolveInitial(
   initial: ReservationWizardInitial | undefined,
-  rooms: ActiveRoom[],
-): { roomId: string; startsAt: string; selectedDate: string } {
-  const vacio = { roomId: "", startsAt: "", selectedDate: "" };
-  if (!initial?.roomId || !initial.startsAt) return vacio;
-  if (!rooms.some((r) => r.id === initial.roomId)) return vacio;
+): { startsAt: string; selectedDate: string } {
+  const vacio = { startsAt: "", selectedDate: "" };
+  if (!initial?.startsAt) return vacio;
 
   const fecha = new Date(initial.startsAt);
   if (Number.isNaN(fecha.getTime())) return vacio;
 
   return {
-    roomId: initial.roomId,
     startsAt: fecha.toISOString(),
     selectedDate: toBogotaDayKey(fecha),
   };
 }
 
 export function ReservationWizard({
-  rooms,
+  room,
   initial,
 }: {
-  rooms: ActiveRoom[];
+  room: ActiveRoom;
   initial?: ReservationWizardInitial;
 }) {
-  const prellenado = resolveInitial(initial, rooms);
+  const prellenado = resolveInitial(initial);
 
   const [paso, setPaso] = useState(0);
   const [enviando, setEnviando] = useState(false);
@@ -75,7 +69,7 @@ export function ReservationWizard({
     resolver: zodResolver(createReservationSchema),
     mode: "onTouched",
     defaultValues: {
-      roomId: prellenado.roomId,
+      roomId: room.id,
       startsAt: prellenado.startsAt,
       endsAt: "",
       requesterName: "",
@@ -100,18 +94,16 @@ export function ReservationWizard({
     formState: { errors },
   } = form;
 
-  const roomId = watch("roomId");
   const startsAt = watch("startsAt");
   const endsAt = watch("endsAt");
   const [selectedDate, setSelectedDate] = useState(prellenado.selectedDate);
-  const room = rooms.find((r) => r.id === roomId) ?? null;
 
   const hoyBogota = toBogotaDayKey(new Date());
   const maxBogota = toBogotaDayKey(addDays(new Date(), BOOKING_CONFIG.maxAdvanceDays));
 
   async function avanzar() {
     if (paso === 0) {
-      const ok = await trigger(["roomId", "startsAt", "endsAt"]);
+      const ok = await trigger(["startsAt", "endsAt"]);
       if (ok) setPaso(1);
       return;
     }
@@ -187,10 +179,12 @@ export function ReservationWizard({
 
         {paso === 0 && (
           <>
-            <StepRoom
-              rooms={rooms}
-              roomId={roomId}
-              onRoomChange={(id) => setValue("roomId", id, { shouldValidate: true })}
+            <div className="rounded border border-borde bg-superficie px-4 py-3">
+              <p className="text-caption text-texto-secundario">Sala</p>
+              <p className="text-body font-medium text-texto">{room.name}</p>
+            </div>
+            <StepDateTime
+              roomId={room.id}
               selectedDate={selectedDate}
               onDateChange={(dayKey) => {
                 setSelectedDate(dayKey);
@@ -200,11 +194,6 @@ export function ReservationWizard({
               }}
               minDate={hoyBogota}
               maxDate={maxBogota}
-              errorRoom={errors.roomId?.message}
-            />
-            <StepDateTime
-              roomId={roomId}
-              selectedDate={selectedDate}
               startsAt={startsAt}
               endsAt={endsAt}
               onChange={({ startsAt: s, endsAt: e, warning: w }) => {

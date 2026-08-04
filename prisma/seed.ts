@@ -53,22 +53,14 @@ async function main() {
     },
   });
 
-  const salaReuniones = await prisma.room.upsert({
-    where: { slug: "sala-reuniones" },
-    update: {},
-    create: {
-      slug: "sala-reuniones",
-      name: "Sala de Reuniones",
-      description: "Espacio para reuniones de equipo y asesorías.",
-      capacity: 7,
-      hasComputers: false,
-      colorToken: "naranja",
-    },
-  });
-
   // --- Datos de demo: se regeneran en cada ejecución ---
   await prisma.reservation.deleteMany();
   await prisma.timeBlock.deleteMany();
+
+  // Decisión de producto: solo Sala Principal es reservable. La sala de
+  // reuniones se retira del todo (ver CLAUDE.md) — sus reservas de demo ya
+  // se borraron arriba, así que la fila puede eliminarse sin violar la FK.
+  await prisma.room.deleteMany({ where: { slug: "sala-reuniones" } });
 
   const reservas: Array<{
     roomId: string;
@@ -101,7 +93,7 @@ async function main() {
       attendees: 18,
     },
     {
-      roomId: salaReuniones.id,
+      roomId: salaPrincipal.id,
       dia: lunes,
       desde: "13:00",
       hasta: "15:00",
@@ -146,7 +138,7 @@ async function main() {
         "Esa franja está reservada para mantenimiento de los equipos. Puedes solicitarla el miércoles en el mismo horario.",
     },
     {
-      roomId: salaReuniones.id,
+      roomId: salaPrincipal.id,
       dia: miercoles,
       desde: "08:00",
       hasta: "12:00",

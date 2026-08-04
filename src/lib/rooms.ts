@@ -33,3 +33,14 @@ export async function getActiveRooms(): Promise<ActiveRoom[]> {
     },
   });
 }
+
+/*
+ * Solo Sala Principal es reservable (decisión de producto: se retiró Sala de
+ * Reuniones). `Room` sigue siendo un modelo genérico por si vuelve a hacer
+ * falta una segunda sala — esta función solo asume que, de las salas
+ * activas, la primera es la que hay que mostrar.
+ */
+export async function getActiveRoom(): Promise<ActiveRoom | null> {
+  const rooms = await getActiveRooms();
+  return rooms[0] ?? null;
+}
