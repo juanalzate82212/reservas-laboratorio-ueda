@@ -12,7 +12,14 @@ import interactionPlugin, { type DateClickArg } from "@fullcalendar/interaction"
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import { addMinutes } from "date-fns";
-import { AlertTriangle, Ban, CalendarCheck, Clock, type LucideIcon } from "lucide-react";
+import {
+  AlertTriangle,
+  Ban,
+  CalendarCheck,
+  Clock,
+  LoaderCircle,
+  type LucideIcon,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -62,6 +69,13 @@ function siguienteDia(dayKey: string): string {
 export function RoomCalendar({ room }: { room: ActiveRoom }) {
   const router = useRouter();
   const calendarRef = useRef<FullCalendar>(null);
+  // FullCalendar puede disparar datesSet más de una vez para el mismo rango
+  // (recalculo de vista, cambio de ancho, etc.), lanzando pedidos de
+  // disponibilidad solapados. Sin esto, un pedido viejo que resuelve DESPUÉS
+  // de uno nuevo podía dejar "cargando" pegado en true para siempre aunque
+  // los datos ya hubieran llegado — bug real reportado por el usuario. Solo
+  // el pedido más reciente puede tocar el estado; uno viejo se aborta.
+  const solicitudActualRef = useRef<AbortController | null>(null);
   const [events, setEvents] = useState<EventInput[]>([]);
   const [reservas, setReservas] = useState<ReservationLike[]>([]);
   const [bloqueos, setBloqueos] = useState<TimeBlockLike[]>([]);
@@ -82,6 +96,10 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
 
   const cargarDisponibilidad = useCallback(
     async (from: Date, to: Date) => {
+      solicitudActualRef.current?.abort();
+      const controller = new AbortController();
+      solicitudActualRef.current = controller;
+
       setCargando(true);
       setError(null);
       try {
@@ -90,7 +108,9 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
           from: from.toISOString(),
           to: to.toISOString(),
         });
-        const res = await fetch(`/api/availability?${params.toString()}`);
+        const res = await fetch(`/api/availability?${params.toString()}`, {
+          signal: controller.signal,
+        });
         if (!res.ok) {
           throw new Error("No se pudo cargar la disponibilidad.");
         }
@@ -165,16 +185,27 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
           ...eventosFestivos,
         ]);
         setFestivos(new Set(diasFestivos.map((d) => d.date)));
-      } catch {
+      } catch (err) {
+        // AbortError = una petición más nueva ya está en curso: esta ya no
+        // importa, y no debe pisar el estado (error o "cargando") de la que
+        // sí sigue viva.
+        if (err instanceof DOMException && err.name === "AbortError") return;
         setError(
           "No se pudo cargar la disponibilidad. Intenta de nuevo en un momento.",
         );
       } finally {
-        setCargando(false);
+        // Solo la petición todavía vigente puede apagar el spinner — una
+        // vieja que resuelve tarde (o que se abortó) no puede hacerlo,
+        // aunque su `finally` se ejecute igual.
+        if (solicitudActualRef.current === controller) setCargando(false);
       }
     },
     [room.id],
   );
+
+  useEffect(() => {
+    return () => solicitudActualRef.current?.abort();
+  }, []);
 
   const handleDatesSet = useCallback(
     (arg: DatesSetArg) => {
@@ -248,44 +279,55 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
         </p>
       )}
 
-      <div
-        className={cn(
-          "overflow-hidden rounded border border-borde transition-opacity",
-          cargando && "opacity-60",
+      <div className="relative overflow-hidden rounded border border-borde">
+        {cargando && (
+          // El anillo girando es el mismo gesto de carga que Button.tsx (§5.1
+          // del documento de marca) — no un spinner distinto inventado aquí.
+          // La disponibilidad tarda un momento en llegar (consulta reservas +
+          // bloqueos), y el grid vacío de FullCalendar por sí solo no deja
+          // claro que todavía está cargando en vez de "sin nada agendado".
+          <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-fondo/70">
+            <LoaderCircle aria-hidden className="h-5 w-5 animate-spin text-primary" />
+            <span className="text-caption font-medium text-texto-secundario">
+              Cargando disponibilidad…
+            </span>
+          </div>
         )}
-      >
-        <FullCalendar
-          ref={calendarRef}
-          plugins={[timeGridPlugin, interactionPlugin]}
-          initialView={vistaInicial}
-          headerToolbar={{ left: "prev,next", center: "title", right: "today" }}
-          locale={esLocale}
-          timeZone="UTC"
-          // "now" también en hora de Bogotá disfrazada de UTC: si no, el
-          // indicador de hora actual y la vista inicial usarían la hora real
-          // del servidor/navegador, desalineada 5h del resto de la grilla.
-          now={() => toBogotaWallClockIso(new Date())}
-          nowIndicator
-          slotMinTime="08:00:00"
-          slotMaxTime="17:00:00"
-          allDaySlot={false}
-          weekends={false}
-          editable={false}
-          selectable={false}
-          height="auto"
-          businessHours={[
-            { daysOfWeek: [1, 2, 3, 4, 5], startTime: "08:00", endTime: "12:00" },
-            { daysOfWeek: [1, 2, 3, 4, 5], startTime: "13:00", endTime: "17:00" },
-          ]}
-          events={events}
-          eventContent={renderEventContent}
-          dayHeaderClassNames={(arg: DayHeaderContentArg) =>
-            festivos.has(fullCalendarDayKey(arg.date)) ? ["fc-dia-festivo-header"] : []
-          }
-          datesSet={handleDatesSet}
-          dateClick={handleDateClick}
-          eventClick={handleEventClick}
-        />
+
+        <div className={cn("transition-opacity", cargando && "opacity-60")}>
+          <FullCalendar
+            ref={calendarRef}
+            plugins={[timeGridPlugin, interactionPlugin]}
+            initialView={vistaInicial}
+            headerToolbar={{ left: "prev,next", center: "title", right: "today" }}
+            locale={esLocale}
+            timeZone="UTC"
+            // "now" también en hora de Bogotá disfrazada de UTC: si no, el
+            // indicador de hora actual y la vista inicial usarían la hora real
+            // del servidor/navegador, desalineada 5h del resto de la grilla.
+            now={() => toBogotaWallClockIso(new Date())}
+            nowIndicator
+            slotMinTime="08:00:00"
+            slotMaxTime="17:00:00"
+            allDaySlot={false}
+            weekends={false}
+            editable={false}
+            selectable={false}
+            height="auto"
+            businessHours={[
+              { daysOfWeek: [1, 2, 3, 4, 5], startTime: "08:00", endTime: "12:00" },
+              { daysOfWeek: [1, 2, 3, 4, 5], startTime: "13:00", endTime: "17:00" },
+            ]}
+            events={events}
+            eventContent={renderEventContent}
+            dayHeaderClassNames={(arg: DayHeaderContentArg) =>
+              festivos.has(fullCalendarDayKey(arg.date)) ? ["fc-dia-festivo-header"] : []
+            }
+            datesSet={handleDatesSet}
+            dateClick={handleDateClick}
+            eventClick={handleEventClick}
+          />
+        </div>
       </div>
     </div>
   );

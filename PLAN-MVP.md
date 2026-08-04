@@ -524,7 +524,7 @@ Cumplimiento obligatorio de [`identidad-visual-ucla-ui-ux.md`](identidad-visual-
 - **Jerarquía:** azul estructura · blanco respira · naranja señala **una sola cosa** por vista · gris acompaña.
 - **Tipografía:** `Montserrat` (display) + `Inter` (cuerpo) vía `next/font/google` — evita FOUT y no requiere licencia.
 - **Gesto de marca:** un solo arco/anillo naranja por pantalla, en la cabecera de la landing.
-- **Logo:** SVG en la top bar. Mientras Comunicaciones no entregue el arte oficial, placeholder tipográfico — **nunca** un PNG reescalado ni una versión recoloreada.
+- **Logo:** SVG en la top bar. Mientras Comunicaciones no entregue el arte oficial, placeholder tipográfico — **nunca** un PNG reescalado ni una versión recoloreada. **Actualización:** el usuario entregó el arte oficial como PNG (no SVG) tras la Fase 8; se usa tal cual, sin reescalar ni recolorear — ver R3 y la nota de ajustes post-Fase 8 en `CLAUDE.md`.
 - **Accesibilidad:** WCAG AA, foco de teclado visible, `prefers-reduced-motion`. Texto sobre naranja siempre `#2E2E2E`, nunca blanco.
 - **Copy:** voz cercana y activa. Los botones dicen qué hacen: "Solicitar reserva", "Confirmar reserva", "Rechazar solicitud".
 
@@ -740,7 +740,7 @@ SMTP_PORT="587"
 SMTP_SECURE="false"                          # false con 587 (STARTTLS); true con 465
 SMTP_USER="lab.analitica@amigo.edu.co"    # la cuenta del laboratorio
 SMTP_PASSWORD="abcdefghijklmnop"             # contraseña de aplicación, sin espacios
-MAIL_FROM="Laboratorio UEDA <lab.analitica@amigo.edu.co>"
+MAIL_FROM="Laboratorio de Analítica de Datos e Inteligencia Artificial <lab.analitica@amigo.edu.co>"
 ```
 
 > ⚠️ **La dirección de `MAIL_FROM` debe ser la misma de `SMTP_USER`** (o un alias configurado en esa cuenta). Gmail rechaza remitentes arbitrarios; poner un `no-responder@...` que no exista hace fallar el envío.
@@ -807,7 +807,7 @@ SMTP_PORT="587"
 SMTP_SECURE="false"
 SMTP_USER="lab.analitica@amigo.edu.co"
 SMTP_PASSWORD=""                             # contraseña de aplicación de 16 caracteres, sin espacios
-MAIL_FROM="Laboratorio UEDA <lab.analitica@amigo.edu.co>"
+MAIL_FROM="Laboratorio de Analítica de Datos e Inteligencia Artificial <lab.analitica@amigo.edu.co>"
 ```
 
 ---
@@ -837,7 +837,7 @@ MAIL_FROM="Laboratorio UEDA <lab.analitica@amigo.edu.co>"
 | ~~P2~~ | ~~**La lista de festivos de 2026 está calculada, no verificada**~~ | ~~Se aceptarían reservas un día festivo.~~ | **RESUELTO en la Fase 1, y la sospecha estaba justificada: faltaba un festivo.** Se recalculó la Pascua (5 abr 2026) y se revisó traslado por traslado; las 18 fechas originales son correctas, pero la **Ley 2578 de 2026** (sancionada el 1 de junio de 2026) creó el Día de Nuestra Señora del Rosario de Chiquinquirá: 9 de julio, trasladado al **lunes 13 de julio de 2026**. Son **19 festivos**, no 18. Lección para 2027: el calendario puede cambiar por ley dentro del mismo año, así que la lista se revisa al añadir cada año nuevo, no una sola vez. |
 | ~~R1~~ | ~~Google Workspace institucional puede tener deshabilitadas las contraseñas de aplicación.~~ | ~~El correo no sale.~~ | **RESUELTO en la Fase 7.** `/apppasswords` sí estaba habilitado para `lab.analitica@amigo.edu.co`: se generó la contraseña de aplicación sin fricción y el envío real se verificó de punta a punta (ver Fase 7 más abajo). |
 | R2 | La lista de festivos se queda sin años. | El sistema abriría festivos de 2027 en silencio. | `console.warn` al arrancar + aviso en el panel si el año en curso no está en `HOLIDAYS_CO` (§5.1). |
-| R3 | No hay logo oficial en SVG. | Incumplimiento de marca. | Solicitarlo a la Oficina de Comunicaciones. Placeholder tipográfico mientras tanto; nunca recolorear ni reescalar un PNG. |
+| ~~R3~~ | ~~No hay logo oficial en SVG.~~ | ~~Incumplimiento de marca.~~ | **RESUELTO tras la Fase 8.** El usuario entregó el arte oficial en PNG (no llegó a haber SVG). `Logo.tsx` lo usa sin recolorear ni reescalar — ver nota de ajustes post-Fase 8 en `CLAUDE.md`. |
 | R4 | Supabase pausa el proyecto tras 7 días sin actividad. | La aplicación aparece caída. | Verificar el estado antes de cualquier presentación. Alternativa: Neon (§11.3). |
 | R5 | Una sola contraseña de admin, sin usuarios reales. | Aceptable en MVP, no en producción. | Documentado como fase 2 (SSO institucional). Contraseña fuerte y rotada tras la demo. |
 | R6 | Sin autenticación del solicitante, cualquiera con un correo `@amigo.edu.co` válido puede reservar a nombre de otro. | Uso indebido. | Aceptado en MVP; el admin aprueba manualmente. Fase 2: verificación por enlace al correo. |
