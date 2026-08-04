@@ -76,6 +76,27 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
   // los datos ya hubieran llegado — bug real reportado por el usuario. Solo
   // el pedido más reciente puede tocar el estado; uno viejo se aborta.
   const solicitudActualRef = useRef<AbortController | null>(null);
+  // Causa real del bug (confirmada con Playwright, no solo por lectura de
+  // código): cada `setState` de este componente (tras un fetch) hace que
+  // <FullCalendar> reciba props nuevas; su wrapper de React llama
+  // `resetOptions()` con un objeto de opciones recién creado en CADA
+  // render, lo que hace que la memoización interna de FullCalendar para el
+  // generador de rango de fechas falle siempre y reconstruya el
+  // `dateProfile` — disparando `datesSet` de nuevo para el MISMO rango
+  // visible. Sin este guard, eso relanza `cargarDisponibilidad`, que vuelve
+  // a hacer `setState`, en un ciclo que nunca se detiene solo y deja
+  // "cargando" parpadeando para siempre. Se ignora un `datesSet` cuyo rango
+  // es idéntico al último que se PIDIÓ (se marca al empezar, no al
+  // terminar, para bloquear también un redisparo espurio mientras la
+  // petición sigue en vuelo). Si la petición para ese rango termina
+  // abortada o falla, `cargarDisponibilidad` deshace la marca — si se
+  // dejara marcada para siempre pase lo que pase, un primer intento
+  // abortado (p. ej. por el doble montaje de efectos que React hace en
+  // desarrollo) dejaría el rango bloqueado sin datos reales para siempre —
+  // bug real reportado por el usuario tras el primer intento de este fix:
+  // la carga inicial se quedaba sin franjas hasta cambiar de semana y
+  // volver.
+  const ultimoRangoRef = useRef<{ from: number; to: number } | null>(null);
   const [events, setEvents] = useState<EventInput[]>([]);
   const [reservas, setReservas] = useState<ReservationLike[]>([]);
   const [bloqueos, setBloqueos] = useState<TimeBlockLike[]>([]);
@@ -95,10 +116,20 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
   );
 
   const cargarDisponibilidad = useCallback(
-    async (from: Date, to: Date) => {
+    async (from: Date, to: Date, rango: { from: number; to: number }) => {
       solicitudActualRef.current?.abort();
       const controller = new AbortController();
       solicitudActualRef.current = controller;
+      // Se marca de inmediato (no solo al terminar con éxito) para que un
+      // redisparo espurio de `datesSet` para este MISMO rango, mientras esta
+      // petición sigue en vuelo, no dispare un segundo fetch redundante —
+      // eso pasaba con `setCargando(true)` de la línea siguiente: al ser un
+      // cambio real de valor (false→true), provoca un re-render, que a su
+      // vez puede volver a disparar `datesSet` antes de que este fetch
+      // termine. Si esta petición concreta termina abortada o falla, se
+      // "desmarca" en el catch (solo si nadie más la reemplazó ya) para
+      // permitir un reintento — ver el comentario de `ultimoRangoRef`.
+      ultimoRangoRef.current = rango;
 
       setCargando(true);
       setError(null);
@@ -186,6 +217,12 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
         ]);
         setFestivos(new Set(diasFestivos.map((d) => d.date)));
       } catch (err) {
+        // Esta petición no llegó a buen puerto (abortada o con error real):
+        // si nadie más ya reemplazó la marca de "último rango" con la suya
+        // propia, se deshace para que un futuro datesSet — real o espurio —
+        // para este mismo rango pueda reintentar en vez de quedar bloqueado
+        // para siempre por un intento que nunca trajo datos.
+        if (ultimoRangoRef.current === rango) ultimoRangoRef.current = null;
         // AbortError = una petición más nueva ya está en curso: esta ya no
         // importa, y no debe pisar el estado (error o "cargando") de la que
         // sí sigue viva.
@@ -209,10 +246,19 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
 
   const handleDatesSet = useCallback(
     (arg: DatesSetArg) => {
-      void cargarDisponibilidad(
-        fullCalendarDateToInstant(arg.start),
-        fullCalendarDateToInstant(arg.end),
-      );
+      const from = fullCalendarDateToInstant(arg.start);
+      const to = fullCalendarDateToInstant(arg.end);
+      const rango = { from: from.getTime(), to: to.getTime() };
+
+      if (
+        ultimoRangoRef.current &&
+        ultimoRangoRef.current.from === rango.from &&
+        ultimoRangoRef.current.to === rango.to
+      ) {
+        return; // Mismo rango que el último ya cargado con éxito: datesSet redundante, no dispara otro fetch.
+      }
+
+      void cargarDisponibilidad(from, to, rango);
     },
     [cargarDisponibilidad],
   );
