@@ -662,6 +662,8 @@ Wizard de 3 pasos + confirmación, en página `/reservar`.
 
 **Aceptación:** bloquear una franja la vuelve no seleccionable en el wizard; una franja de advertencia sigue siendo reservable, muestra el motivo en el paso 3, y ese motivo aparece en el correo de confirmación.
 
+> **Decisión de implementación:** el formulario pide **fecha de inicio y fecha de fin por separado** (no un solo día + hora de inicio/fin, como el wizard público). Una franja de admin puede abarcar varios días — "semana de receso", una jornada institucional de varios días — y a diferencia de una reserva no está sujeta a `fitsInSingleRange`/`isAlignedToSlot` de `lib/datetime.ts` (esas reglas son de la grilla de reserva del público, no aplican a lo que el admin declara como cerrado). El chequeo de conflicto al crear un `BLOCKED` compara contra reservas `PENDING`/`CONFIRMED`, filtrando por sala solo si `roomId` no es `null` — una franja global (`roomId: null`) choca con una reserva de **cualquier** sala.
+
 ---
 
 ### Fase 9 — Despliegue en Vercel
