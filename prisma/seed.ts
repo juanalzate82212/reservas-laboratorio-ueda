@@ -1,4 +1,9 @@
-import { PrismaClient, type ReservationStatus } from "@prisma/client";
+import {
+  PrismaClient,
+  type AcademicProgram,
+  type ActivityType,
+  type ReservationStatus,
+} from "@prisma/client";
 import { addDays } from "date-fns";
 
 import { fromBogota, isOpenDay, toBogotaDayKey } from "../src/lib/datetime";
@@ -75,8 +80,10 @@ async function main() {
     requesterRole: string;
     requesterDocId: string;
     requesterEmail: string;
-    purpose?: string;
-    attendees?: number;
+    academicProgram: AcademicProgram;
+    activityType: ActivityType;
+    activityTypeOther?: string;
+    attendees: number;
     adminNote?: string;
   }> = [
     {
@@ -89,7 +96,8 @@ async function main() {
       requesterRole: "Docente",
       requesterDocId: "1017234567",
       requesterEmail: "ana.restrepo@amigo.edu.co",
-      purpose: "Práctica de analítica de datos con el grupo de séptimo semestre.",
+      academicProgram: "INGENIERIA_SISTEMAS",
+      activityType: "CLASE_PRACTICA",
       attendees: 18,
     },
     {
@@ -102,7 +110,8 @@ async function main() {
       requesterRole: "Coordinador académico",
       requesterDocId: "71234567",
       requesterEmail: "carlos.velez@amigo.edu.co",
-      purpose: "Reunión de seguimiento del semillero.",
+      academicProgram: "ESPECIALIZACION_BIG_DATA_BI",
+      activityType: "SEMILLERO_INVESTIGACION",
       attendees: 6,
     },
     {
@@ -115,6 +124,8 @@ async function main() {
       requesterRole: "Estudiante",
       requesterDocId: "1098765432",
       requesterEmail: "laura.gomez@amigo.edu.co",
+      academicProgram: "TECNOLOGIA_DESARROLLO_SOFTWARE",
+      activityType: "TALLER",
       attendees: 12,
     },
     {
@@ -127,7 +138,10 @@ async function main() {
       requesterRole: "Estudiante",
       requesterDocId: "1020304050",
       requesterEmail: "julian.ospina@amigo.edu.co",
-      purpose: "Ensayo de presentación.",
+      academicProgram: "INGENIERIA_CIVIL",
+      activityType: "OTRO",
+      activityTypeOther: "Ensayo de presentación de tesis.",
+      attendees: 4,
       adminNote:
         "Esa franja está reservada para mantenimiento de los equipos. Puedes solicitarla el miércoles en el mismo horario.",
     },
@@ -141,7 +155,8 @@ async function main() {
       requesterRole: "Investigadora",
       requesterDocId: "43567890",
       requesterEmail: "diana.munoz@amigo.edu.co",
-      purpose: "Sesión de trabajo del proyecto de investigación.",
+      academicProgram: "ARQUITECTURA",
+      activityType: "PROYECTO_AULA",
       attendees: 5,
     },
     {
@@ -154,6 +169,9 @@ async function main() {
       requesterRole: "Docente",
       requesterDocId: "8123456",
       requesterEmail: "santiago.arango@amigo.edu.co",
+      academicProgram: "INGENIERIA_SISTEMAS_APARTADO",
+      activityType: "EVALUACION",
+      attendees: 20,
       adminNote: "Se canceló por jornada institucional.",
     },
   ];
@@ -170,8 +188,11 @@ async function main() {
         requesterRole: r.requesterRole,
         requesterDocId: r.requesterDocId,
         requesterEmail: r.requesterEmail,
-        purpose: r.purpose,
+        academicProgram: r.academicProgram,
+        activityType: r.activityType,
+        activityTypeOther: r.activityTypeOther,
         attendees: r.attendees,
+        responsibilityAccepted: true,
         adminNote: r.adminNote,
         decidedAt: r.status === "PENDING" ? null : new Date(),
       },

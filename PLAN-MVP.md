@@ -241,6 +241,26 @@ enum TimeBlockKind {
   WARNING
 }
 
+// Los `value` de src/config/reservationOptions.ts deben coincidir exactamente
+// con estos nombres (ver revisión post-Fase 4 más abajo).
+enum AcademicProgram {
+  INGENIERIA_SISTEMAS
+  INGENIERIA_CIVIL
+  ARQUITECTURA
+  TECNOLOGIA_DESARROLLO_SOFTWARE
+  ESPECIALIZACION_BIG_DATA_BI
+  INGENIERIA_SISTEMAS_APARTADO
+}
+
+enum ActivityType {
+  CLASE_PRACTICA
+  TALLER
+  EVALUACION
+  PROYECTO_AULA
+  SEMILLERO_INVESTIGACION
+  OTRO
+}
+
 model Room {
   id            String        @id @default(cuid())
   slug          String        @unique          // "sala-principal" | "sala-reuniones"
@@ -269,8 +289,12 @@ model Reservation {
   requesterRole   String                         // cargo
   requesterDocId  String                         // número de documento
   requesterEmail  String                         // debe terminar en @amigo.edu.co
-  purpose         String?                        // motivo (opcional)
-  attendees       Int?
+
+  academicProgram        AcademicProgram         // programa académico, lista cerrada
+  activityType            ActivityType           // tipo de actividad, lista cerrada + "OTRO"
+  activityTypeOther       String?                // solo cuando activityType = OTRO
+  attendees                Int                   // estimado, obligatorio
+  responsibilityAccepted   Boolean  @default(false) // cuadro de responsabilidad aceptado
 
   status          ReservationStatus @default(PENDING)
   adminNote       String?                        // razón de rechazo/cancelación
@@ -415,6 +439,8 @@ export const HOLIDAYS_CO: Record<number, string[]> = {
 10. No solapa con ninguna reserva `PENDING` o `CONFIRMED` de la misma sala.
 11. No solapa con ningún `TimeBlock` de tipo `BLOCKED` (de esa sala o global).
 12. Máximo `maxPendingPerEmail` solicitudes `PENDING` simultáneas por correo.
+
+> **Revisión post-Fase 4 (pedida por el usuario antes de la Fase 6):** el formulario del wizard estaba incompleto frente a lo que administración necesita para revisar una solicitud. Se agregaron cuatro campos, los cuatro obligatorios (cubiertos por la regla 1): `academicProgram` (lista cerrada, `AcademicProgram`), `activityType` (lista cerrada + `OTRO` con detalle abierto en `activityTypeOther`, obligatorio solo si se elige `OTRO`), y `responsibilityAccepted` (checkbox de aceptación del uso responsable del espacio, debe ser `true`). De paso, `attendees` pasó de opcional a obligatorio y `purpose` (motivo libre) se eliminó del modelo — lo reemplaza `activityType`, que es más útil para el admin al decidir. Las opciones de ambas listas viven en `src/config/reservationOptions.ts`, fuente única para el `<select>`, el Zod compartido y el paso de revisión.
 
 **Condición de solapamiento** (usar exactamente esta — evita el error clásico de bordes):
 

@@ -1,18 +1,24 @@
 "use client";
 
-import type { FieldErrors, UseFormRegister } from "react-hook-form";
+import type { Control, FieldErrors, UseFormRegister } from "react-hook-form";
+import { useWatch } from "react-hook-form";
 
+import { Checkbox } from "@/components/ui/Checkbox";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
-import { Textarea } from "@/components/ui/Textarea";
+import { Select } from "@/components/ui/Select";
+import { ACADEMIC_PROGRAMS, ACTIVITY_TYPES } from "@/config/reservationOptions";
 import type { CreateReservationInput } from "@/lib/validation/reservation";
 
 export interface StepRequesterProps {
   register: UseFormRegister<CreateReservationInput>;
+  control: Control<CreateReservationInput>;
   errors: FieldErrors<CreateReservationInput>;
 }
 
-export function StepRequester({ register, errors }: StepRequesterProps) {
+export function StepRequester({ register, control, errors }: StepRequesterProps) {
+  const activityType = useWatch({ control, name: "activityType" });
+
   return (
     <div className="grid gap-5 sm:grid-cols-2">
       <Field
@@ -53,24 +59,69 @@ export function StepRequester({ register, errors }: StepRequesterProps) {
       </Field>
 
       <Field
-        label="Número de asistentes"
-        opcional
-        error={errors.attendees?.message}
+        label="Programa académico"
+        error={errors.academicProgram?.message}
+        className="sm:col-span-2"
       >
-        <Input type="number" inputMode="numeric" min={1} {...register("attendees")} />
+        <Select defaultValue="" {...register("academicProgram")}>
+          <option value="" disabled>
+            Selecciona tu programa
+          </option>
+          {ACADEMIC_PROGRAMS.map((programa) => (
+            <option key={programa.value} value={programa.value}>
+              {programa.label}
+            </option>
+          ))}
+        </Select>
       </Field>
 
       <Field
-        label="Motivo"
-        opcional
-        error={errors.purpose?.message}
-        className="sm:col-span-2"
+        label="Tipo de actividad"
+        error={errors.activityType?.message}
+        className={activityType === "OTRO" ? undefined : "sm:col-span-2"}
       >
-        <Textarea
-          placeholder="Cuéntanos brevemente para qué usarás el espacio."
-          {...register("purpose")}
+        <Select defaultValue="" {...register("activityType")}>
+          <option value="" disabled>
+            Selecciona el tipo de actividad
+          </option>
+          {ACTIVITY_TYPES.map((tipo) => (
+            <option key={tipo.value} value={tipo.value}>
+              {tipo.label}
+            </option>
+          ))}
+        </Select>
+      </Field>
+
+      {activityType === "OTRO" && (
+        <Field
+          label="¿Cuál actividad?"
+          error={errors.activityTypeOther?.message}
+        >
+          <Input placeholder="Describe brevemente la actividad" {...register("activityTypeOther")} />
+        </Field>
+      )}
+
+      <Field
+        label="Número de asistentes"
+        ayuda="Cantidad estimada."
+        error={errors.attendees?.message}
+      >
+        <Input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          placeholder="Ej: 25 asistentes estimados"
+          {...register("attendees")}
         />
       </Field>
+
+      <div className="sm:col-span-2">
+        <Checkbox
+          label="Al registrar este formulario, me hago responsable del uso adecuado del laboratorio y de los equipos, los cuales recibo en buen estado y me comprometo a entregar en las mismas condiciones. Reportaré de inmediato al administrador cualquier daño, falla o novedad que se presente durante el uso del espacio."
+          error={errors.responsibilityAccepted?.message}
+          {...register("responsibilityAccepted")}
+        />
+      </div>
     </div>
   );
 }
