@@ -76,6 +76,18 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
   // los datos ya hubieran llegado — bug real reportado por el usuario. Solo
   // el pedido más reciente puede tocar el estado; uno viejo se aborta.
   const solicitudActualRef = useRef<AbortController | null>(null);
+  // Causa real del bug (confirmada con Playwright, no solo por lectura de
+  // código): cada `setState` de este componente (tras un fetch) hace que
+  // <FullCalendar> reciba props nuevas; su wrapper de React llama
+  // `resetOptions()` con un objeto de opciones recién creado en CADA
+  // render, lo que hace que la memoización interna de FullCalendar para el
+  // generador de rango de fechas falle siempre y reconstruya el
+  // `dateProfile` — disparando `datesSet` de nuevo para el MISMO rango
+  // visible. Sin este guard, eso relanza `cargarDisponibilidad`, que vuelve
+  // a hacer `setState`, en un ciclo que nunca se detiene solo y deja
+  // "cargando" parpadeando para siempre. Se ignora un `datesSet` cuyo rango
+  // es idéntico al último que ya se pidió.
+  const ultimoRangoRef = useRef<{ from: number; to: number } | null>(null);
   const [events, setEvents] = useState<EventInput[]>([]);
   const [reservas, setReservas] = useState<ReservationLike[]>([]);
   const [bloqueos, setBloqueos] = useState<TimeBlockLike[]>([]);
@@ -209,10 +221,20 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
 
   const handleDatesSet = useCallback(
     (arg: DatesSetArg) => {
-      void cargarDisponibilidad(
-        fullCalendarDateToInstant(arg.start),
-        fullCalendarDateToInstant(arg.end),
-      );
+      const from = fullCalendarDateToInstant(arg.start);
+      const to = fullCalendarDateToInstant(arg.end);
+      const rango = { from: from.getTime(), to: to.getTime() };
+
+      if (
+        ultimoRangoRef.current &&
+        ultimoRangoRef.current.from === rango.from &&
+        ultimoRangoRef.current.to === rango.to
+      ) {
+        return; // Mismo rango que el último pedido: datesSet redundante, no dispara otro fetch.
+      }
+      ultimoRangoRef.current = rango;
+
+      void cargarDisponibilidad(from, to);
     },
     [cargarDisponibilidad],
   );
