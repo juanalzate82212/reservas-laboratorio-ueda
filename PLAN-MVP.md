@@ -502,13 +502,15 @@ Tres plantillas en `lib/mail/templates.ts`, HTML con **estilos inline** (los cli
 | Disparador | Asunto | Contenido clave |
 |------------|--------|-----------------|
 | `CONFIRM` | `Reserva confirmada — {Sala}, {fecha} {hora}` | Sala, fecha, hora inicio–fin, código, nombre. **Si la franja solapa un `TimeBlock` de tipo `WARNING`, incluir el aviso destacado** (ej. "En este horario no hay préstamo de equipos de cómputo"). |
-| `REJECT` | `Solicitud de reserva no aprobada — {Sala}, {fecha}` | Datos de la solicitud + `adminNote` como motivo + invitación a solicitar otro horario. |
-| `CANCEL` | `Reserva cancelada — {Sala}, {fecha} {hora}` | Datos + `adminNote` + disculpa breve, en la voz de marca (§9 del documento de identidad: sin dramatismo, explicar y ofrecer salida). |
+| `REJECT` | `Solicitud de reserva no aprobada — {Sala}, {fecha}` | Datos de la solicitud + `adminNote` como motivo (si existe) + invitación a solicitar otro horario. |
+| `CANCEL` | `Reserva cancelada — {Sala}, {fecha} {hora}` | Datos + `adminNote` (si existe) + disculpa breve, en la voz de marca (§9 del documento de identidad: sin dramatismo, explicar y ofrecer salida). |
+
+> **Nota (Fase 7, consecuencia de la revisión pre-Fase 6):** como `adminNote` ya no se captura en ningún punto del flujo (§6), `REJECT`/`CANCEL` casi nunca tendrán motivo que mostrar — la plantilla lo incluye solo si el campo tiene valor (relevante para las tres filas de la semilla que lo traían de antes de ese cambio). El correo explica que la solicitud no fue aprobada / fue cancelada e invita a solicitar otro horario, sin citar una razón específica.
 
 **Requisitos de implementación:**
 - El envío **nunca hace fallar la transición de estado**. Orden: actualizar la reserva → intentar enviar → registrar en `EmailLog` (`SENT` / `FAILED` / `LOGGED`). Si el correo falla, la respuesta es `200` con `{ emailStatus: "FAILED" }` y el panel muestra un botón "Reintentar envío".
-- Sin `SMTP_HOST`: escribir en consola + `EmailLog` con estado `LOGGED`.
-- `app/admin/correos/page.tsx` lista `EmailLog` con vista previa del HTML — es la evidencia visible de que los correos se generan.
+- Sin `SMTP_HOST` **o sin `SMTP_PASSWORD`**: escribir en consola + `EmailLog` con estado `LOGGED` — `lib/mail/mailer.ts` revisa ambas variables, no solo el host, porque en la práctica el host se configura antes de tramitar la contraseña de aplicación.
+- `app/admin/correos/page.tsx` lista `EmailLog` con vista previa del HTML (en un `<iframe sandbox="">`, no `dangerouslySetInnerHTML` — ver nota de seguridad en CLAUDE.md) — es la evidencia visible de que los correos se generan.
 
 > ⚠️ **Nodemailer no funciona en Edge Runtime.** Los handlers que envían correo deben declarar `export const runtime = "nodejs"` explícitamente.
 
@@ -829,9 +831,9 @@ MAIL_FROM="Laboratorio UEDA <lab.analitica@amigo.edu.co>"
 
 | # | Asunto | Impacto | Manejo |
 |---|--------|---------|--------|
-| ~~P1~~ | ~~**Dirección real del correo del laboratorio**~~ | ~~Bloquea la Fase 7.~~ | **RESUELTO.** La dirección confirmada es `lab.analitica@amigo.edu.co` y está aplicada en todo el plan y en `.env.example`. Queda pendiente solo el trámite de la contraseña de aplicación (riesgo R1). |
+| ~~P1~~ | ~~**Dirección real del correo del laboratorio**~~ | ~~Bloquea la Fase 7.~~ | **RESUELTO.** La dirección confirmada es `lab.analitica@amigo.edu.co` y está aplicada en todo el plan y en `.env.example`. |
 | ~~P2~~ | ~~**La lista de festivos de 2026 está calculada, no verificada**~~ | ~~Se aceptarían reservas un día festivo.~~ | **RESUELTO en la Fase 1, y la sospecha estaba justificada: faltaba un festivo.** Se recalculó la Pascua (5 abr 2026) y se revisó traslado por traslado; las 18 fechas originales son correctas, pero la **Ley 2578 de 2026** (sancionada el 1 de junio de 2026) creó el Día de Nuestra Señora del Rosario de Chiquinquirá: 9 de julio, trasladado al **lunes 13 de julio de 2026**. Son **19 festivos**, no 18. Lección para 2027: el calendario puede cambiar por ley dentro del mismo año, así que la lista se revisa al añadir cada año nuevo, no una sola vez. |
-| R1 | Google Workspace institucional puede tener deshabilitadas las contraseñas de aplicación. | El correo no sale. | Escribir a TI en la Fase 0. Respaldo: `EmailLog` visible en el panel como evidencia funcional. |
+| ~~R1~~ | ~~Google Workspace institucional puede tener deshabilitadas las contraseñas de aplicación.~~ | ~~El correo no sale.~~ | **RESUELTO en la Fase 7.** `/apppasswords` sí estaba habilitado para `lab.analitica@amigo.edu.co`: se generó la contraseña de aplicación sin fricción y el envío real se verificó de punta a punta (ver Fase 7 más abajo). |
 | R2 | La lista de festivos se queda sin años. | El sistema abriría festivos de 2027 en silencio. | `console.warn` al arrancar + aviso en el panel si el año en curso no está en `HOLIDAYS_CO` (§5.1). |
 | R3 | No hay logo oficial en SVG. | Incumplimiento de marca. | Solicitarlo a la Oficina de Comunicaciones. Placeholder tipográfico mientras tanto; nunca recolorear ni reescalar un PNG. |
 | R4 | Supabase pausa el proyecto tras 7 días sin actividad. | La aplicación aparece caída. | Verificar el estado antes de cualquier presentación. Alternativa: Neon (§11.3). |
