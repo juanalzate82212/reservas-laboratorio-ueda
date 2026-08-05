@@ -9,16 +9,23 @@ import { cn } from "@/lib/utils";
  */
 export interface ArcoDecorativoProps {
   forma?: "arco" | "anillo-fragmentado";
-  color?: "naranja" | "azul";
+  /** "blanco" es para la textura de patrón (§5.2) sobre fondo azul pleno. */
+  color?: "naranja" | "azul" | "blanco";
   className?: string;
 }
+
+const TRAZOS = {
+  naranja: "stroke-accent",
+  azul: "stroke-primary",
+  blanco: "stroke-white",
+} as const;
 
 export function ArcoDecorativo({
   forma = "arco",
   color = "naranja",
   className,
 }: ArcoDecorativoProps) {
-  const trazo = color === "naranja" ? "stroke-accent" : "stroke-primary";
+  const trazo = TRAZOS[color];
 
   return (
     <svg

@@ -31,6 +31,30 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   cargando?: boolean;
 }
 
+/*
+ * Clases de Button expuestas por separado: un <button> no puede anidarse
+ * dentro de un <a> (HTML lo prohíbe, y rompe accesibilidad de teclado), así
+ * que un CTA que en realidad navega usa <Link className={buttonVariants(...)}>
+ * en vez de envolver un <Button> dentro de un Link.
+ */
+export function buttonVariants({
+  variante = "primary",
+  tamano = "md",
+  className,
+}: {
+  variante?: keyof typeof variantes;
+  tamano?: keyof typeof tamanos;
+  className?: string;
+} = {}) {
+  return cn(
+    "inline-flex items-center justify-center rounded font-medium transition-colors",
+    "disabled:pointer-events-none disabled:opacity-50",
+    variantes[variante],
+    tamanos[tamano],
+    className,
+  );
+}
+
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   function Button(
     {
@@ -49,13 +73,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || cargando}
         aria-busy={cargando || undefined}
-        className={cn(
-          "inline-flex items-center justify-center rounded font-medium transition-colors",
-          "disabled:pointer-events-none disabled:opacity-50",
-          variantes[variante],
-          tamanos[tamano],
-          className,
-        )}
+        className={buttonVariants({ variante, tamano, className })}
         {...props}
       >
         {cargando && (

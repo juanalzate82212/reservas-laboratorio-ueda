@@ -14,7 +14,7 @@ El laboratorio UEDA de la Universidad Católica Luis Amigó necesita gestionar l
 
 | # | Funcionalidad |
 |---|---------------|
-| F1 | Landing pública accesible por QR con dos calendarios de disponibilidad (Sala de Reuniones y Sala Principal) |
+| F1 | Landing pública accesible por QR con ~~dos calendarios de disponibilidad (Sala de Reuniones y Sala Principal)~~ **un calendario de disponibilidad (Sala Principal) — decisión de producto tras la Fase 8: se retiró Sala de Reuniones, ver §13 y `CLAUDE.md`** |
 | F2 | Flujo de solicitud de reserva: sala → día → hora → duración |
 | F3 | Formulario de datos del solicitante: nombre, cargo, número de documento, correo institucional |
 | F4 | Validación de dominio `@amigo.edu.co` y de todos los campos obligatorios |
@@ -241,6 +241,26 @@ enum TimeBlockKind {
   WARNING
 }
 
+// Los `value` de src/config/reservationOptions.ts deben coincidir exactamente
+// con estos nombres (ver revisión post-Fase 4 más abajo).
+enum AcademicProgram {
+  INGENIERIA_SISTEMAS
+  INGENIERIA_CIVIL
+  ARQUITECTURA
+  TECNOLOGIA_DESARROLLO_SOFTWARE
+  ESPECIALIZACION_BIG_DATA_BI
+  INGENIERIA_SISTEMAS_APARTADO
+}
+
+enum ActivityType {
+  CLASE_PRACTICA
+  TALLER
+  EVALUACION
+  PROYECTO_AULA
+  SEMILLERO_INVESTIGACION
+  OTRO
+}
+
 model Room {
   id            String        @id @default(cuid())
   slug          String        @unique          // "sala-principal" | "sala-reuniones"
@@ -269,8 +289,12 @@ model Reservation {
   requesterRole   String                         // cargo
   requesterDocId  String                         // número de documento
   requesterEmail  String                         // debe terminar en @amigo.edu.co
-  purpose         String?                        // motivo (opcional)
-  attendees       Int?
+
+  academicProgram        AcademicProgram         // programa académico, lista cerrada
+  activityType            ActivityType           // tipo de actividad, lista cerrada + "OTRO"
+  activityTypeOther       String?                // solo cuando activityType = OTRO
+  attendees                Int                   // estimado, obligatorio
+  responsibilityAccepted   Boolean  @default(false) // cuadro de responsabilidad aceptado
 
   status          ReservationStatus @default(PENDING)
   adminNote       String?                        // razón de rechazo/cancelación
@@ -379,6 +403,7 @@ export const HOLIDAYS_CO: Record<number, string[]> = {
     "2026-06-08", // Corpus Christi (trasladado)
     "2026-06-15", // Sagrado Corazón (trasladado)
     "2026-06-29", // San Pedro y San Pablo
+    "2026-07-13", // Virgen de Chiquinquirá (9 jul → lunes) — Ley 2578 de 2026
     "2026-07-20", // Independencia
     "2026-08-07", // Batalla de Boyacá
     "2026-08-17", // Asunción (trasladado)
@@ -414,6 +439,8 @@ export const HOLIDAYS_CO: Record<number, string[]> = {
 10. No solapa con ninguna reserva `PENDING` o `CONFIRMED` de la misma sala.
 11. No solapa con ningún `TimeBlock` de tipo `BLOCKED` (de esa sala o global).
 12. Máximo `maxPendingPerEmail` solicitudes `PENDING` simultáneas por correo.
+
+> **Revisión post-Fase 4 (pedida por el usuario antes de la Fase 6):** el formulario del wizard estaba incompleto frente a lo que administración necesita para revisar una solicitud. Se agregaron cuatro campos, los cuatro obligatorios (cubiertos por la regla 1): `academicProgram` (lista cerrada, `AcademicProgram`), `activityType` (lista cerrada + `OTRO` con detalle abierto en `activityTypeOther`, obligatorio solo si se elige `OTRO`), y `responsibilityAccepted` (checkbox de aceptación del uso responsable del espacio, debe ser `true`). De paso, `attendees` pasó de opcional a obligatorio y `purpose` (motivo libre) se eliminó del modelo — lo reemplaza `activityType`, que es más útil para el admin al decidir. Las opciones de ambas listas viven en `src/config/reservationOptions.ts`, fuente única para el `<select>`, el Zod compartido y el paso de revisión.
 
 **Condición de solapamiento** (usar exactamente esta — evita el error clásico de bordes):
 
@@ -451,7 +478,7 @@ Formato de error uniforme:
 | `POST` | `/api/admin/login` | `{ password }` → setea cookie. |
 | `POST` | `/api/admin/logout` | Borra cookie. |
 | `GET` | `/api/admin/reservations?status=&roomId=` | Bandeja con datos del solicitante. |
-| `PATCH` | `/api/admin/reservations/[id]` | `{ action: "CONFIRM" \| "REJECT" \| "CANCEL", adminNote? }`. Cambia estado **y dispara el correo**. `REJECT` y `CANCEL` exigen `adminNote`. |
+| `PATCH` | `/api/admin/reservations/[id]` | `{ action: "CONFIRM" \| "REJECT" \| "CANCEL" }`. Cambia estado **y dispara el correo** (a partir de la Fase 7). ~~`REJECT` y `CANCEL` exigen `adminNote`~~ — ver revisión post-Fase-4/pre-Fase-6 más abajo. |
 | `GET` | `/api/admin/time-blocks` | Lista de franjas. |
 | `POST` | `/api/admin/time-blocks` | Crea una franja. Si es `BLOCKED` y solapa reservas existentes, responde `409` con la lista de conflictos. |
 | `DELETE` | `/api/admin/time-blocks/[id]` | Elimina la franja. |
@@ -464,6 +491,8 @@ REJECTED  → (final)
 CANCELLED → (final)
 ```
 
+> **Revisión pre-Fase 6:** el plan original exigía `adminNote` (motivo) al rechazar o cancelar. El usuario pidió explícitamente lo contrario antes de construir la Fase 6: esas acciones solo piden confirmación en la UI ("¿Estás seguro de...?"), sin capturar un motivo. `adminNote` sigue existiendo en el modelo (nullable) — la Fase 6 no lo escribe nunca, pero queda disponible por si una fase futura decide retomar la captura de motivo. Consecuencia para la Fase 7: el correo de rechazo no podrá incluir una razón específica, porque no se recoge.
+
 ---
 
 ## 7. Correos
@@ -473,13 +502,15 @@ Tres plantillas en `lib/mail/templates.ts`, HTML con **estilos inline** (los cli
 | Disparador | Asunto | Contenido clave |
 |------------|--------|-----------------|
 | `CONFIRM` | `Reserva confirmada — {Sala}, {fecha} {hora}` | Sala, fecha, hora inicio–fin, código, nombre. **Si la franja solapa un `TimeBlock` de tipo `WARNING`, incluir el aviso destacado** (ej. "En este horario no hay préstamo de equipos de cómputo"). |
-| `REJECT` | `Solicitud de reserva no aprobada — {Sala}, {fecha}` | Datos de la solicitud + `adminNote` como motivo + invitación a solicitar otro horario. |
-| `CANCEL` | `Reserva cancelada — {Sala}, {fecha} {hora}` | Datos + `adminNote` + disculpa breve, en la voz de marca (§9 del documento de identidad: sin dramatismo, explicar y ofrecer salida). |
+| `REJECT` | `Solicitud de reserva no aprobada — {Sala}, {fecha}` | Datos de la solicitud + `adminNote` como motivo (si existe) + invitación a solicitar otro horario. |
+| `CANCEL` | `Reserva cancelada — {Sala}, {fecha} {hora}` | Datos + `adminNote` (si existe) + disculpa breve, en la voz de marca (§9 del documento de identidad: sin dramatismo, explicar y ofrecer salida). |
+
+> **Nota (Fase 7, consecuencia de la revisión pre-Fase 6):** como `adminNote` ya no se captura en ningún punto del flujo (§6), `REJECT`/`CANCEL` casi nunca tendrán motivo que mostrar — la plantilla lo incluye solo si el campo tiene valor (relevante para las tres filas de la semilla que lo traían de antes de ese cambio). El correo explica que la solicitud no fue aprobada / fue cancelada e invita a solicitar otro horario, sin citar una razón específica.
 
 **Requisitos de implementación:**
 - El envío **nunca hace fallar la transición de estado**. Orden: actualizar la reserva → intentar enviar → registrar en `EmailLog` (`SENT` / `FAILED` / `LOGGED`). Si el correo falla, la respuesta es `200` con `{ emailStatus: "FAILED" }` y el panel muestra un botón "Reintentar envío".
-- Sin `SMTP_HOST`: escribir en consola + `EmailLog` con estado `LOGGED`.
-- `app/admin/correos/page.tsx` lista `EmailLog` con vista previa del HTML — es la evidencia visible de que los correos se generan.
+- Sin `SMTP_HOST` **o sin `SMTP_PASSWORD`**: escribir en consola + `EmailLog` con estado `LOGGED` — `lib/mail/mailer.ts` revisa ambas variables, no solo el host, porque en la práctica el host se configura antes de tramitar la contraseña de aplicación.
+- `app/admin/correos/page.tsx` lista `EmailLog` con vista previa del HTML (en un `<iframe sandbox="">`, no `dangerouslySetInnerHTML` — ver nota de seguridad en CLAUDE.md) — es la evidencia visible de que los correos se generan.
 
 > ⚠️ **Nodemailer no funciona en Edge Runtime.** Los handlers que envían correo deben declarar `export const runtime = "nodejs"` explícitamente.
 
@@ -493,7 +524,7 @@ Cumplimiento obligatorio de [`identidad-visual-ucla-ui-ux.md`](identidad-visual-
 - **Jerarquía:** azul estructura · blanco respira · naranja señala **una sola cosa** por vista · gris acompaña.
 - **Tipografía:** `Montserrat` (display) + `Inter` (cuerpo) vía `next/font/google` — evita FOUT y no requiere licencia.
 - **Gesto de marca:** un solo arco/anillo naranja por pantalla, en la cabecera de la landing.
-- **Logo:** SVG en la top bar. Mientras Comunicaciones no entregue el arte oficial, placeholder tipográfico — **nunca** un PNG reescalado ni una versión recoloreada.
+- **Logo:** SVG en la top bar. Mientras Comunicaciones no entregue el arte oficial, placeholder tipográfico — **nunca** un PNG reescalado ni una versión recoloreada. **Actualización:** el usuario entregó el arte oficial como PNG (no SVG) tras la Fase 8; se usa tal cual, sin reescalar ni recolorear — ver R3 y la nota de ajustes post-Fase 8 en `CLAUDE.md`.
 - **Accesibilidad:** WCAG AA, foco de teclado visible, `prefers-reduced-motion`. Texto sobre naranja siempre `#2E2E2E`, nunca blanco.
 - **Copy:** voz cercana y activa. Los botones dicen qué hacen: "Solicitar reserva", "Confirmar reserva", "Rechazar solicitud".
 
@@ -542,13 +573,15 @@ Diez fases. **Cada una termina en un estado ejecutable y verificable.** No empez
    | Sala | `slug` | Aforo | Equipos de cómputo | `colorToken` |
    |------|--------|-------|--------------------|--------------|
    | Sala Principal | `sala-principal` | 20 | Sí | `azul` |
-   | Sala de Reuniones | `sala-reuniones` | 7 | No | `naranja` |
+   | ~~Sala de Reuniones~~ | ~~`sala-reuniones`~~ | ~~7~~ | ~~No~~ | ~~`naranja`~~ |
+
+   > **Actualización tras la Fase 8:** Sala de Reuniones se retiró por decisión de producto (§13). El modelo `Room` sigue siendo genérico — no se tocó el schema —, pero `prisma/seed.ts` ya no la crea y borró la fila existente; las dos reservas de demo que tenía se reasignaron a Sala Principal. Ver `CLAUDE.md`.
 
 4. `config/booking.ts` con `BOOKING_CONFIG` del §5 y `config/holidays.ts` con `HOLIDAYS_CO` del §5.1.
 5. `lib/datetime.ts`: `toBogota()`, `fromBogota()`, `generateSlots(date, room)`, `getOpeningRangesFor(date)`, `isHoliday(date)`, `fitsInSingleRange(start, end)`, `formatRange()`.
 6. `lib/availability.ts`: `overlaps(a, b)`, `getSlotState(slot, reservations, blocks)`, `findConflicts()`.
 
-**Aceptación:** `npx prisma studio` muestra las 2 salas con sus aforos y los datos de demo. Existe `scripts/check-datetime.ts` que imprime y verifica los casos límite: 08:00, 12:00, 13:00, 17:00, una reserva que intenta cruzar el receso, un sábado, un festivo trasladado (ej. 2026-01-12), y un cálculo de anticipación mínima corriendo con `TZ=UTC` (simulando Vercel).
+**Aceptación:** `npx prisma studio` muestra las 2 salas con sus aforos y los datos de demo. Existe `scripts/check-datetime.ts` que imprime y verifica los casos límite: 08:00, 12:00, 13:00, 17:00, una reserva que intenta cruzar el receso, un sábado, un festivo trasladado (ej. 2026-01-12), y un cálculo de anticipación mínima corriendo con `TZ=UTC` (simulando Vercel). *(Estado tras la Fase 8: `prisma studio` muestra 1 sala activa — ver actualización arriba.)*
 
 ---
 
@@ -562,16 +595,18 @@ Diez fases. **Cada una termina en un estado ejecutable y verificable.** No empez
 
 ### Fase 3 — Landing pública con los dos calendarios
 1. `app/page.tsx`: cabecera de marca con el arco, título, texto breve, leyenda de colores, dos `RoomCalendar` lado a lado en escritorio y apilados en móvil.
-2. `components/calendar/RoomCalendar.tsx` (`"use client"`): FullCalendar en `timeGridWeek`, `slotMinTime: "08:00"` / `slotMaxTime: "17:00"`, `locale` es, `allDaySlot: false`, `weekends: false` (el laboratorio no abre), sin edición. El receso 12:00–13:00 se pinta como no disponible. Los días festivos se atenúan y se etiquetan "Festivo" en la cabecera del día. Colores según §8.
+2. `components/calendar/RoomCalendar.tsx` (`"use client"`): FullCalendar en `timeGridWeek`, `slotMinTime: "08:00"` / `slotMaxTime: "17:00"`, `locale` es, `allDaySlot: false`, `weekends: false` (el laboratorio no abre). El receso 12:00–13:00 se pinta como no disponible. Los días festivos se atenúan y se etiquetan "Festivo" en la cabecera del día. Colores según §8.
 3. Botón destacado **"Reservar espacio"** (única acción en naranja de la pantalla).
 4. Responsive: **la landing se abre desde un QR, así que móvil es el caso principal.** En pantallas pequeñas, vista por defecto `timeGridDay` con navegación por días.
 
 **Aceptación:** a 390 px de ancho se ven ambos calendarios legibles con la disponibilidad y la leyenda; no hay scroll horizontal; el receso se distingue de una franja bloqueada; una semana que contenga un festivo lo muestra atenuado y etiquetado.
 
+> **Revisión post-Fase 3 (con la Fase 4 ya construida):** dos cambios de diseño sobre lo anterior, pedidos explícitamente por el usuario tras ver el resultado. (1) Los calendarios ya no se muestran de entrada: cada uno empieza plegado detrás de un botón "Ver disponibilidad de {sala}" — menos que cargar antes de decidir qué sala mirar, coherente con que la landing se abre desde un QR. (2) El calendario dejó de ser "sin edición": ahora es clicable (`@fullcalendar/interaction`). Clicar una franja libre o con `WARNING` navega a `/reservar?roomId=&startsAt=` con la hora ya elegida — ver Fase 4.
+
 ---
 
 ### Fase 4 — Flujo de solicitud de reserva
-Wizard de 3 pasos + confirmación, en un `Dialog` de Radix (o página `/reservar` en móvil).
+Wizard de 3 pasos + confirmación, en página `/reservar`.
 
 1. **Paso 1 — Espacio y horario:** selector de sala, selector de día, grilla de horas disponibles (deshabilitando ocupadas, bloqueadas y las que no caben en la jornada), selector de duración. Las franjas `WARNING` son seleccionables con el aviso visible.
 2. **Paso 2 — Datos del solicitante:** nombre completo, cargo, número de documento, correo institucional, motivo (opcional), n.º de asistentes (opcional). Validación en vivo con RHF + Zod, mensajes en español y en voz de marca.
@@ -581,6 +616,10 @@ Wizard de 3 pasos + confirmación, en un `Dialog` de Radix (o página `/reservar
 6. Error de carrera: si la franja se ocupó mientras el usuario llenaba el formulario → mensaje claro ("Esa franja acaba de ser reservada, elige otra") y vuelta al paso 1 con el calendario refrescado.
 
 **Aceptación:** una reserva válida aparece como `PENDING` en Prisma Studio y como "En revisión" en el calendario. Un correo `@gmail.com` se rechaza con el mensaje del §5, regla 2. Una franja bloqueada no es seleccionable. Una reserva 11:00–14:00 se rechaza por cruzar el receso. Un festivo y un fin de semana no ofrecen ninguna franja. Enviar dos veces la misma franja falla la segunda vez.
+
+> **Revisión post-Fase 3/4:** `/reservar` acepta `?roomId=&startsAt=` para llegar con la sala y la hora ya elegidas (validado contra las salas reales antes de confiar en la URL; si no cuadra, el wizard arranca vacío sin romper nada). El Paso 1 sigue existiendo — sala, día y franja se ven pre-seleccionados y editables —, pero con esos dos parámetros el selector de duración queda visible de inmediato, sin repetir la elección de horario que ya se hizo en el calendario.
+>
+> **Actualización tras la Fase 8:** con una sola sala reservable (ver §13), el Paso 1 ya no tiene selector de sala — solo día, hora y duración —, y el enlace desde el calendario quedó en `?startsAt=` sin `roomId` (redundante cuando solo hay una sala). Ver `CLAUDE.md`.
 
 ---
 
@@ -599,12 +638,12 @@ Wizard de 3 pasos + confirmación, en un `Dialog` de Radix (o página `/reservar
 ### Fase 6 — Bandeja de solicitudes
 1. `app/admin/page.tsx`: lista de reservas con filtros por estado y sala, ordenadas por fecha de inicio. Tarjetas en móvil, tabla en escritorio.
 2. Detalle expandible con todos los datos del solicitante.
-3. Acciones: **Confirmar** (con confirmación), **Rechazar** y **Cancelar** (ambas abren un diálogo que exige motivo).
+3. Acciones: **Confirmar**, **Rechazar** y **Cancelar**, cada una con un diálogo de confirmación simple ("¿Estás seguro de...?") — sin motivo, ver revisión pre-Fase 6 en el §6.
 4. `PATCH /api/admin/reservations/[id]` validando las transiciones permitidas.
 5. Toasts + revalidación de la lista tras cada acción.
 6. Contador de pendientes visible en la navegación.
 
-**Aceptación:** confirmar una solicitud la mueve a `CONFIRMED` y la pinta como reservada en el calendario público. Rechazar sin motivo es imposible. Confirmar una ya rechazada devuelve `409`.
+**Aceptación:** confirmar una solicitud la mueve a `CONFIRMED` y la pinta como reservada en el calendario público. Confirmar una ya rechazada devuelve `409`.
 
 ---
 
@@ -626,6 +665,8 @@ Wizard de 3 pasos + confirmación, en un `Dialog` de Radix (o página `/reservar
 4. Verificar que ambos tipos se reflejan en el calendario público y en el wizard.
 
 **Aceptación:** bloquear una franja la vuelve no seleccionable en el wizard; una franja de advertencia sigue siendo reservable, muestra el motivo en el paso 3, y ese motivo aparece en el correo de confirmación.
+
+> **Decisión de implementación:** el formulario pide **fecha de inicio y fecha de fin por separado** (no un solo día + hora de inicio/fin, como el wizard público). Una franja de admin puede abarcar varios días — "semana de receso", una jornada institucional de varios días — y a diferencia de una reserva no está sujeta a `fitsInSingleRange`/`isAlignedToSlot` de `lib/datetime.ts` (esas reglas son de la grilla de reserva del público, no aplican a lo que el admin declara como cerrado). El chequeo de conflicto al crear un `BLOCKED` compara contra reservas `PENDING`/`CONFIRMED`, filtrando por sala solo si `roomId` no es `null` — una franja global (`roomId: null`) choca con una reserva de **cualquier** sala.
 
 ---
 
@@ -671,7 +712,7 @@ Para eso necesita cuatro datos:
 |------|--------|-----------------------------|
 | **Host** | Dirección del servidor de envío | `smtp.gmail.com` |
 | **Puerto** | Puerto de conexión | `587` (con STARTTLS) o `465` (con SSL directo) |
-| **Usuario** | La dirección de correo completa | ej. `laboratorio.ueda@amigo.edu.co` |
+| **Usuario** | La dirección de correo completa | ej. `lab.analitica@amigo.edu.co` |
 | **Contraseña** | Credencial de acceso | ⚠️ **No la contraseña normal** — ver 10.2 |
 
 Los correos salidos **aparecen enviados desde ese buzón** y quedan en su carpeta "Enviados". Si alguien responde a un correo de confirmación, la respuesta llega a ese mismo buzón. Por eso conviene usar la cuenta del laboratorio y no una cuenta personal.
@@ -701,9 +742,9 @@ Google **bloquea el acceso SMTP con la contraseña normal de la cuenta** desde 2
 SMTP_HOST="smtp.gmail.com"
 SMTP_PORT="587"
 SMTP_SECURE="false"                          # false con 587 (STARTTLS); true con 465
-SMTP_USER="laboratorio.ueda@amigo.edu.co"    # la cuenta del laboratorio
+SMTP_USER="lab.analitica@amigo.edu.co"    # la cuenta del laboratorio
 SMTP_PASSWORD="abcdefghijklmnop"             # contraseña de aplicación, sin espacios
-MAIL_FROM="Laboratorio UEDA <laboratorio.ueda@amigo.edu.co>"
+MAIL_FROM="Laboratorio de Analítica de Datos e Inteligencia Artificial <lab.analitica@amigo.edu.co>"
 ```
 
 > ⚠️ **La dirección de `MAIL_FROM` debe ser la misma de `SMTP_USER`** (o un alias configurado en esa cuenta). Gmail rechaza remitentes arbitrarios; poner un `no-responder@...` que no exista hace fallar el envío.
@@ -768,9 +809,9 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"  # en Vercel: https://<proyecto>.ver
 SMTP_HOST="smtp.gmail.com"
 SMTP_PORT="587"
 SMTP_SECURE="false"
-SMTP_USER="laboratorio.ueda@amigo.edu.co"
+SMTP_USER="lab.analitica@amigo.edu.co"
 SMTP_PASSWORD=""                             # contraseña de aplicación de 16 caracteres, sin espacios
-MAIL_FROM="Laboratorio UEDA <laboratorio.ueda@amigo.edu.co>"
+MAIL_FROM="Laboratorio de Analítica de Datos e Inteligencia Artificial <lab.analitica@amigo.edu.co>"
 ```
 
 ---
@@ -781,7 +822,7 @@ MAIL_FROM="Laboratorio UEDA <laboratorio.ueda@amigo.edu.co>"
 |------|----------|
 | Horario de atención | **8:00–12:00 y 13:00–17:00**, de lunes a viernes. Receso de 12:00 a 13:00 no reservable. Una reserva no puede cruzarlo. |
 | Días cerrados | **Sábados, domingos y festivos colombianos.** Los festivos viven en `config/holidays.ts` (§5.1); los cierres excepcionales los crea el admin como `TimeBlock`. |
-| Salas | **Sala Principal**: aforo 20, con equipos de cómputo. **Sala de Reuniones**: aforo 7, sin equipos. |
+| Salas | **Sala Principal**: aforo 20, con equipos de cómputo. ~~**Sala de Reuniones**: aforo 7, sin equipos.~~ **Retirada tras la Fase 8** (decisión de producto: solo se reserva Sala Principal). El modelo `Room` se mantuvo genérico por si se reactiva una segunda sala; el wizard y la landing ya no muestran selector de sala. Ver `CLAUDE.md`. |
 | Duración de reservas | De **30 minutos a 4 horas**, en bloques de 30 min. |
 | Correo institucional | **Google Workspace** → SMTP de Gmail con contraseña de aplicación (§10). |
 | Acuse de recibo | **No se envía.** Solo hay correo al confirmar, rechazar o cancelar. La pantalla de éxito con el código cumple esa función. |
@@ -796,11 +837,11 @@ MAIL_FROM="Laboratorio UEDA <laboratorio.ueda@amigo.edu.co>"
 
 | # | Asunto | Impacto | Manejo |
 |---|--------|---------|--------|
-| **P1** | **Dirección real del correo del laboratorio** desde la que saldrán las notificaciones. | Bloquea la Fase 7. | Provisional en todo el plan: `laboratorio.ueda@amigo.edu.co`. **Confirmar la dirección real y arrancar el trámite de la contraseña de aplicación en la Fase 0** — es un valor de `.env`, cambiarlo después no cuesta nada, pero el trámite sí toma tiempo. |
-| **P2** | **La lista de festivos de 2026 está calculada, no verificada** contra fuente oficial. | Se aceptarían reservas un día festivo. | Verificar antes de cerrar la Fase 1 (§5.1). |
-| R1 | Google Workspace institucional puede tener deshabilitadas las contraseñas de aplicación. | El correo no sale. | Escribir a TI en la Fase 0. Respaldo: `EmailLog` visible en el panel como evidencia funcional. |
+| ~~P1~~ | ~~**Dirección real del correo del laboratorio**~~ | ~~Bloquea la Fase 7.~~ | **RESUELTO.** La dirección confirmada es `lab.analitica@amigo.edu.co` y está aplicada en todo el plan y en `.env.example`. |
+| ~~P2~~ | ~~**La lista de festivos de 2026 está calculada, no verificada**~~ | ~~Se aceptarían reservas un día festivo.~~ | **RESUELTO en la Fase 1, y la sospecha estaba justificada: faltaba un festivo.** Se recalculó la Pascua (5 abr 2026) y se revisó traslado por traslado; las 18 fechas originales son correctas, pero la **Ley 2578 de 2026** (sancionada el 1 de junio de 2026) creó el Día de Nuestra Señora del Rosario de Chiquinquirá: 9 de julio, trasladado al **lunes 13 de julio de 2026**. Son **19 festivos**, no 18. Lección para 2027: el calendario puede cambiar por ley dentro del mismo año, así que la lista se revisa al añadir cada año nuevo, no una sola vez. |
+| ~~R1~~ | ~~Google Workspace institucional puede tener deshabilitadas las contraseñas de aplicación.~~ | ~~El correo no sale.~~ | **RESUELTO en la Fase 7.** `/apppasswords` sí estaba habilitado para `lab.analitica@amigo.edu.co`: se generó la contraseña de aplicación sin fricción y el envío real se verificó de punta a punta (ver Fase 7 más abajo). |
 | R2 | La lista de festivos se queda sin años. | El sistema abriría festivos de 2027 en silencio. | `console.warn` al arrancar + aviso en el panel si el año en curso no está en `HOLIDAYS_CO` (§5.1). |
-| R3 | No hay logo oficial en SVG. | Incumplimiento de marca. | Solicitarlo a la Oficina de Comunicaciones. Placeholder tipográfico mientras tanto; nunca recolorear ni reescalar un PNG. |
+| ~~R3~~ | ~~No hay logo oficial en SVG.~~ | ~~Incumplimiento de marca.~~ | **RESUELTO tras la Fase 8.** El usuario entregó el arte oficial en PNG (no llegó a haber SVG). `Logo.tsx` lo usa sin recolorear ni reescalar — ver nota de ajustes post-Fase 8 en `CLAUDE.md`. |
 | R4 | Supabase pausa el proyecto tras 7 días sin actividad. | La aplicación aparece caída. | Verificar el estado antes de cualquier presentación. Alternativa: Neon (§11.3). |
 | R5 | Una sola contraseña de admin, sin usuarios reales. | Aceptable en MVP, no en producción. | Documentado como fase 2 (SSO institucional). Contraseña fuerte y rotada tras la demo. |
 | R6 | Sin autenticación del solicitante, cualquiera con un correo `@amigo.edu.co` válido puede reservar a nombre de otro. | Uso indebido. | Aceptado en MVP; el admin aprueba manualmente. Fase 2: verificación por enlace al correo. |

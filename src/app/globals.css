@@ -38,6 +38,15 @@
   --fondo: #ffffff;
   --negro: #111111;
 
+  /*
+   * Solo para el grid de FullCalendar (--fc-border-color más abajo): --borde
+   * resultó demasiado sutil para las líneas de una grilla de 30 min, pedido
+   * explícito del usuario tras verla en el navegador. No es un token de
+   * marca — no hace falta espejarlo en tailwind.config.ts, ningún
+   * componente lo usa como utilidad.
+   */
+  --borde-calendario: #c7c7c7;
+
   /* Estados (derivado, fuera de marca) */
   --exito: #2e7d5b;
   --error: #c0392b;
@@ -94,4 +103,138 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/*
+ * Theming de FullCalendar (Fase 3). Usa las variables CSS documentadas por
+ * FullCalendar (--fc-*) en vez de pelear con la especificidad de sus reglas
+ * por defecto. Referencia de estados: §8 del plan.
+ */
+.fc {
+  --fc-border-color: var(--borde-calendario);
+  --fc-neutral-bg-color: var(--superficie);
+  --fc-page-bg-color: var(--fondo);
+  --fc-today-bg-color: var(--azul-50);
+  --fc-now-indicator-color: var(--naranja-500);
+  /* Receso y horario fuera de atención: atenuado, sin etiqueta (tabla §8). */
+  --fc-non-business-color: rgb(132 133 133 / 0.14);
+  --fc-button-bg-color: var(--fondo);
+  --fc-button-border-color: var(--borde);
+  --fc-button-text-color: var(--texto);
+  --fc-button-hover-bg-color: var(--superficie);
+  --fc-button-hover-border-color: var(--azul-500);
+  --fc-button-active-bg-color: var(--azul-50);
+  --fc-button-active-border-color: var(--azul-500);
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+.fc .fc-button {
+  box-shadow: none !important;
+  font-weight: 500;
+  text-transform: none;
+}
+
+.fc .fc-toolbar-title {
+  font-family: var(--font-montserrat), system-ui, sans-serif;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--texto);
+}
+
+.fc .fc-col-header-cell-cushion {
+  padding: 6px 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--texto);
+  text-transform: capitalize;
+}
+
+.fc .fc-timegrid-slot-label-cushion,
+.fc .fc-timegrid-axis-cushion {
+  font-size: 0.75rem;
+  color: var(--texto-secundario);
+}
+
+/* Rayado diagonal: refuerzo no cromático de "bloqueada"/"no disponible",
+   compartido entre AvailabilityLegend y los eventos BLOCKED del calendario. */
+.rayado-diagonal {
+  background-color: var(--gris);
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgb(0 0 0 / 0.18) 0px,
+    rgb(0 0 0 / 0.18) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+}
+
+.fc-timegrid-event.fc-evento-reservado {
+  border-color: var(--azul-500);
+  background-color: var(--azul-500);
+  color: #fff;
+}
+
+.fc-timegrid-event.fc-evento-revision {
+  border: 2px dashed var(--azul-500);
+  background-color: var(--azul-200);
+  color: var(--texto);
+}
+
+/*
+ * AVISO va como evento de fondo (display:"background"), no de primer plano:
+ * así no intercepta el clic y la grilla sigue abriendo el wizard con la
+ * franja exacta de 30 min tocada, igual que en una zona libre — la franja
+ * sigue siendo reservable (§5 del plan), solo lleva un aviso.
+ *
+ * Los bg-event de FullCalendar NO tienen el wrapper .fc-event-main: nuestro
+ * contenido (icono + motivo) se inserta directo dentro de .fc-bg-event
+ * (verificado contra @fullcalendar/core/internal-common.js). Por eso el tinte
+ * va en background-color con alpha, no en `opacity`: `opacity` atenuaría
+ * también el texto que vive en el mismo elemento.
+ * Texto sobre naranja siempre oscuro, nunca blanco (identidad de marca).
+ */
+.fc-bg-event.fc-evento-aviso {
+  opacity: 1; /* anula --fc-bg-event-opacity, que también atenuaría el texto */
+  border: 1px dashed var(--naranja-700);
+  background-color: rgb(243 146 0 / 0.22); /* naranja-500 al 22% */
+  color: var(--texto);
+}
+
+.fc-timegrid-event.fc-evento-bloqueado {
+  border-color: var(--gris);
+  color: #fff;
+}
+.fc-timegrid-event.fc-evento-bloqueado .fc-event-main {
+  background-color: var(--gris);
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgb(0 0 0 / 0.18) 0px,
+    rgb(0 0 0 / 0.18) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+}
+
+/* Festivo: día atenuado ("#F5F5F5 atenuado" — tabla §8). */
+.fc-bg-event.fc-dia-festivo {
+  background-color: var(--superficie);
+  opacity: 0.85;
+}
+
+.fc-dia-festivo-header {
+  opacity: 0.6;
+}
+.fc-dia-festivo-header .fc-col-header-cell-cushion::after {
+  content: "Festivo";
+  display: block;
+  margin-top: 2px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--naranja-700);
+  text-transform: none;
+}
+
+/* Clicar una franja libre (o con aviso) abre el wizard con esa hora. */
+.fc-timegrid-slot-lane {
+  cursor: pointer;
 }
