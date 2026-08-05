@@ -4,6 +4,26 @@
 
 ---
 
+## ⚠️ Cómo leer este documento hoy
+
+**Estado: Fases 0–9 completas. La aplicación está en producción** (https://reservas-laboratorio-ueda.vercel.app). La Fase 10 está parcialmente hecha.
+
+Este sigue siendo el **contrato de alcance, modelo de datos, reglas de negocio y contratos de API** — sigue vigente y hay que respetarlo. Pero fue escrito *antes* de construir, y varias decisiones posteriores lo modificaron. Donde eso pasó, el texto está ~~tachado~~ con una nota al lado.
+
+**Para saber el estado actual y por qué las cosas son como son, la fuente de verdad es [`CLAUDE.md`](CLAUDE.md)**, no este archivo. Ahí están las decisiones de producto tomadas sobre la marcha, las trampas técnicas ya resueltas y lo que queda pendiente. Lo pendiente concreto está en [`BACKLOG.md`](BACKLOG.md).
+
+Desviaciones principales respecto a lo que se lee aquí:
+
+| Tema | Qué dice el plan | Qué se hizo |
+|------|------------------|-------------|
+| Salas | Dos salas (Principal y de Reuniones) | **Solo Sala Principal.** Decisión de producto tras la Fase 8. El modelo `Room` se mantuvo genérico. |
+| Rechazar / cancelar | `adminNote` obligatorio | **Solo confirmación**, sin capturar motivo. Pedido antes de construir la Fase 6. |
+| Formulario de reserva | Nombre, cargo, documento, correo, motivo libre, asistentes opcional | Se añadieron **programa académico**, **tipo de actividad** y **aceptación de responsabilidad**; `attendees` pasó a obligatorio; el campo libre `purpose` se eliminó. |
+| Versiones del §2 | Ver tabla | Cinco paquetes cambiaron por advisories de seguridad — ver la tabla de desviaciones en `CLAUDE.md`. |
+| Logo (riesgo R3) | SVG oficial pendiente | Resuelto: se entregó en **PNG**, sin canal alfa. |
+
+---
+
 ## 1. Contexto y objetivo
 
 El laboratorio UEDA de la Universidad Católica Luis Amigó necesita gestionar la reserva de sus espacios. Hoy no existe sistema: se coordina de forma informal.
@@ -593,7 +613,7 @@ Diez fases. **Cada una termina en un estado ejecutable y verificable.** No empez
 
 ---
 
-### Fase 3 — Landing pública con los dos calendarios
+### Fase 3 — Landing pública con ~~los dos calendarios~~ el calendario
 1. `app/page.tsx`: cabecera de marca con el arco, título, texto breve, leyenda de colores, dos `RoomCalendar` lado a lado en escritorio y apilados en móvil.
 2. `components/calendar/RoomCalendar.tsx` (`"use client"`): FullCalendar en `timeGridWeek`, `slotMinTime: "08:00"` / `slotMaxTime: "17:00"`, `locale` es, `allDaySlot: false`, `weekends: false` (el laboratorio no abre). El receso 12:00–13:00 se pinta como no disponible. Los días festivos se atenúan y se etiquetan "Festivo" en la cabecera del día. Colores según §8.
 3. Botón destacado **"Reservar espacio"** (única acción en naranja de la pantalla).
@@ -602,6 +622,8 @@ Diez fases. **Cada una termina en un estado ejecutable y verificable.** No empez
 **Aceptación:** a 390 px de ancho se ven ambos calendarios legibles con la disponibilidad y la leyenda; no hay scroll horizontal; el receso se distingue de una franja bloqueada; una semana que contenga un festivo lo muestra atenuado y etiquetado.
 
 > **Revisión post-Fase 3 (con la Fase 4 ya construida):** dos cambios de diseño sobre lo anterior, pedidos explícitamente por el usuario tras ver el resultado. (1) Los calendarios ya no se muestran de entrada: cada uno empieza plegado detrás de un botón "Ver disponibilidad de {sala}" — menos que cargar antes de decidir qué sala mirar, coherente con que la landing se abre desde un QR. (2) El calendario dejó de ser "sin edición": ahora es clicable (`@fullcalendar/interaction`). Clicar una franja libre o con `WARNING` navega a `/reservar?roomId=&startsAt=` con la hora ya elegida — ver Fase 4.
+>
+> **Actualización tras la Fase 8:** el punto (1) ya no aplica. Con una sola sala (ver §13), el plegado perdió su motivo —existía para elegir *qué* calendario mirar— y `CalendarGrid.tsx` se eliminó: ahora `RoomAvailability.tsx` muestra el único calendario directo y a todo el ancho. El enlace del punto (2) quedó en `?startsAt=`, sin `roomId`. Ver `CLAUDE.md`.
 
 ---
 
@@ -681,6 +703,14 @@ Wizard de 3 pasos + confirmación, en página `/reservar`.
 
 **Aceptación:** el flujo completo funciona desde la URL pública de Vercel, en un teléfono real, con datos persistiendo en Supabase.
 
+> **✅ COMPLETA.** Desplegada en https://reservas-laboratorio-ueda.vercel.app (subdominio de Vercel: decisión explícita del usuario, no hay dominio propio). Verificada con peticiones reales contra esa URL, incluyendo que la cookie de sesión de admin autorice efectivamente las rutas protegidas.
+>
+> Dos desviaciones respecto a los pasos de arriba:
+> - **El paso 6 (seed contra producción) no aplica como está escrito.** No existe una base de datos separada: local y producción comparten el mismo proyecto de Supabase, que ya estaba migrado y sembrado desde la Fase 1. Además el usuario limpió después los datos de demo a propósito, para dejar la aplicación lista para uso real. **`prisma db seed` es destructivo contra producción** — ver `CLAUDE.md`.
+> - **El paso 7 quedó a medias:** se verificó landing, wizard, login de admin y todas las rutas, pero **no una reserva completa con correo real desde producción**. Sigue pendiente en `BACKLOG.md`.
+>
+> Las trampas encontradas al desplegar (el primer `vercel deploy` va siempre a producción, la Production Branch por defecto, `vercel env add` con caracteres `<`/`>`) están documentadas en `CLAUDE.md`.
+
 ---
 
 ### Fase 10 — QR, pulido y cierre
@@ -695,6 +725,12 @@ Wizard de 3 pasos + confirmación, en página `/reservar`.
 9. `README.md` con instalación, variables de entorno y pasos de despliegue.
 
 **Aceptación:** recorrido completo end-to-end desde un teléfono real escaneando el QR impreso, terminando con el correo de confirmación recibido.
+
+> **🟡 PARCIAL.** Hechos: **1** (la ruta real es `app/admin/(protected)/qr/page.tsx`, dentro del route group), **7** y **9**. Parciales: **2** (falta la imagen OG) y **3** (el calendario y `EmptyState` sí, el resto no se repasó). Pendientes: **4**, **5**, **6**.
+>
+> El punto **8 queda anulado a propósito**: contradice la decisión del usuario de limpiar los datos de prueba para uso real.
+>
+> El seguimiento vivo de lo que falta está en [`BACKLOG.md`](BACKLOG.md), no aquí.
 
 ---
 
