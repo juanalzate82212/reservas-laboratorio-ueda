@@ -238,3 +238,11 @@
 .fc-timegrid-slot-lane {
   cursor: pointer;
 }
+
+/* Página del QR (admin/qr): formato imprimible, tamaño carta. */
+@media print {
+  @page {
+    size: letter;
+    margin: 1in;
+  }
+}
