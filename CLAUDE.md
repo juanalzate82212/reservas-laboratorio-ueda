@@ -175,6 +175,14 @@ Tras probar el wizard en el navegador, el usuario pidió:
 
 **Disponibilidad.** `lib/availability.ts` implementa el solapamiento con exactamente `A.startsAt < B.endsAt && B.startsAt < A.endsAt` (09:00–10:00 y 10:00–11:00 **no** solapan). Las reservas `PENDING` **ocupan la franja** igual que las `CONFIRMED`.
 
+**`EXPIRED` se aplica al leer, no con una tarea programada.** Una solicitud que nadie revisó y cuya franja ya terminó pasa a `EXPIRED`. Es el único estado que **no** decide el administrador, así que no hay ninguna acción de usuario donde colgarlo: `lib/expiration.ts` hace un `updateMany` idempotente (`status = PENDING AND endsAt < now()`) que se llama **antes** de las tres lecturas que importan — `GET /api/admin/reservations` (de donde cuelga también el contador del nav), `getPublicReservationByCode()` y el conteo de pendientes de `POST /api/reservations`.
+
+Se descartó Vercel Cron porque **en plan Hobby solo permite una ejecución al día**: una solicitud vencida por la mañana seguiría mostrándose "En revisión" hasta la madrugada. Aplicándolo al leer, lo que se ve nunca está desfasado. `decidedAt` se deja en `null` a propósito — `EXPIRED` con `decidedAt` nulo significa exactamente "se venció sin que nadie la mirara".
+
+**Es terminal:** `ALLOWED_FROM` en `PATCH /api/admin/reservations/[id]` solo admite origen `PENDING` o `CONFIRMED`, así que las tres acciones sobre una vencida devuelven `409 INVALID_TRANSITION` sin necesidad de código extra. Y **arregla un bug real**: el tope de `maxPendingPerEmail` filtra por `status: "PENDING"`, así que antes tres solicitudes vencidas sin revisar bloqueaban ese correo de forma permanente.
+
+⚠️ `lib/availability.ts` declara su **propio** union `ReservationStatus` en vez de importar el de Prisma (para servir igual en cliente y servidor, y poder probarse con literales). No puede desincronizarse en silencio —los handlers pasan resultados de Prisma a `findConflicts()`, así que un estado nuevo que falte allí rompe la compilación— pero al añadir uno hay que tocar los dos sitios.
+
 **Mutaciones = Route Handlers, no Server Actions.** Un solo patrón, para poder probar con `curl`. Formato de error uniforme: `{ "error": { "code": "...", "message": "..." } }`.
 
 **El correo nunca bloquea la transición de estado.** Orden en `PATCH /api/admin/reservations/[id]`: actualizar BD → intentar enviar → registrar en `EmailLog` (`SENT`/`FAILED`/`LOGGED`). Si el envío falla, la respuesta sigue siendo `200` con `{ emailStatus: "FAILED" }`.

@@ -13,6 +13,9 @@ export const RESERVATION_STATUS_TONE = {
   CONFIRMED: "exito",
   REJECTED: "error",
   CANCELLED: "neutral",
+  // Gris propio, distinto del de "Cancelada": las dos son inactivas, pero no
+  // significan lo mismo y no deben leerse como el mismo estado.
+  EXPIRED: "bloqueado",
 } as const satisfies Record<ReservationStatus, BadgeProps["tono"]>;
 
 export const RESERVATION_STATUS_LABEL = {
@@ -20,4 +23,5 @@ export const RESERVATION_STATUS_LABEL = {
   CONFIRMED: "Confirmada",
   REJECTED: "Rechazada",
   CANCELLED: "Cancelada",
+  EXPIRED: "Vencida",
 } as const satisfies Record<ReservationStatus, string>;
