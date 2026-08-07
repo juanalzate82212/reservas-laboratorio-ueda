@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { addDays } from "date-fns";
 import { CheckCircle2, Copy } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -14,7 +14,7 @@ import { BOOKING_CONFIG } from "@/config/booking";
 import { toBogotaDayKey } from "@/lib/datetime";
 import type { ActiveRoom } from "@/lib/rooms";
 import {
-  createReservationSchema,
+  buildCreateReservationSchema,
   type CreateReservationInput,
 } from "@/lib/validation/reservation";
 
@@ -65,8 +65,16 @@ export function ReservationWizard({
   const [warning, setWarning] = useState<string | null>(null);
   const [codigo, setCodigo] = useState<string | null>(null);
 
+  // El tope de asistentes es el aforo de esta sala, que solo se conoce en
+  // tiempo de ejecución. El servidor lo vuelve a comprobar contra la BD; esto
+  // solo evita llegar hasta el envío para descubrirlo.
+  const schema = useMemo(
+    () => buildCreateReservationSchema({ maxAttendees: room.capacity }),
+    [room.capacity],
+  );
+
   const form = useForm<CreateReservationInput>({
-    resolver: zodResolver(createReservationSchema),
+    resolver: zodResolver(schema),
     mode: "onTouched",
     defaultValues: {
       roomId: room.id,
@@ -207,7 +215,12 @@ export function ReservationWizard({
         )}
 
         {paso === 1 && (
-          <StepRequester register={register} control={control} errors={errors} />
+          <StepRequester
+            register={register}
+            control={control}
+            errors={errors}
+            maxAttendees={room.capacity}
+          />
         )}
 
         {paso === 2 && (

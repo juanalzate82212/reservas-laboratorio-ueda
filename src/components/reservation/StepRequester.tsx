@@ -14,9 +14,16 @@ export interface StepRequesterProps {
   register: UseFormRegister<CreateReservationInput>;
   control: Control<CreateReservationInput>;
   errors: FieldErrors<CreateReservationInput>;
+  /** Aforo de la sala: es el tope de asistentes, y sale de la BD. */
+  maxAttendees: number;
 }
 
-export function StepRequester({ register, control, errors }: StepRequesterProps) {
+export function StepRequester({
+  register,
+  control,
+  errors,
+  maxAttendees,
+}: StepRequesterProps) {
   const activityType = useWatch({ control, name: "activityType" });
 
   return (
@@ -103,14 +110,15 @@ export function StepRequester({ register, control, errors }: StepRequesterProps)
 
       <Field
         label="Número de asistentes"
-        ayuda="Cantidad estimada."
+        ayuda={`Cantidad estimada. La sala admite hasta ${maxAttendees}.`}
         error={errors.attendees?.message}
       >
         <Input
           type="number"
           inputMode="numeric"
           min={1}
-          placeholder="Ej: 25 asistentes estimados"
+          max={maxAttendees}
+          placeholder={`Ej: ${Math.max(1, Math.floor(maxAttendees / 2))}`}
           {...register("attendees")}
         />
       </Field>

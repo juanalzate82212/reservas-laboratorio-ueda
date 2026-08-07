@@ -6,7 +6,10 @@ import { errorResponse, validationErrorResponse } from "@/lib/api/http";
 import { findConflicts, hasConflicts } from "@/lib/availability";
 import { prisma } from "@/lib/db";
 import { generateReservationCode } from "@/lib/reservation-code";
-import { createReservationSchema } from "@/lib/validation/reservation";
+import {
+  createReservationSchema,
+  mensajeAforoExcedido,
+} from "@/lib/validation/reservation";
 
 /** Señal interna: la franja dejó de estar libre entre que se validó y se creó. */
 class SlotUnavailableError extends Error {}
@@ -52,13 +55,26 @@ export async function POST(request: NextRequest) {
 
   const room = await prisma.room.findFirst({
     where: { id: roomId, isActive: true },
-    select: { id: true },
+    select: { id: true, capacity: true },
   });
   if (!room) {
     return errorResponse(
       404,
       "ROOM_NOT_FOUND",
       "La sala indicada no existe o no está activa.",
+    );
+  }
+
+  // El aforo sale de la BD, así que no cabe en el esquema de Zod compartido:
+  // va aquí, con el resto de reglas que necesitan consultar. Esta es la
+  // comprobación que manda — el cliente hace la suya con la capacidad que
+  // recibió, pero pudo cambiar desde entonces, y de todos modos el servidor
+  // no confía en el cliente.
+  if (attendees > room.capacity) {
+    return errorResponse(
+      400,
+      "ATTENDEES_EXCEED_CAPACITY",
+      mensajeAforoExcedido(room.capacity),
     );
   }
 
