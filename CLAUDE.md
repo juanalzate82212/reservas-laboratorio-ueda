@@ -39,23 +39,11 @@ Regla mnemotécnica: **laboratorio = el lugar; Unidad = quién construyó la her
 | 7 — Correos automáticos | ✅ Completa (SMTP real verificado) |
 | 8 — Gestión de franjas | ✅ Completa |
 | 9 — Despliegue en Vercel | ✅ Completa (en producción, verificada) |
-| 10 — QR, pulido y cierre | 🟡 Parcial — ver abajo |
+| 10 — QR, pulido y cierre | 🟡 Parcial |
 
-**Fase 10, detalle:**
+De la Fase 10 están hechos el QR imprimible (`/admin/qr`), el `title`/`description` del layout raíz, el `README.md` y el `npm run build` limpio. El punto 8 (dataset de demostración) quedó **anulado a propósito** — ver "Datos" más abajo.
 
-| Punto | Estado |
-|-------|--------|
-| 1. Página del QR imprimible (`/admin/qr`) | ✅ Hecho |
-| 2. Metadata y Open Graph | 🟡 `title`/`description` sí; falta imagen OG |
-| 3. Estados de carga y vacíos | 🟡 El calendario y `EmptyState` sí; falta repasar el resto |
-| 4. `error.tsx`, `not-found.tsx`, `loading.tsx` | ❌ No existen |
-| 5. Revisión de accesibilidad | ❌ Pendiente |
-| 6. Eliminar `/kitchen-sink` | ❌ Sigue existiendo |
-| 7. `npm run build` limpio | ✅ Pasa |
-| 8. Dataset de demostración | ⚠️ Anulado a propósito — ver "Datos" abajo |
-| 9. `README.md` | ✅ Hecho |
-
-Lo pendiente concreto está en [BACKLOG.md](BACKLOG.md).
+> **[BACKLOG.md](BACKLOG.md) es la única lista de lo que falta**, tanto de la Fase 10 como de los ajustes pedidos después del despliegue. **No repetir ese estado aquí**: eran dos listas con numeraciones distintas y se desincronizan. Este archivo guarda las *decisiones y sus porqués*; el backlog guarda las *tareas abiertas*.
 
 **Verificación de que la app funciona en producción** (hecha con peticiones reales, no solo comprobando que cargue): landing, `/reservar` y `/admin/login` responden `200`; `/admin` y `/admin/qr` sin sesión redirigen (`307`); `POST /api/admin/login` devuelve una cookie de sesión que efectivamente autoriza `GET /admin`, `GET /admin/qr` y `GET /api/admin/reservations`.
 
