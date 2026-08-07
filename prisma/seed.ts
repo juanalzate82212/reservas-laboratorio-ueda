@@ -40,6 +40,11 @@ async function main() {
   console.log(`Sembrando sobre los días: ${[lunes, martes, miercoles, jueves].join(", ")}`);
 
   // --- Salas (idempotentes: la migración no debe perderlas) ---
+  // `capacity` no es decorativo: es el tope de asistentes que valida el
+  // formulario y POST /api/reservations. Ojo con `update: {}` — si la fila ya
+  // existe, la semilla NO la toca, así que cambiar el aforo aquí solo sirve
+  // para una base nueva; en una que ya tiene la sala hay que actualizarla
+  // aparte.
   const salaPrincipal = await prisma.room.upsert({
     where: { slug: "sala-principal" },
     update: {},
@@ -47,7 +52,7 @@ async function main() {
       slug: "sala-principal",
       name: "Sala Principal",
       description: "Sala amplia con equipos de cómputo para prácticas y clases.",
-      capacity: 20,
+      capacity: 25,
       hasComputers: true,
       colorToken: "azul",
     },

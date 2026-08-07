@@ -38,82 +38,122 @@ const TIPOS_ACTIVIDAD = ACTIVITY_TYPES.map((t) => t.value) as [
   ...ActivityTypeValue[],
 ];
 
-export const createReservationSchema = z
-  .object({
-    roomId: z
-      .string({ required_error: "Falta indicar la sala." })
-      .min(1, "Falta indicar la sala."),
-    startsAt: z
-      .string({ required_error: "Falta la hora de inicio." })
-      .datetime({ message: "La hora de inicio no tiene un formato válido." }),
-    endsAt: z
-      .string({ required_error: "Falta la hora de fin." })
-      .datetime({ message: "La hora de fin no tiene un formato válido." }),
-    requesterName: z
-      .string({ required_error: "Escribe tu nombre completo." })
-      .trim()
-      .min(5, "El nombre debe tener al menos 5 caracteres.")
-      .refine(nombreTieneNombreYApellido, "Escribe tu nombre y apellido."),
-    requesterRole: z
-      .string({ required_error: "Indica tu cargo." })
-      .trim()
-      .min(2, "Indica tu cargo."),
-    requesterDocId: z
-      .string({ required_error: "Indica tu número de documento." })
-      .regex(
-        /^\d{6,12}$/,
-        "El documento debe tener entre 6 y 12 dígitos, sin puntos ni espacios.",
-      ),
-    requesterEmail: z
-      .string({ required_error: "Escribe tu correo institucional." })
-      .trim()
-      .toLowerCase()
-      .email("Escribe un correo válido.")
-      .refine(
-        (correo) => correo.endsWith(`@${BOOKING_CONFIG.emailDomain}`),
-        `Usa tu correo institucional (@${BOOKING_CONFIG.emailDomain}) para solicitar una reserva.`,
-      ),
-    academicProgram: z.enum(PROGRAMAS_ACADEMICOS, {
-      required_error: "Selecciona tu programa académico.",
-      invalid_type_error: "Selecciona tu programa académico.",
-    }),
-    activityType: z.enum(TIPOS_ACTIVIDAD, {
-      required_error: "Selecciona el tipo de actividad.",
-      invalid_type_error: "Selecciona el tipo de actividad.",
-    }),
-    activityTypeOther: z
-      .string()
-      .trim()
-      .max(200, "La descripción es demasiado larga.")
-      .optional()
-      .or(z.literal("")),
-    // preprocess: un <input type="number"> vacío llega como "", y
-    // Number("") es 0 (no NaN) — sin este paso, un campo vacío pasaría la
-    // coerción como 0 en vez de fallar la validación de obligatoriedad.
-    attendees: z.preprocess(
-      (valor) => (valor === "" || valor === null ? undefined : valor),
-      z.coerce
-        .number({
-          invalid_type_error: "Indica el número estimado de asistentes.",
-        })
-        .int("El número de asistentes debe ser un número entero.")
-        .positive("El número de asistentes debe ser mayor que cero.")
-        .max(200, "El número de asistentes parece demasiado alto."),
+/** Un solo texto para el tope de aforo, lo aplique el cliente o el servidor. */
+export function mensajeAforoExcedido(maxAttendees: number): string {
+  return `Esta sala admite hasta ${maxAttendees} asistentes.`;
+}
+
+const camposReserva = z.object({
+  roomId: z
+    .string({ required_error: "Falta indicar la sala." })
+    .min(1, "Falta indicar la sala."),
+  startsAt: z
+    .string({ required_error: "Falta la hora de inicio." })
+    .datetime({ message: "La hora de inicio no tiene un formato válido." }),
+  endsAt: z
+    .string({ required_error: "Falta la hora de fin." })
+    .datetime({ message: "La hora de fin no tiene un formato válido." }),
+  requesterName: z
+    .string({ required_error: "Escribe tu nombre completo." })
+    .trim()
+    .min(5, "El nombre debe tener al menos 5 caracteres.")
+    .refine(nombreTieneNombreYApellido, "Escribe tu nombre y apellido."),
+  requesterRole: z
+    .string({ required_error: "Indica tu cargo." })
+    .trim()
+    .min(2, "Indica tu cargo."),
+  requesterDocId: z
+    .string({ required_error: "Indica tu número de documento." })
+    .regex(
+      /^\d{6,12}$/,
+      "El documento debe tener entre 6 y 12 dígitos, sin puntos ni espacios.",
     ),
-    responsibilityAccepted: z
-      .boolean({
-        required_error: "Debes aceptar la responsabilidad sobre el uso del espacio.",
+  requesterEmail: z
+    .string({ required_error: "Escribe tu correo institucional." })
+    .trim()
+    .toLowerCase()
+    .email("Escribe un correo válido.")
+    .refine(
+      (correo) => correo.endsWith(`@${BOOKING_CONFIG.emailDomain}`),
+      `Usa tu correo institucional (@${BOOKING_CONFIG.emailDomain}) para solicitar una reserva.`,
+    ),
+  // errorMap, y NO required_error/invalid_type_error: el <select> arranca en
+  // "" (su <option> de marcador), así que al enviar sin elegir llega un
+  // string FUERA de la lista, no un campo ausente. Zod clasifica eso como
+  // `invalid_enum_value`, el único de los tres casos que required_error e
+  // invalid_type_error no cubren — por ahí se colaba el mensaje por defecto
+  // "Invalid enum value. Expected 'INGENIERIA_SISTEMAS' | … received ''".
+  // errorMap cubre los tres de una vez, y Zod prohíbe combinarlo con los
+  // otros dos, así que va solo.
+  academicProgram: z.enum(PROGRAMAS_ACADEMICOS, {
+    errorMap: () => ({ message: "Selecciona tu programa académico." }),
+  }),
+  activityType: z.enum(TIPOS_ACTIVIDAD, {
+    errorMap: () => ({ message: "Selecciona el tipo de actividad." }),
+  }),
+  activityTypeOther: z
+    .string()
+    .trim()
+    .max(200, "La descripción es demasiado larga.")
+    .optional()
+    .or(z.literal("")),
+  // preprocess: un <input type="number"> vacío llega como "", y
+  // Number("") es 0 (no NaN) — sin este paso, un campo vacío pasaría la
+  // coerción como 0 en vez de fallar la validación de obligatoriedad.
+  //
+  // No lleva `.max()` fijo: el tope real es el aforo de la sala, que sale de
+  // la BD. Ver buildCreateReservationSchema().
+  attendees: z.preprocess(
+    (valor) => (valor === "" || valor === null ? undefined : valor),
+    z.coerce
+      .number({
+        invalid_type_error: "Indica el número estimado de asistentes.",
       })
-      .refine((valor) => valor === true, {
-        message: "Debes aceptar la responsabilidad sobre el uso del espacio para continuar.",
-      }),
-  })
-  .superRefine((data, ctx) => {
+      .int("El número de asistentes debe ser un número entero.")
+      .positive("El número de asistentes debe ser mayor que cero."),
+  ),
+  responsibilityAccepted: z
+    .boolean({
+      required_error: "Debes aceptar la responsabilidad sobre el uso del espacio.",
+    })
+    .refine((valor) => valor === true, {
+      message: "Debes aceptar la responsabilidad sobre el uso del espacio para continuar.",
+    }),
+});
+
+/*
+ * El tope de asistentes es el aforo de la sala (`Room.capacity`), no una
+ * constante: depende de la BD, así que por la regla de arriba no puede vivir
+ * dentro del esquema como los demás límites. De ahí la fábrica:
+ *
+ * - El cliente ya recibe la sala, así que construye el esquema con su aforo
+ *   y avisa mientras se llena el formulario, sin esperar al envío.
+ * - El servidor usa el esquema sin aforo y comprueba la capacidad en
+ *   POST /api/reservations, donde ya consulta la sala — junto al resto de
+ *   reglas que necesitan la BD. Esa es la comprobación que manda.
+ *
+ * La redacción del mensaje sale de mensajeAforoExcedido() en ambos casos.
+ */
+export function buildCreateReservationSchema(
+  opciones: { maxAttendees?: number } = {},
+) {
+  return camposReserva.superRefine((data, ctx) => {
     if (data.activityType === "OTRO" && !data.activityTypeOther?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["activityTypeOther"],
         message: "Describe brevemente la actividad.",
+      });
+    }
+
+    if (
+      opciones.maxAttendees !== undefined &&
+      data.attendees > opciones.maxAttendees
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["attendees"],
+        message: mensajeAforoExcedido(opciones.maxAttendees),
       });
     }
 
@@ -164,5 +204,9 @@ export const createReservationSchema = z
       });
     }
   });
+}
+
+/** Sin tope de aforo: lo aplica el Route Handler, que sí conoce la sala. */
+export const createReservationSchema = buildCreateReservationSchema();
 
 export type CreateReservationInput = z.infer<typeof createReservationSchema>;

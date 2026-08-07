@@ -21,7 +21,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import {
@@ -114,6 +114,16 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
       ? "timeGridDay"
       : "timeGridWeek",
   );
+  // Espera entre el clic en una franja libre y que /reservar esté lista (ver
+  // handleDateClick). `isPending` de useTransition dura exactamente eso: hasta
+  // que la ruta destino terminó de resolverse, no solo hasta que se llamó a
+  // push(). Un booleano propio con setState no sabría cuándo apagarse.
+  //
+  // Que esto re-renderice <FullCalendar> es esperado y ya está cubierto: cada
+  // render hace que su wrapper llame a resetOptions() y eso puede redisparar
+  // `datesSet` para el mismo rango visible, que es justo lo que ignora el
+  // guard de `ultimoRangoRef`.
+  const [navegando, iniciarNavegacion] = useTransition();
 
   const cargarDisponibilidad = useCallback(
     async (from: Date, to: Date, rango: { from: number; to: number }) => {
@@ -268,6 +278,8 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
   // sala y la hora ya elegidas.
   const handleDateClick = useCallback(
     (arg: DateClickArg) => {
+      if (navegando) return; // ya hay una navegación en curso: no encolar otra
+
       const inicio = fullCalendarDateToInstant(arg.date);
       const fin = addMinutes(inicio, 30);
 
@@ -276,9 +288,15 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
       const estado = getSlotState({ startsAt: inicio, endsAt: fin }, reservas, bloqueos);
       if (!estado.reservable) return;
 
-      router.push(`/reservar?startsAt=${encodeURIComponent(inicio.toISOString())}`);
+      // Un router.push() suelto no da ninguna señal: hasta que el servidor
+      // devuelve /reservar la pantalla se queda igual y el clic parece no
+      // haber hecho nada. Suele contestar rápido, pero con la red del campus
+      // o el arranque en frío de una función serverless no siempre.
+      iniciarNavegacion(() => {
+        router.push(`/reservar?startsAt=${encodeURIComponent(inicio.toISOString())}`);
+      });
     },
-    [reservas, bloqueos, router],
+    [reservas, bloqueos, router, navegando, iniciarNavegacion],
   );
 
   // Clic en un evento en primer plano (reservado, en revisión o bloqueado):
@@ -324,21 +342,28 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
       )}
 
       <div className="relative overflow-hidden rounded border border-borde">
-        {cargando && (
+        {(cargando || navegando) && (
           // El anillo girando es el mismo gesto de carga que Button.tsx (§5.1
           // del documento de marca) — no un spinner distinto inventado aquí.
           // La disponibilidad tarda un momento en llegar (consulta reservas +
           // bloqueos), y el grid vacío de FullCalendar por sí solo no deja
           // claro que todavía está cargando en vez de "sin nada agendado".
-          <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-fondo/70">
+          // El mismo overlay cubre la espera al abrir el wizard: son dos
+          // esperas distintas, pero se ven en el mismo sitio y solo puede
+          // haber una a la vez, así que comparten el gesto y cambia el texto.
+          <div
+            role="status"
+            aria-live="polite"
+            className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-fondo/70"
+          >
             <LoaderCircle aria-hidden className="h-5 w-5 animate-spin text-primary" />
             <span className="text-caption font-medium text-texto-secundario">
-              Cargando disponibilidad…
+              {navegando ? "Abriendo el formulario…" : "Cargando disponibilidad…"}
             </span>
           </div>
         )}
 
-        <div className={cn("transition-opacity", cargando && "opacity-60")}>
+        <div className={cn("transition-opacity", (cargando || navegando) && "opacity-60")}>
           <FullCalendar
             ref={calendarRef}
             plugins={[timeGridPlugin, interactionPlugin]}
