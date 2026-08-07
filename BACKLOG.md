@@ -12,7 +12,7 @@ Estado general: **Fases 0–9 completas, la app está en producción.** La Fase 
 
 Prioridad actual. Las causas raíz anotadas aquí están **verificadas leyendo el código**, no supuestas.
 
-Los puntos **1, 2 y 5 ya están hechos** (estado de carga al tocar una franja, mensajes de validación de los desplegables, y tope de asistentes ligado al aforo de la sala, fijado en 25); se conserva la numeración original para no romper las referencias. Tres puntos (4, 6 y 9) necesitan una decisión de producto antes de tocar nada.
+Los puntos **1, 2, 5 y 9 ya están hechos** (estado de carga al tocar una franja, mensajes de validación de los desplegables, tope de asistentes ligado al aforo de la sala fijado en 25, y el estado `EXPIRED`); se conserva la numeración original para no romper las referencias. Quedan dos decisiones de producto por tomar, en los puntos 6 y 7.
 
 ### 3. Entrada pública a "Revisar el estado de mi reserva"
 
@@ -23,22 +23,21 @@ La página [/reserva/[codigo]](src/app/reserva/[codigo]/) ya existe y funciona; 
 - Código inexistente: mensaje en voz de marca, no el 404 genérico de Next (se cruza con el `not-found.tsx` pendiente de la Fase 10).
 - **Hacer antes que el punto 4**, que cuelga de esta misma pantalla.
 
-### 4. Cancelación por parte del solicitante — ⚠️ decisión pendiente
+### 4. Cancelación por parte del solicitante
 
 Que quien solicitó pueda cancelar mientras la reserva esté `PENDING` o `CONFIRMED`, de forma segura y personal.
 
 El problema: `/reserva/[codigo]` es público y solo pide el código. Cancelar no puede ir con esa única llave.
 
-- **Opción A — código + documento (recomendada).** El formulario pide el número de documento y el servidor lo compara contra `requesterDocId`. Sin infraestructura nueva, funciona aunque hayan perdido el correo, y no revierte ninguna decisión anterior. El documento no es secreto, pero sumado a un código de ~33 M combinaciones son dos datos que un tercero no tiene juntos. Comparar en el servidor y **no revelar cuál de los dos falló**.
-- **Opción B — enlace firmado por correo.** JWT con `jose` (ya es dependencia) acotado a `reservationId` + propósito. Más fuerte, pero **obliga a enviar un correo al crear la solicitud**, y eso está explícitamente descartado más abajo en "Fuera de alcance": elegirla implica revertir esa decisión y actualizar esa línea. Encaja bien con el punto 7.
-- **A decidir además:** ¿hasta cuándo se puede cancelar una `CONFIRMED` — con antelación mínima, o nunca una vez empezada? ¿Se le avisa al administrador cuando el solicitante cancela?
+**Mecanismo decidido: código + número de documento.** El formulario pide el documento y el servidor lo compara contra `requesterDocId`. Sin infraestructura nueva, funciona aunque hayan perdido el correo, y no revierte ninguna decisión anterior. El documento no es secreto, pero sumado a un código de ~33 M combinaciones son dos datos que un tercero no tiene juntos. Comparar en el servidor y **no revelar cuál de los dos falló**.
+
+- **Falta decidir:** ¿hasta cuándo se puede cancelar una `CONFIRMED` — con antelación mínima, o nunca una vez empezada? ¿Se le avisa al administrador cuando el solicitante cancela?
 - No hace falta estado nuevo: se reutiliza `CANCELLED`. Si interesa distinguir quién canceló, decidirlo aquí y no improvisarlo al programar.
+- Ojo: una reserva `EXPIRED` no es cancelable (ya es terminal), así que la pantalla debe ofrecer el botón solo en `PENDING` y `CONFIRMED`.
 
 ### 3bis. Reservas de prueba por encima del aforo (menor)
 
-Al fijar el aforo en 25 quedaron dos reservas antiguas por encima: `UEDA-HZEX8` (100, `REJECTED`) y `UEDA-2RPGM` (183, `PENDING`). Son pruebas de desarrollo y no se tocaron: la validación nueva solo aplica a solicitudes futuras. Conviene limpiarlas desde el panel antes de que el laboratorio empiece a usarse de verdad, junto con las demás de prueba.
-
-Además, `UEDA-MRLGR` y `UEDA-2RPGM` siguen `PENDING` con fecha ya pasada — es exactamente el caso del punto 9, y ya son 2 de las 3 que bloquearían ese correo.
+Al fijar el aforo en 25 quedaron dos reservas antiguas por encima: `UEDA-HZEX8` (100, `REJECTED`) y `UEDA-2RPGM` (183, ahora `EXPIRED`). Son pruebas de desarrollo y no se tocaron: la validación nueva solo aplica a solicitudes futuras. Conviene limpiarlas desde el panel antes de que el laboratorio empiece a usarse de verdad, junto con las demás de prueba.
 
 ### 6. "Cargo" como desplegable — ⚠️ decisión pendiente
 
@@ -70,15 +69,6 @@ Hoy `POST /api/reservations` **no envía ningún correo**: el único correo sale
 - Enlace `https://calendar.google.com/calendar/render?action=TEMPLATE&dates=…`, con las fechas en UTC (`YYYYMMDDTHHMMSSZ`).
 - ⚠️ Usar el instante UTC real, tal como está en BD. **No** pasar por `toBogotaWallClockIso()`: ese truco existe solo para el límite con FullCalendar y aquí metería 5 h de desfase en el calendario del usuario.
 - El valor acaba en un `href` dentro de HTML: hay que codificarlo para URL **y** escaparlo para HTML.
-
-### 9. Estado "Vencida" para las solicitudes no revisadas — ⚠️ decisión pendiente
-
-Una reserva que sigue `PENDING` cuando su fecha ya pasó debe mostrarse como **Vencida**.
-
-- **Recomendado: estado derivado, no valor nuevo en el enum.** `PENDING` + `endsAt < ahora` ⇒ se muestra "Vencida". Cero migraciones y cero trabajos programados. Meterlo en `ReservationStatus` exigiría migración *y* un cron que lo aplicara, y el dato quedaría desfasado entre ejecuciones.
-- **Dónde toca:** [reservationStatus.ts](src/lib/reservationStatus.ts) — sus dos mapas son `satisfies Record<ReservationStatus, …>`, así que el tipo de presentación pasa a `ReservationStatus | "EXPIRED"` y hay que ampliar ambos a la vez (están compartidos a propósito entre la página pública y el panel). Además: filtros de la bandeja y `/reserva/[codigo]`.
-- 🐞 **Bug real que este punto destapa:** el tope de 3 pendientes por correo cuenta *todas* las `PENDING` sin mirar la fecha ([route.ts:65-68](src/app/api/reservations/route.ts#L65-L68)). A quien se le venzan 3 solicitudes sin revisar **queda bloqueado indefinidamente** y no puede pedir ninguna más. Al implementar esto hay que excluir las vencidas de ese conteo.
-- **A decidir:** ¿el administrador puede seguir confirmando una vencida, o solo rechazarla? ¿Las vencidas siguen ocupando la franja? (`lib/availability.ts` trata `PENDING` como ocupada; en la práctica casi da igual porque una franja pasada no es reservable, pero cambia cómo se pintan las semanas anteriores).
 
 ---
 

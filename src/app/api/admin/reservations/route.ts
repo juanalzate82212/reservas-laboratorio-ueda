@@ -1,10 +1,14 @@
+import { ReservationStatus } from "@prisma/client";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { errorResponse } from "@/lib/api/http";
 import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { expirarReservasVencidas } from "@/lib/expiration";
 
-const ESTADOS_VALIDOS = ["PENDING", "CONFIRMED", "REJECTED", "CANCELLED"] as const;
+// Del enum de Prisma, no a mano: un estado nuevo en el schema queda filtrable
+// sin tener que acordarse de tocar esta lista.
+const ESTADOS_VALIDOS = Object.values(ReservationStatus);
 
 /*
  * A diferencia de /api/availability (pública, anonimizada), esta sí expone
@@ -23,13 +27,19 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get("status");
   const roomId = searchParams.get("roomId");
 
-  if (status && !ESTADOS_VALIDOS.includes(status as (typeof ESTADOS_VALIDOS)[number])) {
+  if (status && !ESTADOS_VALIDOS.includes(status as ReservationStatus)) {
     return errorResponse(400, "VALIDATION_ERROR", "Estado no reconocido.");
   }
 
+  // Antes de listar: la bandeja es la pantalla donde el administrador decide,
+  // y no debe ofrecerle confirmar algo cuya franja ya pasó. De aquí cuelga
+  // también el contador del nav, que llama a este mismo endpoint con
+  // ?status=PENDING. Secuencial a propósito (ver expirarReservasVencidas).
+  await expirarReservasVencidas();
+
   const reservations = await prisma.reservation.findMany({
     where: {
-      ...(status ? { status: status as (typeof ESTADOS_VALIDOS)[number] } : {}),
+      ...(status ? { status: status as ReservationStatus } : {}),
       ...(roomId ? { roomId } : {}),
     },
     orderBy: { startsAt: "asc" },

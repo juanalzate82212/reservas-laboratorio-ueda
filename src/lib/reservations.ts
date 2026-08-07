@@ -1,8 +1,13 @@
+import type { ReservationStatus } from "@prisma/client";
+
 import { prisma } from "./db";
+import { expirarReservasVencidas } from "./expiration";
 
 export type PublicReservationStatus = {
   code: string;
-  status: "PENDING" | "CONFIRMED" | "REJECTED" | "CANCELLED";
+  // Derivado del enum, no escrito a mano: añadir un estado al schema no puede
+  // dejar este tipo desactualizado en silencio.
+  status: ReservationStatus;
   startsAt: Date;
   endsAt: Date;
   requesterName: string;
@@ -27,6 +32,11 @@ function maskEmail(email: string): string {
 export async function getPublicReservationByCode(
   code: string,
 ): Promise<PublicReservationStatus | null> {
+  // Antes de leer, no después: si esta solicitud ya venció, quien consulta su
+  // código debe ver "Vencida" y no un "En revisión" que ya no es cierto.
+  // Secuencial a propósito (ver expirarReservasVencidas).
+  await expirarReservasVencidas();
+
   const reservation = await prisma.reservation.findUnique({
     where: { code: code.toUpperCase() },
     select: {

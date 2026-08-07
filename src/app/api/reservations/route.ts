@@ -5,6 +5,7 @@ import { BOOKING_CONFIG } from "@/config/booking";
 import { errorResponse, validationErrorResponse } from "@/lib/api/http";
 import { findConflicts, hasConflicts } from "@/lib/availability";
 import { prisma } from "@/lib/db";
+import { expirarReservasVencidas } from "@/lib/expiration";
 import { generateReservationCode } from "@/lib/reservation-code";
 import {
   createReservationSchema,
@@ -77,6 +78,12 @@ export async function POST(request: NextRequest) {
       mensajeAforoExcedido(room.capacity),
     );
   }
+
+  // Antes de contar: una solicitud cuya franja ya pasó no puede seguir
+  // ocupando cupo. Sin esto, a quien se le vencieran 3 sin revisar quedaba
+  // bloqueado de forma permanente, sin poder solicitar nunca más con ese
+  // correo. Secuencial a propósito (ver expirarReservasVencidas).
+  await expirarReservasVencidas();
 
   const pendientesDelCorreo = await prisma.reservation.count({
     where: { requesterEmail, status: "PENDING" },

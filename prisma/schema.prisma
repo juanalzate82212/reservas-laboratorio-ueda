@@ -19,6 +19,10 @@ enum ReservationStatus {
   CONFIRMED
   REJECTED
   CANCELLED
+  // Solicitud que nunca se revisó y cuya franja ya terminó. No la decide el
+  // administrador: la aplica lib/expiration.ts al leer. Es terminal — ver
+  // ACTION_TARGET en /api/admin/reservations/[id].
+  EXPIRED
 }
 
 enum TimeBlockKind {
