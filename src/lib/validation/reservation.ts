@@ -43,6 +43,24 @@ export function mensajeAforoExcedido(maxAttendees: number): string {
   return `Esta sala admite hasta ${maxAttendees} asistentes.`;
 }
 
+/*
+ * El documento se pide dos veces: al solicitar y al cancelar, donde es la
+ * prueba de que quien cancela es quien reservó. Una sola definición para que
+ * un documento aceptado al reservar no pueda ser rechazado al cancelar.
+ */
+const requesterDocIdSchema = z
+  .string({ required_error: "Indica tu número de documento." })
+  .regex(
+    /^\d{6,12}$/,
+    "El documento debe tener entre 6 y 12 dígitos, sin puntos ni espacios.",
+  );
+
+export const cancelReservationSchema = z.object({
+  requesterDocId: requesterDocIdSchema,
+});
+
+export type CancelReservationInput = z.infer<typeof cancelReservationSchema>;
+
 const camposReserva = z.object({
   roomId: z
     .string({ required_error: "Falta indicar la sala." })
@@ -62,12 +80,7 @@ const camposReserva = z.object({
     .string({ required_error: "Indica tu cargo." })
     .trim()
     .min(2, "Indica tu cargo."),
-  requesterDocId: z
-    .string({ required_error: "Indica tu número de documento." })
-    .regex(
-      /^\d{6,12}$/,
-      "El documento debe tener entre 6 y 12 dígitos, sin puntos ni espacios.",
-    ),
+  requesterDocId: requesterDocIdSchema,
   requesterEmail: z
     .string({ required_error: "Escribe tu correo institucional." })
     .trim()

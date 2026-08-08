@@ -12,32 +12,15 @@ Estado general: **Fases 0–9 completas, la app está en producción.** La Fase 
 
 Prioridad actual. Las causas raíz anotadas aquí están **verificadas leyendo el código**, no supuestas.
 
-Los puntos **1, 2, 5 y 9 ya están hechos** (estado de carga al tocar una franja, mensajes de validación de los desplegables, tope de asistentes ligado al aforo de la sala fijado en 25, y el estado `EXPIRED`); se conserva la numeración original para no romper las referencias. Quedan dos decisiones de producto por tomar, en los puntos 6 y 7.
+Hechos ya: **1, 2, 3, 4, 5 y 9** (estado de carga al tocar una franja, mensajes de validación de los desplegables, entrada pública a la consulta por código, cancelación por el solicitante, tope de asistentes ligado al aforo de la sala fijado en 25, y el estado `EXPIRED`). Se conserva la numeración original para no romper las referencias. Quedan **6, 7 y 8**, y dos decisiones de producto en los puntos 6 y 7.
 
-### 3. Entrada pública a "Revisar el estado de mi reserva"
+### 3bis. Reservas de prueba en la base (menor)
 
-La página [/reserva/[codigo]](src/app/reserva/[codigo]/) ya existe y funciona; lo que falta es cómo llegar a ella. Hoy solo se accede desde la pantalla de éxito del wizard, justo en el único momento en que no hace falta.
+Quedan reservas de desarrollo que conviene limpiar desde el panel antes de que el laboratorio se use de verdad. Dos están por encima del aforo nuevo (`UEDA-HZEX8` con 100 y `UEDA-2RPGM` con 183); no se tocaron porque la validación de aforo solo aplica a solicitudes futuras.
 
-- Enlace visible en la landing → pantalla con un campo para el código → navegar a `/reserva/[codigo]`.
-- Normalizar lo que se escriba: mayúsculas, y con o sin el prefijo `UEDA-`. El alfabeto de [reservation-code.ts](src/lib/reservation-code.ts) excluye `I`, `O`, `0` y `1` precisamente porque se confunden al dictarlos; tolerar esas confusiones al teclear es coherente con esa decisión.
-- Código inexistente: mensaje en voz de marca, no el 404 genérico de Next (se cruza con el `not-found.tsx` pendiente de la Fase 10).
-- **Hacer antes que el punto 4**, que cuelga de esta misma pantalla.
+### 4bis. Distinguir quién canceló (menor, sin compromiso)
 
-### 4. Cancelación por parte del solicitante
-
-Que quien solicitó pueda cancelar mientras la reserva esté `PENDING` o `CONFIRMED`, de forma segura y personal.
-
-El problema: `/reserva/[codigo]` es público y solo pide el código. Cancelar no puede ir con esa única llave.
-
-**Mecanismo decidido: código + número de documento.** El formulario pide el documento y el servidor lo compara contra `requesterDocId`. Sin infraestructura nueva, funciona aunque hayan perdido el correo, y no revierte ninguna decisión anterior. El documento no es secreto, pero sumado a un código de ~33 M combinaciones son dos datos que un tercero no tiene juntos. Comparar en el servidor y **no revelar cuál de los dos falló**.
-
-- **Falta decidir:** ¿hasta cuándo se puede cancelar una `CONFIRMED` — con antelación mínima, o nunca una vez empezada? ¿Se le avisa al administrador cuando el solicitante cancela?
-- No hace falta estado nuevo: se reutiliza `CANCELLED`. Si interesa distinguir quién canceló, decidirlo aquí y no improvisarlo al programar.
-- Ojo: una reserva `EXPIRED` no es cancelable (ya es terminal), así que la pantalla debe ofrecer el botón solo en `PENDING` y `CONFIRMED`.
-
-### 3bis. Reservas de prueba por encima del aforo (menor)
-
-Al fijar el aforo en 25 quedaron dos reservas antiguas por encima: `UEDA-HZEX8` (100, `REJECTED`) y `UEDA-2RPGM` (183, ahora `EXPIRED`). Son pruebas de desarrollo y no se tocaron: la validación nueva solo aplica a solicitudes futuras. Conviene limpiarlas desde el panel antes de que el laboratorio empiece a usarse de verdad, junto con las demás de prueba.
+Hoy una cancelación del administrador y una del solicitante quedan idénticas en la base: `CANCELLED` con `decidedAt`. En el panel no se puede saber cuál fue. Si llega a importar, es un campo nuevo en `Reservation` (y su migración), no un apaño de presentación.
 
 ### 6. "Cargo" como desplegable — ⚠️ decisión pendiente
 

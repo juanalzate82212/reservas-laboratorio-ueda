@@ -168,3 +168,41 @@ export function cancelTemplate(r: TemplateReservation): { subject: string; html:
 
   return { subject, html: layout({ titulo: "Reserva cancelada", cuerpoHtml }) };
 }
+
+/*
+ * Cuando cancela el propio solicitante, no sirve cancelTemplate: su redacción
+ * ("lamentamos informarte") es la de una cancelación que sufre, no una que
+ * decidió. Este acuse cumple además una función de seguridad — cancelar solo
+ * pide código + documento, así que si alguien lo hiciera sin permiso, el
+ * dueño se entera en el momento en vez de descubrirlo el día de la actividad.
+ */
+export function selfCancelTemplate(r: TemplateReservation): {
+  subject: string;
+  html: string;
+} {
+  const subject = `Cancelaste tu reserva — ${r.roomName}, ${formatRange(r.startsAt, r.endsAt)}`;
+
+  const cuerpoHtml = `
+    <p style="margin:0 0 8px;">Cancelaste esta reserva y el horario ya quedó libre para otras personas:</p>
+    ${tablaDatos(datosComunes(r))}
+    <p style="margin:16px 0 0;">Si no fuiste tú, escríbenos cuanto antes: todavía estamos a tiempo de recuperar el horario.</p>
+  `;
+
+  return { subject, html: layout({ titulo: "Reserva cancelada", cuerpoHtml }) };
+}
+
+/** Aviso interno al laboratorio: una franja se liberó sin que el admin actuara. */
+export function requesterCancelAdminTemplate(r: TemplateReservation): {
+  subject: string;
+  html: string;
+} {
+  const subject = `Reserva cancelada por el solicitante — ${formatRange(r.startsAt, r.endsAt)}`;
+
+  const cuerpoHtml = `
+    <p style="margin:0 0 8px;">El solicitante canceló esta reserva desde la consulta pública. El horario vuelve a estar disponible:</p>
+    ${tablaDatos(datosComunes(r))}
+    <p style="margin:16px 0 0;color:${COLOR.textoSecundario};font-size:13px;">No hay nada que hacer en el panel: la franja ya se liberó sola.</p>
+  `;
+
+  return { subject, html: layout({ titulo: "Cancelación del solicitante", cuerpoHtml }) };
+}

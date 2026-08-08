@@ -74,6 +74,29 @@ export async function enviarCorreo({
   }
 }
 
+/*
+ * Avisos internos al laboratorio (no al solicitante). La dirección va en su
+ * propia variable y no se deduce de MAIL_FROM/SMTP_USER: quién envía y quién
+ * recibe los avisos no tienen por qué ser la misma cuenta, y atarlos obligaría
+ * a cambiar el remitente de todos los correos para redirigir los avisos.
+ *
+ * Sin MAIL_TO_ADMIN no se manda nada y se deja constancia en consola —
+ * preferible a inventar un destinatario. Devuelve null en ese caso, para que
+ * quien llama pueda distinguir "no configurado" de "falló el envío".
+ */
+export async function enviarCorreoAlLaboratorio(
+  input: Omit<EnviarCorreoInput, "to">,
+): Promise<MailStatus | null> {
+  const destino = process.env.MAIL_TO_ADMIN;
+  if (!destino) {
+    console.warn(
+      `[correo] MAIL_TO_ADMIN sin configurar: se omite el aviso al laboratorio «${input.subject}».`,
+    );
+    return null;
+  }
+  return enviarCorreo({ ...input, to: destino });
+}
+
 /** Reintenta un EmailLog existente con el mismo contenido, actualizando esa misma fila. */
 export async function reintentarCorreo(id: string): Promise<MailStatus | null> {
   const log = await prisma.emailLog.findUnique({ where: { id } });
