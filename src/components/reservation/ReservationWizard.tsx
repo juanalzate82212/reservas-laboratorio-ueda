@@ -81,7 +81,9 @@ export function ReservationWizard({
       startsAt: prellenado.startsAt,
       endsAt: "",
       requesterName: "",
-      requesterRole: "",
+      // undefined y no "": igual que los otros dos desplegables, el valor
+      // vacío del <select> no pertenece a la lista.
+      requesterRole: undefined,
       requesterDocId: "",
       requesterEmail: "",
       academicProgram: undefined,

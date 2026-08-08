@@ -4,8 +4,10 @@ import { BOOKING_CONFIG } from "@/config/booking";
 import {
   ACADEMIC_PROGRAMS,
   ACTIVITY_TYPES,
+  REQUESTER_ROLES,
   type AcademicProgramValue,
   type ActivityTypeValue,
+  type RequesterRoleValue,
 } from "@/config/reservationOptions";
 import { fitsInSingleRange, isAlignedToSlot, isWithinBookingWindow } from "@/lib/datetime";
 
@@ -36,6 +38,10 @@ const PROGRAMAS_ACADEMICOS = ACADEMIC_PROGRAMS.map((p) => p.value) as [
 const TIPOS_ACTIVIDAD = ACTIVITY_TYPES.map((t) => t.value) as [
   ActivityTypeValue,
   ...ActivityTypeValue[],
+];
+const CARGOS = REQUESTER_ROLES.map((r) => r.value) as [
+  RequesterRoleValue,
+  ...RequesterRoleValue[],
 ];
 
 /** Un solo texto para el tope de aforo, lo aplique el cliente o el servidor. */
@@ -76,10 +82,12 @@ const camposReserva = z.object({
     .trim()
     .min(5, "El nombre debe tener al menos 5 caracteres.")
     .refine(nombreTieneNombreYApellido, "Escribe tu nombre y apellido."),
-  requesterRole: z
-    .string({ required_error: "Indica tu cargo." })
-    .trim()
-    .min(2, "Indica tu cargo."),
+  // Lista cerrada aunque la columna sea `String` (ver reservationOptions.ts):
+  // la validación es la única puerta de entrada. errorMap por lo mismo que los
+  // otros dos desplegables — el <select> vacío manda "".
+  requesterRole: z.enum(CARGOS, {
+    errorMap: () => ({ message: "Selecciona tu cargo." }),
+  }),
   requesterDocId: requesterDocIdSchema,
   requesterEmail: z
     .string({ required_error: "Escribe tu correo institucional." })
