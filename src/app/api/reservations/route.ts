@@ -6,11 +6,17 @@ import { errorResponse, validationErrorResponse } from "@/lib/api/http";
 import { findConflicts, hasConflicts } from "@/lib/availability";
 import { prisma } from "@/lib/db";
 import { expirarReservasVencidas } from "@/lib/expiration";
+import { enviarCorreoAlLaboratorio } from "@/lib/mail/mailer";
+import { newRequestAdminTemplate } from "@/lib/mail/templates";
 import { generateReservationCode } from "@/lib/reservation-code";
 import {
   createReservationSchema,
   mensajeAforoExcedido,
 } from "@/lib/validation/reservation";
+
+// Nodemailer no corre en Edge Runtime. Hace falta desde que este handler avisa
+// al laboratorio de cada solicitud nueva.
+export const runtime = "nodejs";
 
 /** Señal interna: la franja dejó de estar libre entre que se validó y se creó. */
 class SlotUnavailableError extends Error {}
@@ -56,7 +62,7 @@ export async function POST(request: NextRequest) {
 
   const room = await prisma.room.findFirst({
     where: { id: roomId, isActive: true },
-    select: { id: true, capacity: true },
+    select: { id: true, capacity: true, name: true },
   });
   if (!room) {
     return errorResponse(
@@ -158,6 +164,44 @@ export async function POST(request: NextRequest) {
       }
       throw new Error("No se pudo generar un código de reserva único.");
     });
+
+    /*
+     * Aviso al laboratorio, FUERA de la transacción y con la reserva ya
+     * escrita. Dentro, una conexión SMTP lenta retendría la única conexión del
+     * pool (connection_limit=1) mientras dura el envío.
+     *
+     * Tampoco puede impedir que la solicitud exista: enviarCorreo() nunca
+     * lanza —registra FAILED en EmailLog y sigue—, así que el 201 se mantiene
+     * pase lo que pase con el correo. Se espera en vez de lanzarlo al aire
+     * porque en serverless la función puede congelarse en cuanto responde, y
+     * un envío a medias no terminaría nunca.
+     */
+    try {
+      await enviarCorreoAlLaboratorio({
+        reservationId: reservation.id,
+        ...newRequestAdminTemplate(
+          {
+            code: reservation.code,
+            roomName: room.name,
+            startsAt: reservation.startsAt,
+            endsAt: reservation.endsAt,
+            requesterName: reservation.requesterName,
+            academicProgram: reservation.academicProgram,
+            activityType: reservation.activityType,
+            activityTypeOther: reservation.activityTypeOther,
+            attendees: reservation.attendees,
+          },
+          reservation.requesterEmail,
+        ),
+      });
+    } catch (error) {
+      // enviarCorreo() ya atrapa los fallos de ENVÍO y los registra como
+      // FAILED, pero el propio EmailLog.create puede fallar y esa excepción sí
+      // saldría. Sin este guard, un problema al registrar el correo devolvería
+      // 500 con la reserva ya creada: el solicitante creería que no se envió y
+      // al reintentar chocaría con su propia franja.
+      console.error("[correo] No se pudo avisar al laboratorio:", error);
+    }
 
     return NextResponse.json({ code: reservation.code }, { status: 201 });
   } catch (error) {
