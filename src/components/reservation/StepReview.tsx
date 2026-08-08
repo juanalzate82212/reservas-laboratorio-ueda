@@ -5,6 +5,7 @@ import type { ActiveRoom } from "@/lib/rooms";
 import {
   labelForAcademicProgram,
   labelForActivityType,
+  labelForRequesterRole,
 } from "@/config/reservationOptions";
 
 export interface StepReviewProps {
@@ -65,7 +66,10 @@ export function StepReview({
           }
         />
         <Dato etiqueta="Nombre" valor={requesterName} />
-        <Dato etiqueta="Cargo" valor={requesterRole} />
+        <Dato
+          etiqueta="Cargo"
+          valor={requesterRole ? labelForRequesterRole(requesterRole) : "—"}
+        />
         <Dato etiqueta="Documento" valor={requesterDocId} />
         <Dato etiqueta="Correo" valor={requesterEmail} />
         <Dato

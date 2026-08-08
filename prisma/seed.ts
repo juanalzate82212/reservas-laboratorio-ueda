@@ -6,6 +6,7 @@ import {
 } from "@prisma/client";
 import { addDays } from "date-fns";
 
+import type { RequesterRoleValue } from "../src/config/reservationOptions";
 import { fromBogota, isOpenDay, toBogotaDayKey } from "../src/lib/datetime";
 import { generateReservationCode } from "../src/lib/reservation-code";
 
@@ -40,6 +41,11 @@ async function main() {
   console.log(`Sembrando sobre los días: ${[lunes, martes, miercoles, jueves].join(", ")}`);
 
   // --- Salas (idempotentes: la migración no debe perderlas) ---
+  // `capacity` no es decorativo: es el tope de asistentes que valida el
+  // formulario y POST /api/reservations. Ojo con `update: {}` — si la fila ya
+  // existe, la semilla NO la toca, así que cambiar el aforo aquí solo sirve
+  // para una base nueva; en una que ya tiene la sala hay que actualizarla
+  // aparte.
   const salaPrincipal = await prisma.room.upsert({
     where: { slug: "sala-principal" },
     update: {},
@@ -47,7 +53,7 @@ async function main() {
       slug: "sala-principal",
       name: "Sala Principal",
       description: "Sala amplia con equipos de cómputo para prácticas y clases.",
-      capacity: 20,
+      capacity: 25,
       hasComputers: true,
       colorToken: "azul",
     },
@@ -69,7 +75,9 @@ async function main() {
     hasta: string;
     status: ReservationStatus;
     requesterName: string;
-    requesterRole: string;
+    // Tipado contra la lista de config y no `string`: la semilla debe generar
+    // los mismos valores que el formulario, no etiquetas legibles.
+    requesterRole: RequesterRoleValue;
     requesterDocId: string;
     requesterEmail: string;
     academicProgram: AcademicProgram;
@@ -85,7 +93,7 @@ async function main() {
       hasta: "10:00",
       status: "CONFIRMED",
       requesterName: "Ana María Restrepo",
-      requesterRole: "Docente",
+      requesterRole: "DOCENTE",
       requesterDocId: "1017234567",
       requesterEmail: "ana.restrepo@amigo.edu.co",
       academicProgram: "INGENIERIA_SISTEMAS",
@@ -99,7 +107,7 @@ async function main() {
       hasta: "15:00",
       status: "PENDING",
       requesterName: "Carlos Andrés Vélez",
-      requesterRole: "Coordinador académico",
+      requesterRole: "COORDINADOR",
       requesterDocId: "71234567",
       requesterEmail: "carlos.velez@amigo.edu.co",
       academicProgram: "ESPECIALIZACION_BIG_DATA_BI",
@@ -113,7 +121,7 @@ async function main() {
       hasta: "11:00",
       status: "PENDING",
       requesterName: "Laura Gómez Sierra",
-      requesterRole: "Estudiante",
+      requesterRole: "ESTUDIANTE",
       requesterDocId: "1098765432",
       requesterEmail: "laura.gomez@amigo.edu.co",
       academicProgram: "TECNOLOGIA_DESARROLLO_SOFTWARE",
@@ -127,7 +135,7 @@ async function main() {
       hasta: "16:00",
       status: "REJECTED",
       requesterName: "Julián Ospina Marín",
-      requesterRole: "Estudiante",
+      requesterRole: "ESTUDIANTE",
       requesterDocId: "1020304050",
       requesterEmail: "julian.ospina@amigo.edu.co",
       academicProgram: "INGENIERIA_CIVIL",
@@ -144,7 +152,7 @@ async function main() {
       hasta: "12:00",
       status: "CONFIRMED",
       requesterName: "Diana Patricia Muñoz",
-      requesterRole: "Investigadora",
+      requesterRole: "INVESTIGADOR",
       requesterDocId: "43567890",
       requesterEmail: "diana.munoz@amigo.edu.co",
       academicProgram: "ARQUITECTURA",
@@ -158,7 +166,7 @@ async function main() {
       hasta: "14:00",
       status: "CANCELLED",
       requesterName: "Santiago Arango Ruiz",
-      requesterRole: "Docente",
+      requesterRole: "DOCENTE",
       requesterDocId: "8123456",
       requesterEmail: "santiago.arango@amigo.edu.co",
       academicProgram: "INGENIERIA_SISTEMAS_APARTADO",

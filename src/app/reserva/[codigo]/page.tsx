@@ -1,5 +1,8 @@
+import Link from "next/link";
+
 import { Footer } from "@/components/brand/Footer";
 import { Header } from "@/components/brand/Header";
+import { CancelarReservaPanel } from "@/components/reservation/CancelarReservaPanel";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatRange } from "@/lib/datetime";
@@ -16,6 +19,20 @@ export default async function ReservaPage({
   params: { codigo: string };
 }) {
   const reservation = await getPublicReservationByCode(params.codigo);
+
+  /*
+   * Quién puede cancelar se decide aquí y no dentro del panel: son datos que
+   * esta página ya tiene, y así el botón no llega siquiera a pintarse cuando
+   * no aplica. El endpoint vuelve a comprobarlo igual — esto es solo para no
+   * ofrecer algo que va a fallar.
+   *
+   * EXPIRED queda fuera por ser terminal, y una reserva ya empezada tampoco:
+   * cancelarla no libera nada.
+   */
+  const sePuedeCancelar =
+    reservation !== null &&
+    (reservation.status === "PENDING" || reservation.status === "CONFIRMED") &&
+    reservation.startsAt.getTime() > Date.now();
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -62,12 +79,26 @@ export default async function ReservaPage({
                 <p className="text-body text-texto">{reservation.adminNote}</p>
               </div>
             )}
+
+            {sePuedeCancelar && (
+              <CancelarReservaPanel
+                code={reservation.code}
+                resumen={`${reservation.room.name} · ${formatRange(reservation.startsAt, reservation.endsAt)}`}
+              />
+            )}
           </div>
         ) : (
-          <EmptyState
-            titulo="No encontramos esa reserva"
-            descripcion="Revisa que el código esté escrito correctamente, tal como aparece en tu pantalla de confirmación."
-          />
+          <div className="flex flex-col gap-4">
+            <EmptyState
+              titulo="No encontramos esa reserva"
+              descripcion="Revisa que el código esté escrito tal como aparece en tu pantalla de confirmación. Ojo con la S y el 5, y con la Z y el 2, que se confunden al leerlos."
+            />
+            <p className="text-center text-caption text-texto-secundario">
+              <Link href="/reserva" className="font-medium text-primary hover:underline">
+                Probar con otro código
+              </Link>
+            </p>
+          </div>
         )}
       </main>
 

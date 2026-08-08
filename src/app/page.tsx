@@ -45,12 +45,23 @@ export default async function Home() {
               disponible y envía tu solicitud: queda sujeta a aprobación del
               administrador.
             </p>
-            <div>
+            {/*
+              Un solo `accent` por pantalla (§ marca): reservar es la acción
+              principal y se queda el naranja. Consultar el estado es para
+              quien ya reservó, así que va en secundario.
+            */}
+            <div className="flex flex-wrap items-center gap-3">
               <Link
                 href="/reservar"
                 className={buttonVariants({ variante: "accent", tamano: "lg" })}
               >
                 Reservar espacio
+              </Link>
+              <Link
+                href="/reserva"
+                className={buttonVariants({ variante: "secondary", tamano: "lg" })}
+              >
+                Consultar mi reserva
               </Link>
             </div>
           </div>

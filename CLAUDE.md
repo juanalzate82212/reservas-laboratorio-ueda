@@ -39,23 +39,11 @@ Regla mnemotécnica: **laboratorio = el lugar; Unidad = quién construyó la her
 | 7 — Correos automáticos | ✅ Completa (SMTP real verificado) |
 | 8 — Gestión de franjas | ✅ Completa |
 | 9 — Despliegue en Vercel | ✅ Completa (en producción, verificada) |
-| 10 — QR, pulido y cierre | 🟡 Parcial — ver abajo |
+| 10 — QR, pulido y cierre | 🟡 Parcial |
 
-**Fase 10, detalle:**
+De la Fase 10 están hechos el QR imprimible (`/admin/qr`), el `title`/`description` del layout raíz, el `README.md` y el `npm run build` limpio. El punto 8 (dataset de demostración) quedó **anulado a propósito** — ver "Datos" más abajo.
 
-| Punto | Estado |
-|-------|--------|
-| 1. Página del QR imprimible (`/admin/qr`) | ✅ Hecho |
-| 2. Metadata y Open Graph | 🟡 `title`/`description` sí; falta imagen OG |
-| 3. Estados de carga y vacíos | 🟡 El calendario y `EmptyState` sí; falta repasar el resto |
-| 4. `error.tsx`, `not-found.tsx`, `loading.tsx` | ❌ No existen |
-| 5. Revisión de accesibilidad | ❌ Pendiente |
-| 6. Eliminar `/kitchen-sink` | ❌ Sigue existiendo |
-| 7. `npm run build` limpio | ✅ Pasa |
-| 8. Dataset de demostración | ⚠️ Anulado a propósito — ver "Datos" abajo |
-| 9. `README.md` | ✅ Hecho |
-
-Lo pendiente concreto está en [BACKLOG.md](BACKLOG.md).
+> **[BACKLOG.md](BACKLOG.md) es la única lista de lo que falta**, tanto de la Fase 10 como de los ajustes pedidos después del despliegue. **No repetir ese estado aquí**: eran dos listas con numeraciones distintas y se desincronizan. Este archivo guarda las *decisiones y sus porqués*; el backlog guarda las *tareas abiertas*.
 
 **Verificación de que la app funciona en producción** (hecha con peticiones reales, no solo comprobando que cargue): landing, `/reservar` y `/admin/login` responden `200`; `/admin` y `/admin/qr` sin sesión redirigen (`307`); `POST /api/admin/login` devuelve una cookie de sesión que efectivamente autoriza `GET /admin`, `GET /admin/qr` y `GET /api/admin/reservations`.
 
@@ -156,6 +144,8 @@ Tras probar el wizard en el navegador, el usuario pidió:
 - `attendees` pasó de opcional a obligatorio.
 - El campo libre `purpose` se **eliminó** del modelo: lo reemplaza `activityType`, más útil para que el admin decida sin leer texto libre.
 
+**El cargo es la excepción del archivo de opciones.** `REQUESTER_ROLES` existe igual que las otras dos listas, pero `Reservation.requesterRole` sigue siendo **`String`, no un enum de Prisma**. Es deliberado: el campo nació como texto libre y las filas anteriores guardan valores que no traducen a la lista ("Analista de Datos", y otros de prueba). Migrar obligaría a inventarles un mapeo o a perderlos, y no compraría nada — la única escritura pasa por Zod, que valida contra esa misma lista, y el canal REST de Supabase está cerrado por RLS. Por eso `labelForRequesterRole()` devuelve el valor crudo si no lo reconoce: así las reservas antiguas siguen legibles. Su "Otro", a diferencia del de `activityType`, **no** pide detalle.
+
 ⚠️ **Los `value` de `src/config/reservationOptions.ts` deben coincidir exactamente con los enums `AcademicProgram`/`ActivityType` de `prisma/schema.prisma`.** Están comentados cruzadamente en ambos archivos. Ese archivo es la única fuente: lo consumen el `<select>` de `StepRequester.tsx`, el `z.enum` de `lib/validation/reservation.ts` (que deriva la tupla del mismo array) y las etiquetas de `StepReview.tsx`.
 
 ### Marca y UI
@@ -187,9 +177,33 @@ Tras probar el wizard en el navegador, el usuario pidió:
 
 **Disponibilidad.** `lib/availability.ts` implementa el solapamiento con exactamente `A.startsAt < B.endsAt && B.startsAt < A.endsAt` (09:00–10:00 y 10:00–11:00 **no** solapan). Las reservas `PENDING` **ocupan la franja** igual que las `CONFIRMED`.
 
+**`EXPIRED` se aplica al leer, no con una tarea programada.** Una solicitud que nadie revisó y cuya franja ya terminó pasa a `EXPIRED`. Es el único estado que **no** decide el administrador, así que no hay ninguna acción de usuario donde colgarlo: `lib/expiration.ts` hace un `updateMany` idempotente (`status = PENDING AND endsAt < now()`) que se llama **antes** de las tres lecturas que importan — `GET /api/admin/reservations` (de donde cuelga también el contador del nav), `getPublicReservationByCode()` y el conteo de pendientes de `POST /api/reservations`.
+
+Se descartó Vercel Cron porque **en plan Hobby solo permite una ejecución al día**: una solicitud vencida por la mañana seguiría mostrándose "En revisión" hasta la madrugada. Aplicándolo al leer, lo que se ve nunca está desfasado. `decidedAt` se deja en `null` a propósito — `EXPIRED` con `decidedAt` nulo significa exactamente "se venció sin que nadie la mirara".
+
+**Es terminal:** `ALLOWED_FROM` en `PATCH /api/admin/reservations/[id]` solo admite origen `PENDING` o `CONFIRMED`, así que las tres acciones sobre una vencida devuelven `409 INVALID_TRANSITION` sin necesidad de código extra. Y **arregla un bug real**: el tope de `maxPendingPerEmail` filtra por `status: "PENDING"`, así que antes tres solicitudes vencidas sin revisar bloqueaban ese correo de forma permanente.
+
+⚠️ `lib/availability.ts` declara su **propio** union `ReservationStatus` en vez de importar el de Prisma (para servir igual en cliente y servidor, y poder probarse con literales). No puede desincronizarse en silencio —los handlers pasan resultados de Prisma a `findConflicts()`, así que un estado nuevo que falte allí rompe la compilación— pero al añadir uno hay que tocar los dos sitios.
+
 **Mutaciones = Route Handlers, no Server Actions.** Un solo patrón, para poder probar con `curl`. Formato de error uniforme: `{ "error": { "code": "...", "message": "..." } }`.
 
-**El correo nunca bloquea la transición de estado.** Orden en `PATCH /api/admin/reservations/[id]`: actualizar BD → intentar enviar → registrar en `EmailLog` (`SENT`/`FAILED`/`LOGGED`). Si el envío falla, la respuesta sigue siendo `200` con `{ emailStatus: "FAILED" }`.
+**El correo nunca bloquea la transición de estado.** Orden en `PATCH /api/admin/reservations/[id]`: actualizar BD → intentar enviar → registrar en `EmailLog` (`SENT`/`FAILED`/`LOGGED`). Si el envío falla, la respuesta sigue siendo `200` con `{ emailStatus: "FAILED" }`. Igual en `POST /api/reservations/[code]/cancel`.
+
+**Cancelación por el propio solicitante.** `POST /api/reservations/[code]/cancel` no lleva sesión: la llave son **código + número de documento**, dos datos que solo junta quien reservó. Detalles que importan:
+
+- **El error es el mismo para "ese código no existe" y "ese documento no coincide".** Si fueran distintos, el endpoint diría si un código existe y volvería recorrible el espacio de códigos.
+- **El acuse por correo al solicitante es parte de la seguridad**, no cortesía: el documento no es un secreto, así que si alguien cancelara sin permiso, el dueño se entera al momento. Usa `selfCancelTemplate` y **no** `cancelTemplate` — la redacción de esa última ("lamentamos informarte") es la de una cancelación que se sufre, no una que se decide.
+- **Compare-and-set**: el estado va en el `WHERE` del `updateMany`, no solo en la comprobación previa. Si el admin decide entre una cosa y la otra, no se pisa su decisión.
+- Se puede cancelar hasta que la reserva **empieza** (`startsAt > now`), estando `PENDING` o `CONFIRMED`. `EXPIRED` no, por terminal. La franja se libera sola: `CANCELLED` no está en `ESTADOS_QUE_OCUPAN`.
+- No se distingue en la BD quién canceló (admin o solicitante); ambos dejan `CANCELLED` con `decidedAt`. Si algún día hace falta, es un campo nuevo.
+
+**`MAIL_TO_ADMIN` para los avisos internos** (solicitud nueva, y cancelación hecha por el solicitante). Hoy vale lo mismo que `SMTP_USER` —el laboratorio se avisa a sí mismo— pero sigue siendo variable aparte a propósito: el día que los avisos deban ir a otra persona se cambia eso y no el remitente de todos los correos. `enviarCorreoAlLaboratorio()` devuelve `null` y avisa por consola si no está configurada, en vez de inventar un destinatario.
+
+⚠️ **Las llamadas a correo van envueltas en `try/catch` en los handlers, además del que ya tiene el mailer.** `enviarCorreo()` atrapa los fallos de *envío* y los registra como `FAILED`, pero el `EmailLog.create` de su propio `catch` puede fallar y esa excepción sí escaparía — convirtiendo un `201`/`200` en `500` con la reserva ya escrita. En `POST /api/reservations` eso sería peor que ruido: el solicitante creería que no se envió y al reintentar chocaría con su propia franja.
+
+**El enlace de Google Calendar del correo de confirmación usa el instante UTC real** (`fechaParaGoogleCalendar()` en `templates.ts`). **No** pasa por `toBogotaWallClockIso()`: ese truco es exclusivo del límite con FullCalendar y aquí metería 5 h de desfase en el calendario de quien pulse el botón. El separador `/` de `dates` va sin codificar, como en la documentación de Google; el resto de valores sí se codifican para URL y el enlace entero se escapa para el `href`.
+
+**El formulario de `/reserva` funciona sin JavaScript**, y no por purismo: entre que la página pinta y que React hidrata hay una ventana en la que el `onSubmit` no está enlazado, y pulsar el botón hacía un envío nativo que recargaba la misma página **sin ir a ninguna parte** (detectado con Playwright, no por lectura). El `<form>` es un `GET` real hacia `/reserva`, que resuelve `?codigo=` en el servidor y redirige; el handler de cliente queda como mejora para ahorrarse el viaje.
 
 **Dos patrones de datos distintos, a propósito.** `app/page.tsx` (landing) consulta Prisma directo: es Server Component y no necesita refrescarse tras una mutación. `app/admin/(protected)/page.tsx` (bandeja) es Client Component y llama a `GET /api/admin/reservations` desde el navegador, porque necesita revalidar tras cada `PATCH`, mantener filtros interactivos y mostrar toasts.
 

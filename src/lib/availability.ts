@@ -8,11 +8,19 @@
 
 export type Interval = { startsAt: Date; endsAt: Date };
 
+/*
+ * Espejo del enum ReservationStatus del schema. No se importa de Prisma por lo
+ * dicho arriba, pero tampoco puede desincronizarse en silencio: los handlers
+ * pasan resultados de Prisma a findConflicts(), así que si el schema gana un
+ * estado que falte aquí, esas llamadas dejan de compilar. Fue lo que ocurrió
+ * al añadir EXPIRED.
+ */
 export type ReservationStatus =
   | "PENDING"
   | "CONFIRMED"
   | "REJECTED"
-  | "CANCELLED";
+  | "CANCELLED"
+  | "EXPIRED";
 
 export type ReservationLike = Interval & { status: ReservationStatus };
 

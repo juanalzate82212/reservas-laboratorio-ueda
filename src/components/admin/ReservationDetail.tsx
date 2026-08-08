@@ -1,6 +1,7 @@
 import {
   labelForAcademicProgram,
   labelForActivityType,
+  labelForRequesterRole,
 } from "@/config/reservationOptions";
 import { formatDateTime } from "@/lib/datetime";
 
@@ -25,7 +26,9 @@ export function ReservationDetail({ reservation }: { reservation: AdminReservati
   return (
     <div className="flex flex-col gap-4">
       <dl className="grid gap-3 sm:grid-cols-2">
-        <Dato etiqueta="Cargo" valor={reservation.requesterRole} />
+        {/* labelFor… devuelve el crudo si no lo reconoce: las reservas
+            anteriores al desplegable guardan texto libre. */}
+        <Dato etiqueta="Cargo" valor={labelForRequesterRole(reservation.requesterRole)} />
         <Dato etiqueta="Documento" valor={reservation.requesterDocId} />
         <Dato etiqueta="Correo" valor={reservation.requesterEmail} />
         <Dato

@@ -7,16 +7,27 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
-import { ACADEMIC_PROGRAMS, ACTIVITY_TYPES } from "@/config/reservationOptions";
+import {
+  ACADEMIC_PROGRAMS,
+  ACTIVITY_TYPES,
+  REQUESTER_ROLES,
+} from "@/config/reservationOptions";
 import type { CreateReservationInput } from "@/lib/validation/reservation";
 
 export interface StepRequesterProps {
   register: UseFormRegister<CreateReservationInput>;
   control: Control<CreateReservationInput>;
   errors: FieldErrors<CreateReservationInput>;
+  /** Aforo de la sala: es el tope de asistentes, y sale de la BD. */
+  maxAttendees: number;
 }
 
-export function StepRequester({ register, control, errors }: StepRequesterProps) {
+export function StepRequester({
+  register,
+  control,
+  errors,
+  maxAttendees,
+}: StepRequesterProps) {
   const activityType = useWatch({ control, name: "activityType" });
 
   return (
@@ -30,7 +41,16 @@ export function StepRequester({ register, control, errors }: StepRequesterProps)
       </Field>
 
       <Field label="Cargo" error={errors.requesterRole?.message}>
-        <Input placeholder="Docente, estudiante, coordinador…" {...register("requesterRole")} />
+        <Select defaultValue="" {...register("requesterRole")}>
+          <option value="" disabled>
+            Selecciona tu cargo
+          </option>
+          {REQUESTER_ROLES.map((cargo) => (
+            <option key={cargo.value} value={cargo.value}>
+              {cargo.label}
+            </option>
+          ))}
+        </Select>
       </Field>
 
       <Field
@@ -103,14 +123,15 @@ export function StepRequester({ register, control, errors }: StepRequesterProps)
 
       <Field
         label="Número de asistentes"
-        ayuda="Cantidad estimada."
+        ayuda={`Cantidad estimada. La sala admite hasta ${maxAttendees}.`}
         error={errors.attendees?.message}
       >
         <Input
           type="number"
           inputMode="numeric"
           min={1}
-          placeholder="Ej: 25 asistentes estimados"
+          max={maxAttendees}
+          placeholder={`Ej: ${Math.max(1, Math.floor(maxAttendees / 2))}`}
           {...register("attendees")}
         />
       </Field>
