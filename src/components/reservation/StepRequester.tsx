@@ -7,7 +7,11 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
-import { ACADEMIC_PROGRAMS, ACTIVITY_TYPES } from "@/config/reservationOptions";
+import {
+  ACADEMIC_PROGRAMS,
+  ACTIVITY_TYPES,
+  REQUESTER_ROLES,
+} from "@/config/reservationOptions";
 import type { CreateReservationInput } from "@/lib/validation/reservation";
 
 export interface StepRequesterProps {
@@ -37,7 +41,16 @@ export function StepRequester({
       </Field>
 
       <Field label="Cargo" error={errors.requesterRole?.message}>
-        <Input placeholder="Docente, estudiante, coordinador…" {...register("requesterRole")} />
+        <Select defaultValue="" {...register("requesterRole")}>
+          <option value="" disabled>
+            Selecciona tu cargo
+          </option>
+          {REQUESTER_ROLES.map((cargo) => (
+            <option key={cargo.value} value={cargo.value}>
+              {cargo.label}
+            </option>
+          ))}
+        </Select>
       </Field>
 
       <Field

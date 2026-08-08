@@ -12,7 +12,7 @@ Estado general: **Fases 0–9 completas, la app está en producción.** La Fase 
 
 Prioridad actual. Las causas raíz anotadas aquí están **verificadas leyendo el código**, no supuestas.
 
-Hechos ya: **1, 2, 3, 4, 5, 7, 8 y 9**. Queda solo el **6** (cargo como desplegable). Se conserva la numeración original para no romper las referencias.
+**Los nueve ajustes pedidos tras el despliegue están hechos.** Lo que queda debajo es lo anterior (Fase 10, mantenimiento, seguridad) más lo menor que fue apareciendo.
 
 ⚠️ **`MAIL_TO_ADMIN` hay que cargarla en el `.env` local y en Vercel** (Production y Preview) para que los avisos al laboratorio salgan de verdad. Sin ella se omiten en silencio: queda constancia en consola, pero no llega a nadie. El valor es el mismo buzón que envía (`SMTP_USER`). Ver `.env.example`.
 
@@ -24,16 +24,11 @@ Quedan reservas de desarrollo que conviene limpiar desde el panel antes de que e
 
 Hoy una cancelación del administrador y una del solicitante quedan idénticas en la base: `CANCELLED` con `decidedAt`. En el panel no se puede saber cuál fue. Si llega a importar, es un campo nuevo en `Reservation` (y su migración), no un apaño de presentación.
 
-### 6. "Cargo" como desplegable
+### 6bis. Los errores de validación no se borran al corregirlos (menor)
 
-Hoy `requesterRole` es texto libre (`String` en el schema, `<Input>` con placeholder "Docente, estudiante, coordinador…").
+Detectado al probar el desplegable de cargo, pero **afecta a todo el formulario y es anterior a este trabajo**: si alguien pulsa "Siguiente" sin completar algo, ve el error en rojo; al corregirlo, el mensaje **sigue ahí** hasta que vuelve a pulsar "Siguiente". No bloquea nada —el paso avanza igual—, pero da la sensación de que la corrección no se registró.
 
-- **Lista confirmada:** Docente, Estudiante, Administrativo, Coordinador, Investigador, Externo, Otro.
-- **"Otro" NO lleva campo de detalle** (decidido). A diferencia de `activityType`, aquí no se pide especificar.
-- **Dónde guardar el valor:**
-  - *Mantener `String`* + lista cerrada en `config/reservationOptions.ts`. Sin migración y sin heredar la restricción de sincronía enum↔config. **Recomendado.**
-  - *Enum `RequesterRole` de Prisma*, como `academicProgram`/`activityType`. Más consistente con lo que ya hay, pero necesita migración y mapear las filas existentes, que tienen texto libre.
-- El `<select>` nuevo nace ya con el `errorMap` del punto 2.
+La causa es la configuración de `useForm`: con `mode: "onTouched"` y errores puestos por `trigger()` (no por un `handleSubmit`), `isSubmitted` sigue en `false` y el `reValidateMode: "onChange"` por defecto no llega a activarse. Se arreglaría revalidando el campo en su `onChange` cuando ya tiene error.
 
 ---
 

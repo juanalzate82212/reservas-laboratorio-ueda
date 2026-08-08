@@ -144,6 +144,8 @@ Tras probar el wizard en el navegador, el usuario pidió:
 - `attendees` pasó de opcional a obligatorio.
 - El campo libre `purpose` se **eliminó** del modelo: lo reemplaza `activityType`, más útil para que el admin decida sin leer texto libre.
 
+**El cargo es la excepción del archivo de opciones.** `REQUESTER_ROLES` existe igual que las otras dos listas, pero `Reservation.requesterRole` sigue siendo **`String`, no un enum de Prisma**. Es deliberado: el campo nació como texto libre y las filas anteriores guardan valores que no traducen a la lista ("Analista de Datos", y otros de prueba). Migrar obligaría a inventarles un mapeo o a perderlos, y no compraría nada — la única escritura pasa por Zod, que valida contra esa misma lista, y el canal REST de Supabase está cerrado por RLS. Por eso `labelForRequesterRole()` devuelve el valor crudo si no lo reconoce: así las reservas antiguas siguen legibles. Su "Otro", a diferencia del de `activityType`, **no** pide detalle.
+
 ⚠️ **Los `value` de `src/config/reservationOptions.ts` deben coincidir exactamente con los enums `AcademicProgram`/`ActivityType` de `prisma/schema.prisma`.** Están comentados cruzadamente en ambos archivos. Ese archivo es la única fuente: lo consumen el `<select>` de `StepRequester.tsx`, el `z.enum` de `lib/validation/reservation.ts` (que deriva la tupla del mismo array) y las etiquetas de `StepReview.tsx`.
 
 ### Marca y UI
