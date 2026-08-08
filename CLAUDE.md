@@ -185,7 +185,19 @@ Se descartó Vercel Cron porque **en plan Hobby solo permite una ejecución al d
 
 **Mutaciones = Route Handlers, no Server Actions.** Un solo patrón, para poder probar con `curl`. Formato de error uniforme: `{ "error": { "code": "...", "message": "..." } }`.
 
-**El correo nunca bloquea la transición de estado.** Orden en `PATCH /api/admin/reservations/[id]`: actualizar BD → intentar enviar → registrar en `EmailLog` (`SENT`/`FAILED`/`LOGGED`). Si el envío falla, la respuesta sigue siendo `200` con `{ emailStatus: "FAILED" }`.
+**El correo nunca bloquea la transición de estado.** Orden en `PATCH /api/admin/reservations/[id]`: actualizar BD → intentar enviar → registrar en `EmailLog` (`SENT`/`FAILED`/`LOGGED`). Si el envío falla, la respuesta sigue siendo `200` con `{ emailStatus: "FAILED" }`. Igual en `POST /api/reservations/[code]/cancel`.
+
+**Cancelación por el propio solicitante.** `POST /api/reservations/[code]/cancel` no lleva sesión: la llave son **código + número de documento**, dos datos que solo junta quien reservó. Detalles que importan:
+
+- **El error es el mismo para "ese código no existe" y "ese documento no coincide".** Si fueran distintos, el endpoint diría si un código existe y volvería recorrible el espacio de códigos.
+- **El acuse por correo al solicitante es parte de la seguridad**, no cortesía: el documento no es un secreto, así que si alguien cancelara sin permiso, el dueño se entera al momento. Usa `selfCancelTemplate` y **no** `cancelTemplate` — la redacción de esa última ("lamentamos informarte") es la de una cancelación que se sufre, no una que se decide.
+- **Compare-and-set**: el estado va en el `WHERE` del `updateMany`, no solo en la comprobación previa. Si el admin decide entre una cosa y la otra, no se pisa su decisión.
+- Se puede cancelar hasta que la reserva **empieza** (`startsAt > now`), estando `PENDING` o `CONFIRMED`. `EXPIRED` no, por terminal. La franja se libera sola: `CANCELLED` no está en `ESTADOS_QUE_OCUPAN`.
+- No se distingue en la BD quién canceló (admin o solicitante); ambos dejan `CANCELLED` con `decidedAt`. Si algún día hace falta, es un campo nuevo.
+
+**`MAIL_TO_ADMIN` para los avisos internos**, aparte de `MAIL_FROM`/`SMTP_USER`: quien envía y quien recibe los avisos no tienen por qué ser la misma cuenta. `enviarCorreoAlLaboratorio()` devuelve `null` y avisa por consola si no está configurada, en vez de inventar un destinatario.
+
+**El formulario de `/reserva` funciona sin JavaScript**, y no por purismo: entre que la página pinta y que React hidrata hay una ventana en la que el `onSubmit` no está enlazado, y pulsar el botón hacía un envío nativo que recargaba la misma página **sin ir a ninguna parte** (detectado con Playwright, no por lectura). El `<form>` es un `GET` real hacia `/reserva`, que resuelve `?codigo=` en el servidor y redirige; el handler de cliente queda como mejora para ahorrarse el viaje.
 
 **Dos patrones de datos distintos, a propósito.** `app/page.tsx` (landing) consulta Prisma directo: es Server Component y no necesita refrescarse tras una mutación. `app/admin/(protected)/page.tsx` (bandeja) es Client Component y llama a `GET /api/admin/reservations` desde el navegador, porque necesita revalidar tras cada `PATCH`, mantener filtros interactivos y mostrar toasts.
 
