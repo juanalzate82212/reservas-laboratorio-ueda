@@ -112,6 +112,40 @@ function datosComunes(r: TemplateReservation): Array<[string, string]> {
   ];
 }
 
+/*
+ * "20260914T140000Z" — el formato que pide Google Calendar en `dates`.
+ *
+ * ⚠️ Recibe el instante UTC real, tal como está en la BD. NO pasar por
+ * toBogotaWallClockIso(): ese truco existe solo para el límite con
+ * FullCalendar y aquí metería 5 h de desfase en el calendario de quien
+ * pulse el botón.
+ */
+function fechaParaGoogleCalendar(fecha: Date): string {
+  return fecha.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+}
+
+/*
+ * Enlace de "añadir al calendario" de Google. El separador de `dates` va como
+ * "/" literal y sin codificar —es lo que documenta Google y lo que aceptan
+ * todos sus ejemplos—; el resto de valores sí se codifican para URL, y el
+ * enlace entero se escapa después para meterlo en el href.
+ */
+function enlaceGoogleCalendar(r: TemplateReservation): string {
+  const texto = `${actividadLegible(r)} — Laboratorio de Analítica de Datos e IA`;
+  const detalles = `Reserva ${r.code} · ${r.roomName}. Consulta su estado con el código en la página del laboratorio.`;
+  const lugar = `Universidad Católica Luis Amigó · ${r.roomName}`;
+
+  const parametros = [
+    "action=TEMPLATE",
+    `text=${encodeURIComponent(texto)}`,
+    `dates=${fechaParaGoogleCalendar(r.startsAt)}/${fechaParaGoogleCalendar(r.endsAt)}`,
+    `details=${encodeURIComponent(detalles)}`,
+    `location=${encodeURIComponent(lugar)}`,
+  ].join("&");
+
+  return `https://calendar.google.com/calendar/render?${parametros}`;
+}
+
 export function confirmTemplate(
   r: TemplateReservation,
   avisoEquipos?: string | null,
@@ -125,10 +159,25 @@ export function confirmTemplate(
       </div>`
     : "";
 
+  // Botón como <a> con estilos inline: en correo no hay hojas de estilo, y un
+  // <button> no navega desde un cliente de correo.
+  const botonCalendario = `
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 0;">
+      <tr>
+        <td style="border-radius:6px;background-color:${COLOR.primary};">
+          <a href="${escapeHtml(enlaceGoogleCalendar(r))}"
+             style="display:inline-block;padding:12px 20px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;font-family:Arial,Helvetica,sans-serif;">
+            Añadir a Google Calendar
+          </a>
+        </td>
+      </tr>
+    </table>`;
+
   const cuerpoHtml = `
     <p style="margin:0 0 8px;">Tu solicitud fue aprobada. El espacio queda reservado con estos datos:</p>
     ${tablaDatos(datosComunes(r))}
     ${aviso}
+    ${botonCalendario}
     <p style="margin:16px 0 0;color:${COLOR.textoSecundario};font-size:13px;">Guarda el código de tu reserva para consultarla más adelante.</p>
   `;
 
@@ -189,6 +238,35 @@ export function selfCancelTemplate(r: TemplateReservation): {
   `;
 
   return { subject, html: layout({ titulo: "Reserva cancelada", cuerpoHtml }) };
+}
+
+/*
+ * Aviso interno al laboratorio: entró una solicitud que espera revisión.
+ *
+ * Sin esto, el administrador solo se entera entrando al panel — y con la
+ * aprobación 100 % manual, una solicitud sin mirar acaba venciendo sola
+ * (EXPIRED). Incluye el correo del solicitante, que las plantillas del
+ * solicitante nunca muestran, porque aquí sirve para responderle directo.
+ */
+export function newRequestAdminTemplate(
+  r: TemplateReservation,
+  requesterEmail: string,
+): { subject: string; html: string } {
+  const subject = `Nueva solicitud por revisar — ${formatRange(r.startsAt, r.endsAt)}`;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+
+  const enlacePanel = appUrl
+    ? `<p style="margin:20px 0 0;"><a href="${escapeHtml(`${appUrl}/admin`)}" style="color:${COLOR.primary};font-weight:bold;">Revisar en el panel</a></p>`
+    : "";
+
+  const cuerpoHtml = `
+    <p style="margin:0 0 8px;">Entró una solicitud nueva y está en revisión. La franja ya queda ocupada mientras decides:</p>
+    ${tablaDatos([...datosComunes(r), ["Correo del solicitante", requesterEmail]])}
+    ${enlacePanel}
+    <p style="margin:16px 0 0;color:${COLOR.textoSecundario};font-size:13px;">Si nadie la revisa antes de que pase su horario, la solicitud se marca como vencida.</p>
+  `;
+
+  return { subject, html: layout({ titulo: "Nueva solicitud de reserva", cuerpoHtml }) };
 }
 
 /** Aviso interno al laboratorio: una franja se liberó sin que el admin actuara. */

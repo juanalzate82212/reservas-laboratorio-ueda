@@ -119,16 +119,25 @@ export async function POST(
   // no puede deshacerla ni bloquearla. Secuenciales, nunca en paralelo — cada
   // envío escribe su EmailLog y con connection_limit=1 competirían por la
   // única conexión.
-  const acuse = await enviarCorreo({
-    reservationId: reservation.id,
-    to: reservation.requesterEmail,
-    ...selfCancelTemplate(datosPlantilla),
-  });
+  let acuse: Awaited<ReturnType<typeof enviarCorreo>> | null = null;
+  try {
+    acuse = await enviarCorreo({
+      reservationId: reservation.id,
+      to: reservation.requesterEmail,
+      ...selfCancelTemplate(datosPlantilla),
+    });
 
-  await enviarCorreoAlLaboratorio({
-    reservationId: reservation.id,
-    ...requesterCancelAdminTemplate(datosPlantilla),
-  });
+    await enviarCorreoAlLaboratorio({
+      reservationId: reservation.id,
+      ...requesterCancelAdminTemplate(datosPlantilla),
+    });
+  } catch (error) {
+    // enviarCorreo() ya atrapa los fallos de ENVÍO, pero el EmailLog.create de
+    // dentro puede fallar por su cuenta y esa excepción sí saldría. La
+    // cancelación ya está escrita: no puede acabar en un 500 que haga creer al
+    // solicitante que no se canceló.
+    console.error("[correo] Falló el correo de una cancelación:", error);
+  }
 
   return NextResponse.json({
     code: reservation.code,

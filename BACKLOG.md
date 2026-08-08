@@ -12,7 +12,9 @@ Estado general: **Fases 0–9 completas, la app está en producción.** La Fase 
 
 Prioridad actual. Las causas raíz anotadas aquí están **verificadas leyendo el código**, no supuestas.
 
-Hechos ya: **1, 2, 3, 4, 5 y 9** (estado de carga al tocar una franja, mensajes de validación de los desplegables, entrada pública a la consulta por código, cancelación por el solicitante, tope de asistentes ligado al aforo de la sala fijado en 25, y el estado `EXPIRED`). Se conserva la numeración original para no romper las referencias. Quedan **6, 7 y 8**, y dos decisiones de producto en los puntos 6 y 7.
+Hechos ya: **1, 2, 3, 4, 5, 7, 8 y 9**. Queda solo el **6** (cargo como desplegable). Se conserva la numeración original para no romper las referencias.
+
+⚠️ **`MAIL_TO_ADMIN` hay que cargarla en el `.env` local y en Vercel** (Production y Preview) para que los avisos al laboratorio salgan de verdad. Sin ella se omiten en silencio: queda constancia en consola, pero no llega a nadie. El valor es el mismo buzón que envía (`SMTP_USER`). Ver `.env.example`.
 
 ### 3bis. Reservas de prueba en la base (menor)
 
@@ -22,36 +24,16 @@ Quedan reservas de desarrollo que conviene limpiar desde el panel antes de que e
 
 Hoy una cancelación del administrador y una del solicitante quedan idénticas en la base: `CANCELLED` con `decidedAt`. En el panel no se puede saber cuál fue. Si llega a importar, es un campo nuevo en `Reservation` (y su migración), no un apaño de presentación.
 
-### 6. "Cargo" como desplegable — ⚠️ decisión pendiente
+### 6. "Cargo" como desplegable
 
 Hoy `requesterRole` es texto libre (`String` en el schema, `<Input>` con placeholder "Docente, estudiante, coordinador…").
 
-- **Falta la lista definitiva.** Punto de partida a confirmar: Docente, Estudiante, Administrativo, Coordinador, Investigador, Externo, Otro.
+- **Lista confirmada:** Docente, Estudiante, Administrativo, Coordinador, Investigador, Externo, Otro.
+- **"Otro" NO lleva campo de detalle** (decidido). A diferencia de `activityType`, aquí no se pide especificar.
 - **Dónde guardar el valor:**
   - *Mantener `String`* + lista cerrada en `config/reservationOptions.ts`. Sin migración y sin heredar la restricción de sincronía enum↔config. **Recomendado.**
-  - *Enum `RequesterRole` de Prisma*, como `academicProgram`/`activityType`. Más consistente con lo que ya hay, pero necesita migración y mapear las filas existentes. Hoy solo hay 1 reserva real, así que el coste es casi nulo — pero hay que decidirlo explícitamente, no descubrirlo cuando la migración falle.
-- Si se incluye "Otro", ¿hace falta un campo de detalle, como `activityTypeOther`?
+  - *Enum `RequesterRole` de Prisma*, como `academicProgram`/`activityType`. Más consistente con lo que ya hay, pero necesita migración y mapear las filas existentes, que tienen texto libre.
 - El `<select>` nuevo nace ya con el `errorMap` del punto 2.
-
-### 7. Aviso al laboratorio cuando entra una solicitud
-
-Hoy `POST /api/reservations` **no envía ningún correo**: el único correo sale al decidir. El administrador no se entera de que tiene algo que revisar.
-
-- Plantilla nueva en `lib/mail/templates.ts` + envío en el handler.
-- Restricciones ya documentadas que aplican aquí:
-  - El envío va **después** de que la transacción confirme, nunca dentro: una llamada SMTP lenta retendría la conexión del pool (`connection_limit=1`).
-  - **No puede bloquear la creación.** Si falla, la respuesta sigue siendo `201` y el fallo queda en `EmailLog` como `FAILED`.
-  - El handler necesita `export const runtime = "nodejs"` — nodemailer no corre en Edge. No lo tiene hoy porque no enviaba correo.
-  - Escapar en la plantilla todo valor venido del formulario (`requesterName`, `activityTypeOther`).
-- **A decidir:** ¿a qué dirección? Conviene una variable propia (`MAIL_TO_ADMIN`) en vez de reutilizar `MAIL_FROM`/`SMTP_USER`; habría que añadirla a `.env.example` y cargarla en Vercel (Production y Preview).
-- Esto **no** es el "acuse de recibo al solicitante" descartado más abajo: es un aviso interno.
-
-### 8. "Añadir a Google Calendar" en el correo de confirmación
-
-- **Dónde:** solo en `confirmTemplate()` ([templates.ts:115](src/lib/mail/templates.ts#L115)); no en rechazo ni cancelación.
-- Enlace `https://calendar.google.com/calendar/render?action=TEMPLATE&dates=…`, con las fechas en UTC (`YYYYMMDDTHHMMSSZ`).
-- ⚠️ Usar el instante UTC real, tal como está en BD. **No** pasar por `toBogotaWallClockIso()`: ese truco existe solo para el límite con FullCalendar y aquí metería 5 h de desfase en el calendario del usuario.
-- El valor acaba en un `href` dentro de HTML: hay que codificarlo para URL **y** escaparlo para HTML.
 
 ---
 
