@@ -221,6 +221,17 @@ JWT firmado con `jose` en cookie `admin_session` (httpOnly, 8 h). Sin NextAuth.
 
 > Esto arregló un bug real que existía desde la Fase 5: `/admin/login` heredaba el layout autenticado y mostraba el nav y el botón de cerrar sesión **antes de que hubiera sesión**, con un `<main>` anidado dentro de otro (HTML inválido). Next.js App Router aplica un layout a *todas* las rutas anidadas, sin excepción automática para páginas públicas.
 
+### Pantallas de estado (error, 404, carga)
+
+`app/not-found.tsx`, `app/error.tsx`, `app/loading.tsx` y `app/global-error.tsx`, todas en voz de marca. Reutilizan `EmptyState` y el shell público (`Header` + `main` + `Footer`) en vez de inventar composiciones nuevas.
+
+- **`EmptyState` ganó `nivelTitulo`** (`"h1" | "h3"`, por defecto `"h3"`). El 404 y el error **son** la página, así que su título tiene que ser el `h1`; el resto de usos son bloques dentro de una página que ya tiene el suyo. El tamaño visual no cambia con el nivel — lo pide la semántica, no el diseño.
+- **Ningún botón de estas pantallas es `variante="accent"`.** `EmptyState` ya trae su arco naranja, que es el único elemento naranja que admite la vista.
+- ⚠️ **`global-error.tsx` usa estilos en línea con los hex escritos a mano**, rompiendo a propósito la regla de "ningún hex suelto". Es la pantalla del fallo del layout raíz, y ese layout es justo quien aplica las variables de `next/font` e importa `globals.css`: depender de esa cadena para dibujar su propio fallo es frágil. Por lo mismo no importa ningún componente del proyecto. Verificado en un build de producción — los colores se aplican de verdad con el layout caído.
+- **`app/admin/(protected)/loading.tsx` es una guarda, no un arreglo.** Hoy no llega a dispararse (las páginas del panel son Client Components y nada suspende en el servidor), pero si una pasara a Server Component, el boundary de la raíz mostraría la cabecera y el pie **públicos** dentro del panel. Está explicado en el propio archivo.
+- ⚠️ **`error.tsx` y `global-error.tsx` no se pueden verificar con `npm run dev`**: el overlay de desarrollo los tapa. Hay que usar `npm run build && npm run start`. Para provocar el error basta arrancar con una `DATABASE_URL` inalcanzable; para el fallo total, un `throw` en el layout **detrás de una variable de entorno** (uno incondicional rompe el propio build al prerenderizar).
+- `/reserva/[codigo]` **no** usa `notFound()` a propósito: responde `200` con su propio `EmptyState`, que además avisa de la confusión entre S/5 y Z/2 al leer un código. Un 404 genérico no puede dar ese consejo.
+
 ### Correos
 
 **El HTML se escapa en origen Y se previsualiza en un `<iframe sandbox="">` — doble capa.** `requesterName`, `activityTypeOther` y `adminNote` los escribió alguien externo por el formulario público, y ese HTML no solo se manda por correo: se guarda tal cual en `EmailLog.body` y se vuelve a renderizar en `/admin/correos`, dentro de la sesión autenticada del admin. `lib/mail/templates.ts` escapa (`&<>"'`) todo valor interpolado; `EmailLogRow.tsx` además lo renderiza dentro de un `<iframe sandbox="">` sin ningún token (ni scripts, ni forms, ni same-origin) en vez de usar `dangerouslySetInnerHTML`.

@@ -38,7 +38,7 @@ Nada de esto bloquea el uso de la aplicación; es lo que separa "funcional" de "
 
 | # | Tarea | Notas |
 |---|-------|-------|
-| 1 | `error.tsx`, `not-found.tsx` y `loading.tsx` | No existen. Hoy se usan los genéricos de Next.js, que están en inglés y fuera de la voz de marca. El `not-found.tsx` se cruza con el punto 3 de arriba. |
+| ~~1~~ | ~~`error.tsx`, `not-found.tsx` y `loading.tsx`~~ | ✅ Hechas, más `global-error.tsx`. Ver "Pantallas de estado" en `CLAUDE.md`. |
 | 2 | Eliminar `/kitchen-sink` | Página temporal de muestra de componentes; ya cumplió su propósito. Su `<Select>` de ejemplo todavía lista "Sala de Reuniones", que ya no existe. |
 | 3 | Imagen de Open Graph | El `title` y la `description` del layout raíz ya están; falta la imagen para cuando se comparta el enlace. |
 | 4 | Revisión de accesibilidad | Navegación completa por teclado, `aria-label` en los controles del calendario, contraste verificado. |
