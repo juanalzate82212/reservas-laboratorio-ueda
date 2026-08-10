@@ -15,10 +15,11 @@ Cualquier persona de la comunidad universitaria escanea un código QR, consulta 
 - Ver la disponibilidad de la sala en un calendario semanal, con los estados diferenciados por color **y** por icono/borde (por accesibilidad para daltonismo): reservado, en revisión, sin equipos de cómputo, no disponible, festivo.
 - Solicitar una reserva eligiendo día, hora de inicio y duración; tocar una franja libre del calendario prellena el formulario.
 - Consultar el estado de una solicitud con el código que se entrega al enviarla (ej. `UEDA-7F3K2`).
+- Cancelar la propia reserva hasta el momento en que empieza, con ese mismo código más el número de documento. No hace falta cuenta: son dos datos que solo junta quien reservó.
 
 **Para el administrador** (una contraseña, sin sistema de usuarios):
 
-- Bandeja de solicitudes con filtros: confirmar, rechazar o cancelar.
+- Bandeja de solicitudes con filtros por estado: confirmar, rechazar o cancelar.
 - Gestión de franjas: bloquear horarios (no reservables) o marcarlos como advertencia (reservables, pero sin préstamo de equipos).
 - Registro de correos enviados, con vista previa y opción de reintentar los fallidos.
 - Página con el código QR en formato imprimible.
@@ -33,9 +34,12 @@ Cualquier persona de la comunidad universitaria escanea un código QR, consulta 
 | Duración de una reserva | De 30 minutos a 4 horas, en bloques de 30 min |
 | Anticipación | Mínimo 1 hora, máximo 60 días |
 | Correo del solicitante | Debe terminar en `@amigo.edu.co` |
+| Asistentes | Obligatorio, y no puede pasar del aforo de la sala (hoy 25) |
 | Aprobación | Siempre manual; las solicitudes pendientes ya ocupan la franja |
 
-Las reglas viven en `src/config/booking.ts` y `src/config/holidays.ts`, no repartidas por el código.
+Las reglas viven en `src/config/booking.ts` y `src/config/holidays.ts`, no repartidas por el código. El aforo es la excepción: sale de `Room.capacity`, porque es un dato de la sala y no una regla global.
+
+**Estados de una reserva:** `PENDING` (en revisión) · `CONFIRMED` · `REJECTED` · `CANCELLED` · `EXPIRED`. Los cuatro primeros los decide el administrador o el solicitante; **`EXPIRED` (vencida) se aplica al leer**, a las solicitudes que nadie revisó y cuya franja ya terminó. No hay tarea programada: `lib/expiration.ts` corre antes de las lecturas que importan.
 
 ---
 
@@ -108,6 +112,7 @@ Todas están documentadas en [`.env.example`](.env.example). Resumen:
 | `NEXT_PUBLIC_APP_URL` | URL pública de la app — **es lo que codifica el QR**; un valor incorrecto rompe la función principal |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASSWORD` | Credenciales de envío de correo |
 | `MAIL_FROM` | Remitente, en formato `Nombre <correo>`. Debe coincidir con `SMTP_USER` o ser un alias suyo |
+| `MAIL_TO_ADMIN` | Buzón interno donde caen los **avisos** al laboratorio: solicitud nueva por revisar, y cancelación hecha por el solicitante. Hoy es la misma cuenta que envía. Si se deja vacía, esos avisos no se mandan y solo queda constancia en consola |
 
 **Las dos URLs de base de datos no son intercambiables** y ambas deben estar declaradas. Omitir `DIRECT_URL` produce errores de *"prepared statement already exists"* que típicamente solo aparecen después de desplegar.
 
@@ -148,8 +153,10 @@ scripts/
 src/
   app/
     page.tsx             Landing pública con el calendario
+    error.tsx …          Pantallas de error, 404 y carga en voz de marca
     reservar/            Wizard de solicitud (3 pasos)
-    reserva/[codigo]/    Consulta pública del estado de una reserva
+    reserva/             Búsqueda por código (funciona sin JavaScript)
+    reserva/[codigo]/    Estado de una reserva, con opción de cancelarla
     admin/
       login/             Pantalla de acceso (fuera del shell autenticado)
       (protected)/       Panel: bandeja, franjas, correos, QR
@@ -167,6 +174,7 @@ src/
   lib/
     datetime.ts          Toda la aritmética de fechas (UTC ↔ Bogotá)
     availability.ts      Solapamiento y estado de cada franja
+    expiration.ts        Marca como vencidas las solicitudes sin revisar
     validation/          Esquemas de Zod compartidos cliente/servidor
     mail/                Plantillas y envío de correo
     auth.ts              JWT de sesión del administrador
