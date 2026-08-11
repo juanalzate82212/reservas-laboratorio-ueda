@@ -16,23 +16,34 @@ Sistema de reserva del **Laboratorio de Analítica de Datos e Inteligencia Artif
 
 ---
 
-## ⚠️ Datos: hay UNA sola base de datos
+## Datos: dos proyectos de Supabase
 
-**Local y producción apuntan al mismo proyecto de Supabase.** No existe una base de desarrollo separada: el `.env` local y las variables de Vercel llevan la misma cadena de conexión.
+**Hay una base de desarrollo separada desde el 2026-08-11.** Antes no la había —local y producción compartían proyecto— y ese era el mayor riesgo del repositorio.
 
-1. **Cualquier escritura desde la máquina local afecta producción.** No hay red de seguridad.
-2. **`npx prisma db seed` BORRA `Reservation` y `TimeBlock` completos** antes de recrear datos de demo. Ejecutarlo "para probar en local" destruiría datos reales.
-3. **El guard de `prisma/seed.ts` NO protege contra esto.** Comprueba `NODE_ENV === "production"`, que en una terminal local vale `"development"` o nada — aunque `DATABASE_URL` apunte a la base real. Solo evitaría correr la semilla *dentro* de un entorno de producción, no *contra* la base de producción.
+| Entorno | Proyecto | Quién lo usa |
+|---------|----------|--------------|
+| **Desarrollo** | `vkixgpvztkvbuwamhqdv` | el `.env` local y el MCP de `.mcp.json` |
+| **Producción** | `ceqqzubsxxuroawcnpvg` | solo las variables de entorno de Vercel |
 
-**Antes de ejecutar cualquier cosa que escriba en la base, mirar primero qué hay** (`npx prisma studio`). Ya hubo un incidente cercano: aparecieron filas de `EmailLog` desconocidas que resultaron ser pruebas que el usuario estaba haciendo en paralelo contra la app en vivo.
+⚠️ **Antes de ejecutar cualquier cosa que escriba en la base, confirmar a cuál apunta el `.env`.** La forma rápida, sin exponer la contraseña:
 
-El usuario pidió vaciar `Reservation` y `EmailLog` a propósito para dejar la app lista para uso real; `Room` se conservó. **No resembrar sin pedirlo.** Y ⚠️ **no dar por buena ninguna cifra de filas que leas aquí: la app está en uso**, así que míralo en vez de deducirlo.
+```bash
+grep -oE 'postgres\.[a-z0-9]{20}' .env | head -1
+```
+
+Sigue siendo importante porque **el guard de `prisma/seed.ts` no protege**: comprueba `NODE_ENV === "production"`, que en una terminal local vale `"development"` o nada, aunque `DATABASE_URL` apunte a producción. Y `npx prisma db seed` **borra `Reservation` y `TimeBlock` completos** antes de recrear los datos de demo. La separación de proyectos quita el riesgo por defecto, no la posibilidad de pegarse un tiro pegando la cadena equivocada.
+
+**En desarrollo la semilla es bienvenida**: deja 1 sala, 6 reservas y 2 bloqueos, que es justo lo que hace falta para trabajar. En producción **no resembrar sin pedirlo** — el usuario vació `Reservation` y `EmailLog` a propósito para dejar la app lista para uso real.
+
+⚠️ **No dar por buena ninguna cifra de filas de producción que leas aquí: la app está en uso.** Míralo en vez de deducirlo.
+
+⚠️ **`_prisma_migrations` no tiene RLS**, en los dos proyectos. Es una decisión heredada ("tabla interna, sin datos sensibles") que conviene revisar: no guarda datos personales, pero con la llave `anon` **se puede escribir**, y corromper el historial de migraciones rompería los despliegues. Arreglarlo es una línea y es seguro, porque Prisma se conecta como `postgres`, que ignora RLS.
 
 ---
 
 ## Documentos
 
-- ⚠️ **[FUSION-DATACUEVA.md](FUSION-DATACUEVA.md)** — **el trabajo grande que viene**: absorber la app de préstamo de equipos ([DataCueva](https://github.com/JuanSNuno/DataCueva)) dentro de este panel de admin, con una sola base de datos y usuarios con roles en vez de la contraseña compartida. Plan aprobado y por fases. **Si vas a trabajar en eso, léelo entero antes de tocar nada, y respeta su regla número 1: cada fase se explica al usuario y se aprueba antes de empezarla.**
+- ⚠️ **[FUSION-DATACUEVA.md](FUSION-DATACUEVA.md)** — **el trabajo grande que viene**: absorber la app de préstamo de equipos ([DataCueva](https://github.com/JuanSNuno/DataCueva)) dentro de este panel de admin, con una sola base para las dos apps y usuarios con roles en vez de la contraseña compartida. Plan aprobado y por fases. **Si vas a trabajar en eso, léelo entero antes de tocar nada, y respeta su regla número 1: cada fase se explica al usuario y se aprueba antes de empezarla.**
 - **[BACKLOG.md](BACKLOG.md)** — lo que falta y lo que se dejó fuera de alcance. No implementar nada listado como fuera de alcance; si aparece la tentación, anotarla ahí y seguir.
 - **[identidad-visual-ucla-ui-ux.md](identidad-visual-ucla-ui-ux.md)** — tokens, tipografía, logo y voz de redacción. **De cumplimiento obligatorio.**
 - **[PLAN-MVP.md](PLAN-MVP.md)** — la especificación numerada que citan los comentarios del código (`§5 del plan`, `§8 del plan`…). Es referencia de contrato, no estado actual: **donde difiera del código, manda el código.**
