@@ -69,6 +69,9 @@ function siguienteDia(dayKey: string): string {
 export function RoomCalendar({ room }: { room: ActiveRoom }) {
   const router = useRouter();
   const calendarRef = useRef<FullCalendar>(null);
+  // Envoltorio del calendario: se usa para corregir la accesibilidad de la
+  // barra de navegación sobre el DOM ya montado (ver el efecto más abajo).
+  const contenedorRef = useRef<HTMLDivElement>(null);
   // FullCalendar puede disparar datesSet más de una vez para el mismo rango
   // (recalculo de vista, cambio de ancho, etc.), lanzando pedidos de
   // disponibilidad solapados. Sin esto, un pedido viejo que resuelve DESPUÉS
@@ -314,6 +317,44 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
   // navegara, y RoomCalendar pedía la disponibilidad DOS veces en cada carga
   // en móvil — una para la semana por defecto que nunca se llega a mostrar,
   // y otra para el día correcto.
+  /*
+   * FullCalendar dibuja las flechas de navegación como <span role="img"> sin
+   * nombre accesible dentro del botón. axe-core lo marca como incumplimiento
+   * serio (role-img-alt), y con razón: un role="img" anónimo se anuncia como
+   * una imagen que nadie describió. El nombre útil ya lo lleva el botón, así
+   * que el icono es decorativo y debe quedar fuera del árbol accesible.
+   *
+   * De paso, ese nombre pasa de `title` a `aria-label`: `title` es solo el
+   * último recurso del cálculo de nombre accesible, muchos lectores no lo
+   * anuncian, y en pantalla táctil no se ve nunca.
+   *
+   * No hay opción de FullCalendar para esto —el role va escrito en su propio
+   * código— así que se corrige sobre el DOM ya montado. El observer hace falta
+   * porque la barra se vuelve a dibujar al cambiar de vista (semana ↔ día al
+   * girar el móvil); no entra en bucle porque solo escribe si falta.
+   */
+  useEffect(() => {
+    const raiz = contenedorRef.current;
+    if (!raiz) return;
+
+    const corregirBarra = () => {
+      raiz.querySelectorAll<HTMLElement>(".fc-toolbar button[title]").forEach((boton) => {
+        const icono = boton.querySelector<HTMLElement>(".fc-icon");
+        if (icono && icono.getAttribute("aria-hidden") !== "true") {
+          icono.setAttribute("aria-hidden", "true");
+        }
+        if (!boton.getAttribute("aria-label")) {
+          boton.setAttribute("aria-label", boton.title);
+        }
+      });
+    };
+
+    corregirBarra();
+    const observer = new MutationObserver(corregirBarra);
+    observer.observe(raiz, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     const mq = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`);
     const aplicarVista = () => {
@@ -341,7 +382,7 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
         </p>
       )}
 
-      <div className="relative overflow-hidden rounded border border-borde">
+      <div ref={contenedorRef} className="relative overflow-hidden rounded border border-borde">
         {(cargando || navegando) && (
           // El anillo girando es el mismo gesto de carga que Button.tsx (§5.1
           // del documento de marca) — no un spinner distinto inventado aquí.

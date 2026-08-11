@@ -27,6 +27,8 @@ const config: Config = {
           100: "#FDE6C7",
           500: "#F39200",
           700: "#C77700",
+          // Naranja como TEXTO sobre fondo claro. Ver globals.css.
+          texto: "#9A5C00",
           DEFAULT: "#F39200",
         },
         gris: "#848585",
@@ -37,17 +39,36 @@ const config: Config = {
           hover: "#00647D",
           active: "#004E61",
           soft: "#E6F2F5",
+          /*
+           * Azul de marca como TEXTO sobre fondo claro. #007B99 no llega a
+           * WCAG AA en texto pequeño sobre ninguna superficie clara nuestra
+           * (4.28–4.89 frente al 4.5 exigido); este sí (5.89–6.73). Ver el
+           * comentario largo en globals.css.
+           *
+           * Azul de FONDO, icono o borde → `primary`. Azul de TEXTO → este.
+           */
+          texto: "#00647D",
         },
         accent: {
           DEFAULT: "#F39200",
-          hover: "#C77700",
+          /*
+           * Aclara en vez de oscurecer, al revés que `primary`: sobre naranja
+           * el texto va oscuro, así que oscurecer el fondo hunde el contraste.
+           * Con el #C77700 anterior el botón caía a 3.92 en hover. Ver
+           * globals.css.
+           */
+          hover: "#E08600",
           soft: "#FDE6C7",
+          // Naranja como TEXTO o icono legible sobre fondo claro.
+          texto: "#9A5C00",
         },
 
         // Neutrales
         texto: {
           DEFAULT: "#2E2E2E",
-          secundario: "#848585",
+          // El gris de marca #848585 se queda en `gris` (arriba) para
+          // gráficos; como texto no pasa AA. Ver globals.css.
+          secundario: "#6F7070",
         },
         borde: "#E1E1E1",
         superficie: "#F5F5F5",

@@ -34,7 +34,7 @@ export default async function Home() {
             className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 opacity-40"
           />
           <div className="relative flex max-w-2xl flex-col gap-3">
-            <p className="text-caption font-medium uppercase tracking-widest text-primary">
+            <p className="text-caption font-medium uppercase tracking-widest text-primary-texto">
               Laboratorio de Analítica de Datos e Inteligencia Artificial
             </p>
             <h1 className="font-display text-h1 font-semibold text-texto">

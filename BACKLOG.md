@@ -12,14 +12,16 @@
 
 Nada de esto bloquea el uso de la aplicación; es lo que separa "funcional" de "terminado".
 
-**La numeración es la del §9 → Fase 10 de [PLAN-MVP.md](PLAN-MVP.md)**, para que las dos listas se puedan cruzar sin traducir. Los puntos que no aparecen aquí (1, 4, 7, 9) están hechos, y el 8 quedó anulado a propósito — el porqué de cada uno está en el plan.
+**La numeración es la del §9 → Fase 10 de [PLAN-MVP.md](PLAN-MVP.md)**, para que las dos listas se puedan cruzar sin traducir. Los puntos que no aparecen aquí (1, 4, 5, 6, 7, 9) están hechos, y el 8 quedó anulado a propósito — el porqué de cada uno está en el plan.
 
 | # | Tarea | Notas |
 |---|-------|-------|
-| 2 | Imagen de Open Graph | El `title` y la `description` del layout raíz ya están; falta la imagen para cuando se comparta el enlace. |
-| 3 | Repasar estados de carga y vacíos | El calendario, `EmptyState` y las pantallas del punto 4 ya los tienen; falta revisar el resto. |
-| 5 | Revisión de accesibilidad | Navegación completa por teclado, `aria-label` en los controles del calendario, contraste verificado. |
-| 6 | Eliminar `/kitchen-sink` | Página temporal de muestra de componentes; ya cumplió su propósito. Su `<Select>` de ejemplo todavía lista "Sala de Reuniones", que ya no existe. |
+| 2 | Imagen de Open Graph | El `title` y la `description` del layout raíz ya están; falta la imagen para cuando se comparta el enlace. **Es lo único que queda de la Fase 10.** |
+| 3 | Repasar estados de carga y vacíos | Parcial. El calendario, `EmptyState`, las pantallas de estado y el wizard ya los tienen; falta un repaso del panel. |
+
+La revisión de accesibilidad (punto 5) se hizo con axe-core y Playwright sobre el build de producción: 12 pantallas sin incumplimientos, teclado y diálogos verificados. Ver "Accesibilidad" en `CLAUDE.md`.
+
+**Lo que quedó fuera de esa revisión, a propósito:** la rejilla del calendario sigue sin ser operable por teclado (FullCalendar no hace focusables las celdas). No incumple, porque el wizard es el camino equivalente y sí es navegable — pero si el wizard cambia, hay que volver a mirarlo.
 
 ---
 

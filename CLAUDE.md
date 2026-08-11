@@ -357,6 +357,26 @@ Corregido en `prisma/migrations/20260805041335_enable_row_level_security/` con `
 
 ---
 
+## Accesibilidad
+
+Auditada con **axe-core sobre el build de producción** (no en `dev`) más recorridos de teclado con Playwright: 12 pantallas incluidas las del panel con sesión real, los tres pasos del wizard, el formulario con errores visibles, el diálogo abierto y una semana **con festivo** — esta última importa, porque la etiqueta "Festivo" tiene su propio color y una semana cualquiera no la muestra.
+
+**El azul y el naranja de marca no valen como texto pequeño.** Ni `#007B99` ni `#C77700` llegan a 4.5:1 sobre nuestras superficies claras. Por eso hay dos tokens aparte, `--azul-texto` (`#00647D`) y `--naranja-texto` (`#9A5C00`), y una regla de una línea: **color de fondo, icono o borde → el token de marca; color de texto → el token `-texto`.** Los colores de marca no se tocaron.
+
+**`--texto-secundario` ya no es el gris de marca.** `#848585` (Pantone 423 C) se queda en `--color-gris` para gráficos, pero como texto daba 3.70 sobre blanco y 3.39 sobre `--superficie`. El neutral de texto es `#6F7070`, el más claro que pasa AA sobre ambos fondos conservando el matiz. Está replicado en `lib/mail/templates.ts`, que copia los tokens en hex porque un cliente de correo no resuelve variables CSS.
+
+**El hover del acento aclara en vez de oscurecer** (`#E08600`). No es un descuido: sobre naranja el texto va oscuro, así que oscurecer el fondo acerca los dos y hunde el contraste — con `#C77700` el botón principal caía a 3.92 al pasar el ratón.
+
+⚠️ **`.fc .fc-button { box-shadow: none !important }` borraba el anillo de foco global.** Tailwind dibuja `ring-*` con `box-shadow`, así que ese reset —puesto para matar el resplandor propio de FullCalendar— dejaba las flechas de navegación como los dos únicos controles de la app que se podían enfocar sin que se viera nada. Repuesto con `outline` en `.fc .fc-button:focus-visible`, no con box-shadow, para no depender de ganarle el `!important`.
+
+⚠️ **FullCalendar dibuja las flechas como `<span role="img">` sin nombre**, y no hay opción para cambiarlo. `RoomCalendar` lo corrige sobre el DOM montado (`aria-hidden` en el icono, `title` → `aria-label` en el botón) con un `MutationObserver`, porque la barra se vuelve a dibujar al cambiar de vista.
+
+**La rejilla del calendario no es operable por teclado** y se acepta así: FullCalendar no hace focusables las celdas. No incumple WCAG 2.1.1 porque existe el camino equivalente —"Reservar espacio" → wizard, con selectores de día, hora y duración—, que sí es completamente navegable. Si algún día el wizard dejara de cubrir ese caso, esto pasaría a ser un incumplimiento.
+
+⚠️ **`Dialog` restaura el foco por su cuenta.** Radix lo trae de serie, pero aquí no ocurría: al cerrar, el foco caía en `<body>` aunque el botón que abrió el diálogo siguiera en el DOM (comprobado marcando ese nodo). El componente anota el último elemento enfocado **fuera** de un diálogo y lo restaura en `onCloseAutoFocus`. No sirve leerlo al abrir: los efectos de Radix son hijos y ya movieron el foco antes.
+
+---
+
 ## Identidad visual
 
 Los tokens del §12.1 del documento de marca se copian a `globals.css` y se mapean en `tailwind.config.ts`. **Ningún hex suelto en componentes.**

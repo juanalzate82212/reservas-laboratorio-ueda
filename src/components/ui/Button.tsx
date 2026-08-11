@@ -12,9 +12,9 @@ import { cn } from "@/lib/utils";
 const variantes = {
   primary: "bg-primary text-white hover:bg-primary-hover active:bg-primary-active",
   secondary:
-    "border border-primary bg-transparent text-primary hover:bg-primary-soft active:bg-azul-200",
+    "border border-primary bg-transparent text-primary-texto hover:bg-primary-soft active:bg-azul-200",
   accent: "bg-accent text-texto hover:bg-accent-hover active:bg-accent-hover",
-  ghost: "bg-transparent text-primary hover:bg-primary-soft",
+  ghost: "bg-transparent text-primary-texto hover:bg-primary-soft",
   danger: "bg-error text-white hover:brightness-95 active:brightness-90",
 } as const;
 

@@ -15,10 +15,17 @@ import { formatRange } from "@/lib/datetime";
  * /admin/correos. Sin escapar, una reserva con un nombre malicioso podría
  * ejecutar código en la sesión del admin que abre la vista previa.
  */
+/*
+ * Copia de los tokens de globals.css. Aquí van en hex y no como var(): un
+ * cliente de correo no carga hojas externas ni resuelve variables CSS.
+ * Si cambias un valor aquí, cámbialo también allí y en tailwind.config.ts.
+ */
 const COLOR = {
   primary: "#007B99",
   texto: "#2E2E2E",
-  textoSecundario: "#848585",
+  // #848585 (el gris de marca) no llega a WCAG AA como texto: 3.70 sobre
+  // blanco y 3.39 sobre la superficie. Mismo cambio que en globals.css.
+  textoSecundario: "#6F7070",
   borde: "#E1E1E1",
   superficie: "#F5F5F5",
   fondo: "#FFFFFF",

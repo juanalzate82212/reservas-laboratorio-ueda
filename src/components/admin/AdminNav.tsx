@@ -56,8 +56,15 @@ export function AdminNav() {
             href={enlace.href}
             aria-current={activo ? "page" : undefined}
             className={cn(
-              "flex items-center gap-1.5 rounded px-3 py-1.5 text-caption font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white",
-              activo && "border-b-2 border-accent text-white",
+              /*
+               * Blanco pleno, no white/80: atenuado quedaba en 3.72 sobre el
+               * azul (#CCE5EB efectivo) y AA pide 4.5. La sección activa ya se
+               * distingue por el subrayado naranja y por aria-current, así que
+               * la opacidad era una pista redundante que además rompía el
+               * contraste de las otras tres.
+               */
+              "flex items-center gap-1.5 rounded px-3 py-1.5 text-caption font-medium text-white transition-colors hover:bg-white/10",
+              activo && "border-b-2 border-accent",
             )}
           >
             {enlace.label}

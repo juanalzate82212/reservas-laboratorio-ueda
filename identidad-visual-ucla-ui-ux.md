@@ -92,6 +92,18 @@ El manual **no** define colores de feedback. Rojo y verde están *prohibidos den
 - Cuerpo de texto: `#2E2E2E` sobre blanco. Evita gris `#848585` para párrafos largos; resérvalo para texto secundario.
 - Meta objetivo: **WCAG AA** en todos los textos y controles.
 
+> ⚠️ **Tres valores derivados se ajustaron por contraste, como autoriza el §2.2.** Se midieron con axe-core sobre el build de producción; los de partida no llegaban a AA:
+>
+> | Rol | Valor del documento | Medido | En uso |
+> |-----|--------------------|--------|--------|
+> | Texto secundario | `#848585` | 3.70 sobre blanco, 3.39 sobre `#F5F5F5` | **`#6F7070`** (4.97 / 4.56) |
+> | Azul como texto | `#007B99` | 4.28 sobre `#E6F2F5` | **`#00647D`** (5.89–6.73) |
+> | Naranja como texto | `#C77700` | 3.17 sobre `#F5F5F5` | **`#9A5C00`** (4.93) |
+>
+> Los colores **de marca no cambian**: `#848585`, `#007B99` y `#F39200` siguen intactos como fondo, icono, borde y gráfico. Lo que se ajusta es su versión *como texto*.
+>
+> Un cuarto ajuste: el hover del acento **aclara** (`#E08600`) en vez de oscurecer. Sobre naranja el texto va oscuro, así que oscurecer el fondo acerca los dos: con `#C77700` el botón principal caía a 3.92 al pasar el ratón.
+
 ---
 
 ## 3. Tipografía
