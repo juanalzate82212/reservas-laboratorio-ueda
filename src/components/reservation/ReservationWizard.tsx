@@ -291,7 +291,7 @@ function PantallaExito({ codigo }: { codigo: string }) {
             void navigator.clipboard.writeText(codigo);
             toast.success("Código copiado");
           }}
-          className="flex items-center gap-2 rounded border-2 border-dashed border-primary bg-primary-soft px-6 py-3 font-display text-h2 font-bold tracking-widest text-primary"
+          className="flex items-center gap-2 rounded border-2 border-dashed border-primary bg-primary-soft px-6 py-3 font-display text-h2 font-bold tracking-widest text-primary-texto"
         >
           {codigo}
           <Copy aria-hidden className="h-5 w-5" />
@@ -300,12 +300,12 @@ function PantallaExito({ codigo }: { codigo: string }) {
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Link
             href={`/reserva/${codigo}`}
-            className="text-body font-medium text-primary hover:underline"
+            className="text-body font-medium text-primary-texto hover:underline"
           >
             Consultar el estado de esta reserva
           </Link>
           <span className="text-texto-secundario">·</span>
-          <Link href="/" className="text-body font-medium text-primary hover:underline">
+          <Link href="/" className="text-body font-medium text-primary-texto hover:underline">
             Volver al inicio
           </Link>
         </div>

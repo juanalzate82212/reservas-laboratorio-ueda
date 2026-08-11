@@ -94,7 +94,7 @@ export default async function ReservaPage({
               descripcion="Revisa que el código esté escrito tal como aparece en tu pantalla de confirmación. Ojo con la S y el 5, y con la Z y el 2, que se confunden al leerlos."
             />
             <p className="text-center text-caption text-texto-secundario">
-              <Link href="/reserva" className="font-medium text-primary hover:underline">
+              <Link href="/reserva" className="font-medium text-primary-texto hover:underline">
                 Probar con otro código
               </Link>
             </p>

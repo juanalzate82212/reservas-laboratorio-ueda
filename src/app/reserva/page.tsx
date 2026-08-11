@@ -64,7 +64,7 @@ export default function ConsultarReservaPage({
 
         <p className="text-caption text-texto-secundario">
           ¿Todavía no tienes una reserva?{" "}
-          <Link href="/reservar" className="font-medium text-primary hover:underline">
+          <Link href="/reservar" className="font-medium text-primary-texto hover:underline">
             Solicita una aquí
           </Link>
           .

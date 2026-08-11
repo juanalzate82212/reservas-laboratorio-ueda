@@ -82,7 +82,9 @@ export function StepReview({
 
       {warning && (
         <div className="flex items-start gap-2 rounded border border-accent bg-accent/10 px-4 py-3">
-          <AlertTriangle aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-accent-hover" />
+          {/* Naranja de texto, no el de hover: este icono se lee, y el hover
+              pasó a ser más claro justamente para que el botón contraste. */}
+          <AlertTriangle aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-accent-texto" />
           <p className="text-caption text-texto">{warning}</p>
         </div>
       )}

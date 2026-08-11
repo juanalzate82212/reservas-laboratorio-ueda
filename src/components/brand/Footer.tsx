@@ -23,13 +23,13 @@ export function Footer({ className }: { className?: string }) {
           <span>Laboratorio de Analítica de Datos e Inteligencia Artificial</span>
           <a
             href="mailto:lab.analitica@amigo.edu.co"
-            className="rounded text-primary hover:underline"
+            className="rounded text-primary-texto hover:underline"
           >
             lab.analitica@amigo.edu.co
           </a>
           <a
             href="https://www.ucatolicaluisamigo.edu.co"
-            className="rounded text-primary hover:underline"
+            className="rounded text-primary-texto hover:underline"
           >
             ucatolicaluisamigo.edu.co
           </a>
