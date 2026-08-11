@@ -32,6 +32,7 @@ El usuario pidió vaciar `Reservation` y `EmailLog` a propósito para dejar la a
 
 ## Documentos
 
+- ⚠️ **[FUSION-DATACUEVA.md](FUSION-DATACUEVA.md)** — **el trabajo grande que viene**: absorber la app de préstamo de equipos ([DataCueva](https://github.com/JuanSNuno/DataCueva)) dentro de este panel de admin, con una sola base de datos y usuarios con roles en vez de la contraseña compartida. Plan aprobado y por fases. **Si vas a trabajar en eso, léelo entero antes de tocar nada, y respeta su regla número 1: cada fase se explica al usuario y se aprueba antes de empezarla.**
 - **[BACKLOG.md](BACKLOG.md)** — lo que falta y lo que se dejó fuera de alcance. No implementar nada listado como fuera de alcance; si aparece la tentación, anotarla ahí y seguir.
 - **[identidad-visual-ucla-ui-ux.md](identidad-visual-ucla-ui-ux.md)** — tokens, tipografía, logo y voz de redacción. **De cumplimiento obligatorio.**
 - **[PLAN-MVP.md](PLAN-MVP.md)** — la especificación numerada que citan los comentarios del código (`§5 del plan`, `§8 del plan`…). Es referencia de contrato, no estado actual: **donde difiera del código, manda el código.**
