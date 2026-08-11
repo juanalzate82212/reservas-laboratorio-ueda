@@ -4,31 +4,7 @@
 
 `CLAUDE.md` guarda las *decisiones y sus porqués*; este archivo guarda las *tareas abiertas*. No duplicar el estado de un pendiente allá.
 
-Estado general: **Fases 0–9 completas, la app está en producción.** La Fase 10 va parcial y encima hay una tanda de ajustes pedidos después del despliegue.
-
----
-
-## Ajustes pedidos tras el despliegue
-
-Prioridad actual. Las causas raíz anotadas aquí están **verificadas leyendo el código**, no supuestas.
-
-**Los nueve ajustes pedidos tras el despliegue están hechos.** Lo que queda debajo es lo anterior (Fase 10, mantenimiento, seguridad) más lo menor que fue apareciendo.
-
-⚠️ **`MAIL_TO_ADMIN` hay que cargarla en el `.env` local y en Vercel** (Production y Preview) para que los avisos al laboratorio salgan de verdad. Sin ella se omiten en silencio: queda constancia en consola, pero no llega a nadie. El valor es el mismo buzón que envía (`SMTP_USER`). Ver `.env.example`.
-
-### 3bis. Reservas de prueba en la base (menor)
-
-Quedan reservas de desarrollo que conviene limpiar desde el panel antes de que el laboratorio se use de verdad. Dos están por encima del aforo nuevo (`UEDA-HZEX8` con 100 y `UEDA-2RPGM` con 183); no se tocaron porque la validación de aforo solo aplica a solicitudes futuras.
-
-### 4bis. Distinguir quién canceló (menor, sin compromiso)
-
-Hoy una cancelación del administrador y una del solicitante quedan idénticas en la base: `CANCELLED` con `decidedAt`. En el panel no se puede saber cuál fue. Si llega a importar, es un campo nuevo en `Reservation` (y su migración), no un apaño de presentación.
-
-### 6bis. Los errores de validación no se borran al corregirlos (menor)
-
-Detectado al probar el desplegable de cargo, pero **afecta a todo el formulario y es anterior a este trabajo**: si alguien pulsa "Siguiente" sin completar algo, ve el error en rojo; al corregirlo, el mensaje **sigue ahí** hasta que vuelve a pulsar "Siguiente". No bloquea nada —el paso avanza igual—, pero da la sensación de que la corrección no se registró.
-
-La causa es la configuración de `useForm`: con `mode: "onTouched"` y errores puestos por `trigger()` (no por un `handleSubmit`), `isSubmitted` sigue en `false` y el `reValidateMode: "onChange"` por defecto no llega a activarse. Se arreglaría revalidando el campo en su `onChange` cuando ya tiene error.
+**Estado general:** fases 0–9 completas y los **nueve ajustes pedidos tras el despliegue, hechos**. La aplicación está en producción y el usuario verificó un recorrido completo de punta a punta el 2026-08-10. Lo que queda es el pulido de la Fase 10, dos detalles menores y el mantenimiento con fecha.
 
 ---
 
@@ -36,13 +12,28 @@ La causa es la configuración de `useForm`: con `mode: "onTouched"` y errores pu
 
 Nada de esto bloquea el uso de la aplicación; es lo que separa "funcional" de "terminado".
 
+**La numeración es la del §9 → Fase 10 de [PLAN-MVP.md](PLAN-MVP.md)**, para que las dos listas se puedan cruzar sin traducir. Los puntos que no aparecen aquí (1, 4, 7, 9) están hechos, y el 8 quedó anulado a propósito — el porqué de cada uno está en el plan.
+
 | # | Tarea | Notas |
 |---|-------|-------|
-| 1 | `error.tsx`, `not-found.tsx` y `loading.tsx` | No existen. Hoy se usan los genéricos de Next.js, que están en inglés y fuera de la voz de marca. El `not-found.tsx` se cruza con el punto 3 de arriba. |
-| 2 | Eliminar `/kitchen-sink` | Página temporal de muestra de componentes; ya cumplió su propósito. Su `<Select>` de ejemplo todavía lista "Sala de Reuniones", que ya no existe. |
-| 3 | Imagen de Open Graph | El `title` y la `description` del layout raíz ya están; falta la imagen para cuando se comparta el enlace. |
-| 4 | Revisión de accesibilidad | Navegación completa por teclado, `aria-label` en los controles del calendario, contraste verificado. |
-| 5 | Repasar estados de carga y vacíos | El calendario y `EmptyState` ya los tienen; falta revisar el resto. El punto 1 de arriba es un caso concreto de esto. |
+| 2 | Imagen de Open Graph | El `title` y la `description` del layout raíz ya están; falta la imagen para cuando se comparta el enlace. |
+| 3 | Repasar estados de carga y vacíos | El calendario, `EmptyState` y las pantallas del punto 4 ya los tienen; falta revisar el resto. |
+| 5 | Revisión de accesibilidad | Navegación completa por teclado, `aria-label` en los controles del calendario, contraste verificado. |
+| 6 | Eliminar `/kitchen-sink` | Página temporal de muestra de componentes; ya cumplió su propósito. Su `<Select>` de ejemplo todavía lista "Sala de Reuniones", que ya no existe. |
+
+---
+
+## Detalles menores, sin compromiso
+
+### Distinguir quién canceló
+
+Hoy una cancelación del administrador y una del solicitante quedan idénticas en la base: `CANCELLED` con `decidedAt`. En el panel no se puede saber cuál fue. Si llega a importar, es un campo nuevo en `Reservation` (y su migración), no un apaño de presentación.
+
+### Los errores de validación no se borran al corregirlos
+
+Detectado al probar el desplegable de cargo, pero **afecta a todo el formulario y es anterior a ese trabajo**: si alguien pulsa "Siguiente" sin completar algo, ve el error en rojo; al corregirlo, el mensaje **sigue ahí** hasta que vuelve a pulsar "Siguiente". No bloquea nada —el paso avanza igual—, pero da la sensación de que la corrección no se registró.
+
+La causa es la configuración de `useForm`: con `mode: "onTouched"` y errores puestos por `trigger()` (no por un `handleSubmit`), `isSubmitted` sigue en `false` y el `reValidateMode: "onChange"` por defecto no llega a activarse. Se arreglaría revalidando el campo en su `onChange` cuando ya tiene error.
 
 ---
 
@@ -55,17 +46,24 @@ Nada de esto bloquea el uso de la aplicación; es lo que separa "funcional" de "
 
 ---
 
-## Verificación pendiente
+## Seguridad, antes de un uso más amplio
 
-- **Reserva completa de punta a punta en producción**, desde un teléfono real escaneando el QR impreso, terminando con el correo de confirmación recibido. Es el criterio de aceptación formal de las Fases 9 y 10. Hasta ahora se verificó en producción el login de administrador y que todas las rutas respondan correctamente, y el envío de correo se probó a fondo en la Fase 7 pero desde el entorno local, no desde Vercel.
+- **Rotar `ADMIN_PASSWORD`.** La actual se eligió durante el desarrollo y ha circulado en sesiones de trabajo. Ahora que la aplicación recoge datos personales reales (nombre, documento, correo), conviene una contraseña fuerte y nueva, cambiada tanto en Vercel como en el `.env` local.
+- **Una sola contraseña de administrador, sin usuarios ni auditoría** (riesgo R5 del plan). Aceptado para el MVP; si el sistema pasa a uso institucional formal, se necesita SSO.
+- **Sin autenticación del solicitante** (riesgo R6): cualquiera con un correo `@amigo.edu.co` válido puede reservar a nombre de otro. Mitigado por la aprobación manual del administrador.
 
 ---
 
-## Seguridad, antes de un uso más amplio
+## Limpieza del repositorio
 
-- **Rotar `ADMIN_PASSWORD`.** La actual se eligió durante el desarrollo y ha circulado en sesiones de trabajo. Ahora que hay datos personales reales (nombre, documento, correo) en la base, conviene una contraseña fuerte y nueva, cambiada tanto en Vercel como en el `.env` local.
-- **Una sola contraseña de administrador, sin usuarios ni auditoría** (riesgo R5 del plan). Aceptado para el MVP; si el sistema pasa a uso institucional formal, se necesita SSO.
-- **Sin autenticación del solicitante** (riesgo R6): cualquiera con un correo `@amigo.edu.co` válido puede reservar a nombre de otro. Mitigado por la aprobación manual del administrador.
+- **Los ficheros de las skills están duplicados en el historial.** En disco, `.claude/skills/frontend-design` y `.claude/skills/vercel-react-best-practices` son *junctions* de Windows que apuntan a `.agents/skills/`, pero git no los sigue como enlaces: **guarda las dos copias**, 115 ficheros por duplicado. Quien clone en Linux o macOS obtiene dos copias reales, que además pueden divergir. Elegir un directorio canónico y dejar el otro fuera del repositorio.
+- **19 ramas remotas ya fusionadas en `develop`** siguen publicadas en GitHub. Borrarlas no pierde nada: los commits están en `develop`.
+
+---
+
+## Verificación pendiente
+
+- **Recorrido completo desde un teléfono real escaneando el QR impreso.** El usuario confirmó una prueba completa de punta a punta el 2026-08-10 y la app quedó "en términos generales funcionando correctamente"; lo que no consta es que se hiciera con el QR ya impreso y pegado en la puerta, que es la formulación literal del criterio de aceptación de las Fases 9 y 10. Es la última comprobación que valida el punto de entrada real del sistema.
 
 ---
 
@@ -78,9 +76,9 @@ No implementar sin pedirlo explícitamente.
 - Reservas recurrentes o series.
 - Gestión de inventario de equipos de cómputo (solo se marca la advertencia).
 - Reportes, métricas y exportación.
-- Recordatorios previos y adjunto `.ics` para Outlook. **Parcialmente reabierto:** el enlace "Añadir a Google Calendar" del correo de confirmación sí entra, y es el punto 8 de arriba. Siguen fuera los recordatorios previos y el `.ics`.
-- **Correo de acuse de recibo al solicitante** al enviar la solicitud — decidido: solo se envía correo en la decisión, y la pantalla de éxito con el código cumple esa función. Ojo con dos matices: el punto 7 (aviso al **administrador**) es otra cosa y sí entra; y la opción B del punto 4 revertiría esta decisión, porque necesita mandarle un enlace firmado al solicitante desde el principio.
-- **Edición** de una reserva ya creada por parte del solicitante. La **cancelación** por parte del solicitante es distinta y sí entra: es el punto 4 de arriba.
+- Recordatorios previos y adjunto `.ics` para Outlook. **Parcialmente reabierto:** el enlace "Añadir a Google Calendar" del correo de confirmación sí se construyó. Siguen fuera los recordatorios previos y el `.ics`.
+- **Correo de acuse de recibo al solicitante** al enviar la solicitud. Decidido: solo se envía correo en la decisión, y la pantalla de éxito con el código cumple esa función. Ojo con el matiz: el aviso al **laboratorio** cuando entra una solicitud nueva es otra cosa y sí se construyó (`MAIL_TO_ADMIN`).
+- **Edición** de una reserva ya creada por parte del solicitante. La **cancelación** por parte del solicitante es distinta y sí se construyó: `POST /api/reservations/[code]/cancel`, con código + documento como llave.
 
 ---
 

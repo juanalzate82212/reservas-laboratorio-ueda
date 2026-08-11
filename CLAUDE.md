@@ -41,11 +41,13 @@ Regla mnemotécnica: **laboratorio = el lugar; Unidad = quién construyó la her
 | 9 — Despliegue en Vercel | ✅ Completa (en producción, verificada) |
 | 10 — QR, pulido y cierre | 🟡 Parcial |
 
-De la Fase 10 están hechos el QR imprimible (`/admin/qr`), el `title`/`description` del layout raíz, el `README.md` y el `npm run build` limpio. El punto 8 (dataset de demostración) quedó **anulado a propósito** — ver "Datos" más abajo.
+De la Fase 10 están hechos el QR imprimible (`/admin/qr`), el `title`/`description` del layout raíz, las pantallas de estado (`error`, `not-found`, `loading` y `global-error`), el `README.md` y el `npm run build` limpio. El punto 8 (dataset de demostración) quedó **anulado a propósito** — ver "Datos" más abajo.
 
 > **[BACKLOG.md](BACKLOG.md) es la única lista de lo que falta**, tanto de la Fase 10 como de los ajustes pedidos después del despliegue. **No repetir ese estado aquí**: eran dos listas con numeraciones distintas y se desincronizan. Este archivo guarda las *decisiones y sus porqués*; el backlog guarda las *tareas abiertas*.
 
 **Verificación de que la app funciona en producción** (hecha con peticiones reales, no solo comprobando que cargue): landing, `/reservar` y `/admin/login` responden `200`; `/admin` y `/admin/qr` sin sesión redirigen (`307`); `POST /api/admin/login` devuelve una cookie de sesión que efectivamente autoriza `GET /admin`, `GET /admin/qr` y `GET /api/admin/reservations`.
+
+Además, **el usuario hizo un recorrido completo de punta a punta el 2026-08-10** y reportó que la aplicación funciona correctamente en términos generales. Lo que sigue sin constar es que ese recorrido se hiciera desde un teléfono escaneando el QR ya impreso, que es la formulación literal del criterio de aceptación de las Fases 9 y 10 — anotado en `BACKLOG.md`.
 
 ---
 
@@ -61,7 +63,9 @@ Consecuencias que hay que tener presentes siempre:
 
 **Antes de ejecutar cualquier cosa que escriba en la base, mirar primero qué hay.** Ya hubo un incidente cercano: se detectaron filas de `EmailLog` desconocidas que resultaron ser pruebas que el usuario estaba haciendo en paralelo contra la app en vivo.
 
-**Estado de los datos hoy:** el usuario borró los datos de demo a propósito para dejar la app lista para uso real. Queda 1 reserva `PENDING` suya, de prueba. Por eso el punto 8 de la Fase 10 ("dataset de demostración poblado") quedó anulado: contradice lo que el usuario quiere. **No resembrar sin pedirlo.**
+**Estado de los datos:** el usuario pidió vaciar `Reservation` y `EmailLog` a propósito (2026-08-10) para dejar la app lista para uso real; `Room` se conservó. Por eso el punto 8 de la Fase 10 ("dataset de demostración poblado") quedó anulado: contradice lo que el usuario quiere. **No resembrar sin pedirlo.**
+
+⚠️ **No dar por buena ninguna cifra de filas que leas aquí: la app está en uso.** Desde entonces el usuario ha hecho pruebas de punta a punta y cualquiera puede reservar desde el QR. Si necesitas saber qué hay, míralo (`npx prisma studio`) en vez de deducirlo de este archivo.
 
 ---
 
@@ -220,6 +224,17 @@ JWT firmado con `jose` en cookie `admin_session` (httpOnly, 8 h). Sin NextAuth.
 **Route group `(protected)`.** `app/admin/(protected)/` agrupa las páginas que llevan el shell autenticado (cabecera azul, `AdminNav`, botón "Salir"). `app/admin/login/page.tsx` queda **fuera** del grupo. Los paréntesis no aparecen en la URL: `/admin`, `/admin/franjas`, `/admin/correos`, `/admin/qr` siguen siendo las mismas rutas.
 
 > Esto arregló un bug real que existía desde la Fase 5: `/admin/login` heredaba el layout autenticado y mostraba el nav y el botón de cerrar sesión **antes de que hubiera sesión**, con un `<main>` anidado dentro de otro (HTML inválido). Next.js App Router aplica un layout a *todas* las rutas anidadas, sin excepción automática para páginas públicas.
+
+### Pantallas de estado (error, 404, carga)
+
+`app/not-found.tsx`, `app/error.tsx`, `app/loading.tsx` y `app/global-error.tsx`, todas en voz de marca. Reutilizan `EmptyState` y el shell público (`Header` + `main` + `Footer`) en vez de inventar composiciones nuevas.
+
+- **`EmptyState` ganó `nivelTitulo`** (`"h1" | "h3"`, por defecto `"h3"`). El 404 y el error **son** la página, así que su título tiene que ser el `h1`; el resto de usos son bloques dentro de una página que ya tiene el suyo. El tamaño visual no cambia con el nivel — lo pide la semántica, no el diseño.
+- **Ningún botón de estas pantallas es `variante="accent"`.** `EmptyState` ya trae su arco naranja, que es el único elemento naranja que admite la vista.
+- ⚠️ **`global-error.tsx` usa estilos en línea con los hex escritos a mano**, rompiendo a propósito la regla de "ningún hex suelto". Es la pantalla del fallo del layout raíz, y ese layout es justo quien aplica las variables de `next/font` e importa `globals.css`: depender de esa cadena para dibujar su propio fallo es frágil. Por lo mismo no importa ningún componente del proyecto. Verificado en un build de producción — los colores se aplican de verdad con el layout caído.
+- **`app/admin/(protected)/loading.tsx` es una guarda, no un arreglo.** Hoy no llega a dispararse (las páginas del panel son Client Components y nada suspende en el servidor), pero si una pasara a Server Component, el boundary de la raíz mostraría la cabecera y el pie **públicos** dentro del panel. Está explicado en el propio archivo.
+- ⚠️ **`error.tsx` y `global-error.tsx` no se pueden verificar con `npm run dev`**: el overlay de desarrollo los tapa. Hay que usar `npm run build && npm run start`. Para provocar el error basta arrancar con una `DATABASE_URL` inalcanzable; para el fallo total, un `throw` en el layout **detrás de una variable de entorno** (uno incondicional rompe el propio build al prerenderizar).
+- `/reserva/[codigo]` **no** usa `notFound()` a propósito: responde `200` con su propio `EmptyState`, que además avisa de la confusión entre S/5 y Z/2 al leer un código. Un 404 genérico no puede dar ese consejo.
 
 ### Correos
 

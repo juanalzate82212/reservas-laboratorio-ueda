@@ -26,8 +26,11 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files
-.env
-.env*.local
+# El orden importa: la negación va AL FINAL del bloque, porque en .gitignore
+# gana el último patrón que coincide. Antes había un `.env*` suelto más abajo
+# que volvía a ignorar .env.example y dejaba muerta esta excepción; el fichero
+# seguía versionado solo porque se añadió antes de que apareciera ese patrón.
+.env*
 !.env.example
 
 # vercel
@@ -36,6 +39,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-.vercel
-.env*
