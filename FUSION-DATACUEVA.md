@@ -51,7 +51,9 @@ Todas las tomó el usuario con la evidencia delante.
 
 **No entra, por la decisión de retirar el autoservicio:**
 
-- La feature **`solicitudes` entera** — su único origen era el QR de autoservicio. Se van su tabla, su agregado, sus 3 casos de uso, sus 3 rutas de API y sus tests. La FK va `solicitudes → prestamos`, así que quitarla es limpio y no arrastra nada.
+- La feature **`solicitudes` entera** — su único origen era el QR de autoservicio. Se van su tabla, su agregado, sus 3 casos de uso, sus 3 rutas de API y sus tests. La FK va `solicitudes → prestamos`, así que **en la base de datos** quitarla es limpio.
+
+  ⚠️ **En el código no lo es del todo, al contrario de lo que decía este plan.** `CalcularIndicadores` depende de `RepositorioSolicitudes` y publica `solicitudesPendientes`. El usuario decidió el 2026-08-11 **quitar ese indicador**; el detalle está en la fase 1.
 - `/solicitar`, `/mostrador/qr` (QR por equipo), `GET /api/equipos/publico`, `POST /api/solicitudes` y `limitador.ts` (solo existía para proteger el endpoint público).
 
 > **Consecuencia que conviene tener presente:** eso es funcionalidad construida y probada que se deja fuera. El código sigue en el historial de DataCueva, así que reactivarla más adelante sería traerla, no rehacerla.
@@ -78,7 +80,7 @@ Regla: **cada fase deja la aplicación desplegable y funcionando.** Cada fase qu
 
 ### ✅ Fase 0 — Fontanería. Ni una línea de DataCueva *(cerrada el 2026-08-11)*
 
-1. ✅ **Base de datos de desarrollo** — hecho el 2026-08-11. Proyecto `vkixgpvztkvbuwamhqdv`, con las 4 migraciones aplicadas, RLS activo en las cuatro tablas y sembrado (1 sala, 6 reservas, 2 bloqueos). El `.env` local apunta ahí; producción solo vive en Vercel. **Resuelto el que era el mayor riesgo del repositorio.** Queda pendiente decidir sobre `_prisma_migrations`, que no tiene RLS en ninguno de los dos proyectos.
+1. ✅ **Base de datos de desarrollo** — hecho el 2026-08-11. Proyecto `vkixgpvztkvbuwamhqdv`, con las 4 migraciones aplicadas, RLS activo en las cuatro tablas y sembrado (1 sala, 6 reservas, 2 bloqueos). El `.env` local apunta ahí; producción solo vive en Vercel. **Resuelto el que era el mayor riesgo del repositorio.** El usuario activó además RLS en `_prisma_migrations`, así que las cinco tablas de `public` lo tienen.
 2. ✅ **Node 20 → 22** — hecho el 2026-08-11. `engines.node` a `22.x`, `.nvmrc` a `22.23.2`, `@types/node` a `22.20.1`. **`ci.yml` no se tocó**: ya usaba `node-version-file: .nvmrc`, así que el CI siguió a la versión sola. Se temía que costara por lo de `nvm use`, pero el usuario había reinstalado nvm/npm/node y el entorno local ya estaba en 22.23.2. Ninguna dependencia se resintió: `typecheck`, `lint`, `build` y `check:datetime` pasaron sin un solo cambio de código.
 3. ✅ **Vitest** — hecho el 2026-08-11. `vitest@4.1.10` (fijado sin `^`, como todo aquí), `vitest.config.mts`, scripts `test` y `test:watch`, y un paso en `ci.yml` colocado **antes** del build, que es más lento.
 
@@ -90,11 +92,29 @@ Regla: **cada fase deja la aplicación desplegable y funcionando.** Cada fase qu
 
 ### ☐ Fase 1 — La mitad pura de DataCueva. Sin base, sin rutas, sin UI
 
-Traer `features/**` (`domain/`, `application/ports/`, `application/use-cases/`), `shared/**`, `reportes/**`, `test-support/{dobles,repositorios-memoria,contrato-repositorios,contexto}.ts` y los **15 tests puros**. Añadir `"target": "ES2022"` al `tsconfig.json`.
+Traer `features/**` (`domain/`, `application/ports/`, `application/use-cases/`), `shared/**`, `reportes/**` y `test-support/{dobles,repositorios-memoria,contrato-repositorios,contexto}.ts`. Añadir `"target": "ES2022"` al `tsconfig.json`.
 
-⚠️ **No activar `noUncheckedIndexedAccess`**: rompería los 93 ficheros existentes. Sin él, el código de DataCueva compila igual.
+**Inventario real, contado sobre el árbol del repositorio el 2026-08-11** (no estimado): **49 ficheros de código**, 4 de andamiaje de pruebas y **13 tests**. Quedan fuera los **7 adaptadores** de Drizzle y Supabase, que son las fases 2 y 3.
 
-*Cierra con: `npm test` en verde con 15 ficheros y nada cableado a nada. Riesgo cero, y a partir de aquí el dominio tiene red.*
+⚠️ **No activar `noUncheckedIndexedAccess`**, aunque DataCueva lo tenga en `true`: rompería los ficheros que ya existen aquí. Quitarlo es aflojar, no apretar — el código de DataCueva compila igual.
+
+⚠️ **Hay que instalar `exceljs` ya en esta fase.** `reportes/{hoja,plantilla}.ts` y `excel.test.ts` lo importan directamente. Es la primera dependencia de producción que trae la fusión; el plan la listaba sin decir en qué fase entra.
+
+#### Tres correcciones al plan original, comprobadas leyendo el repositorio
+
+1. **Son 13 tests, no 15.** Los 15 se contaron antes de decidir que se retiraba el autoservicio: `SolicitudFlujo.test.ts` y `SolicitudPrestamo.test.ts` prueban justo la feature que se va.
+
+2. **El andamiaje NO se copia tal cual.** Es cierto que los tests portan sin tocar una línea; **no lo es de los tres ficheros que los sostienen**. `contexto.ts`, `repositorios-memoria.ts` y `contrato-repositorios.ts` cablean `solicitudes` explícitamente — hay un `RepositorioSolicitudesMemoria` completo y un bloque `describe('RepositorioSolicitudes')` de unas 25 líneas. Ediciones quirúrgicas, pero ediciones.
+
+3. ⚠️ **El plan se equivoca al decir que retirar `solicitudes` "es limpio y no arrastra nada".** La clave foránea sí; **el código no**. `CalcularIndicadores` recibe `RepositorioSolicitudes` en su constructor y publica `solicitudesPendientes` en su DTO.
+
+   **Decisión del usuario (2026-08-11): se quita el indicador.** Sin autoservicio nadie crea solicitudes, así que valdría `0` para siempre. Se elimina del `IndicadoresDTO` y del constructor, y se ajusta `CalcularIndicadores.test.ts`. No se sustituye por nada: inventar un indicador nuevo sería funcionalidad, no un porte.
+
+   ⚠️ Ese mismo fichero hace `Promise.all` de tres consultas a repositorio. **En la fase 1 da igual** (son repositorios en memoria), pero al portarlo a Prisma en la fase 2 es exactamente el patrón que `connection_limit=1` prohíbe fuera de una transacción y que ya provocó un `P2024` real aquí. **Es el sitio concreto que hay que secuenciar.**
+
+**Nota de estilo:** DataCueva escribe sin punto y coma y con comillas simples. ESLint no lo rechaza, pero el código entra con un estilo distinto al del resto. Se deja así en esta fase a propósito — reformatear 49 ficheros mezclaría ruido con sustancia en el diff. Si molesta, se unifica en un commit aparte que no haga otra cosa.
+
+*Cierra con: `npm test` en verde con 14 ficheros (los 13 nuevos más `availability`) y nada cableado a nada. El tamaño del bundle no se mueve, y esa es la prueba de que no se cableó nada.*
 
 ### ☐ Fase 2 — Esquema y persistencia. Sin rutas, sin UI
 
