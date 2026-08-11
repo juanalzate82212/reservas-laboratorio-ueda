@@ -95,7 +95,7 @@ Levanta el servidor de desarrollo:
 npm run dev               # http://localhost:3000
 ```
 
-> ⚠️ **`npx prisma db seed` es destructivo.** Borra todas las reservas y franjas antes de recrear los datos de ejemplo. **Si tu `.env` apunta a la base de datos de producción, destruirás datos reales.** Ver "Una sola base de datos" más abajo.
+> ⚠️ **`npx prisma db seed` es destructivo.** Borra todas las reservas y franjas antes de recrear los datos de ejemplo. **Si tu `.env` apunta a la base de datos de producción, destruirás datos reales.** Ver "Dos bases de datos" más abajo.
 
 ---
 
@@ -230,13 +230,17 @@ El workflow [ci.yml](.github/workflows/ci.yml) corre lint, typecheck y build en 
 
 ---
 
-## ⚠️ Una sola base de datos
+## ⚠️ Dos bases de datos: comprueba a cuál apuntas
 
-**No existe una base de datos de desarrollo separada.** El entorno local y producción apuntan al mismo proyecto de Supabase.
+Hay **dos proyectos de Supabase**: uno de desarrollo y otro de producción. Tu `.env` local debe apuntar al de **desarrollo**; el de producción solo vive en las variables de entorno de Vercel.
 
-Esto significa que cualquier escritura desde tu máquina afecta a producción, y que **`npx prisma db seed` borraría datos reales**. El guard que trae `prisma/seed.ts` comprueba `NODE_ENV === "production"`, lo cual **no protege** en este caso: en una terminal local `NODE_ENV` no vale `"production"` aunque la conexión apunte a la base real.
+Antes de ejecutar cualquier cosa que escriba en la base, confirma el destino:
 
-Antes de ejecutar cualquier cosa que escriba en la base, inspecciona primero qué hay (`npx prisma studio`).
+```bash
+grep -oE 'postgres\.[a-z0-9]{20}' .env | head -1
+```
+
+Sigue importando porque **`npx prisma db seed` borra todas las reservas y franjas** antes de recrear los datos de ejemplo, y el guard de `prisma/seed.ts` **no protege**: comprueba `NODE_ENV === "production"`, que en una terminal local nunca vale eso aunque la cadena apunte a la base real. Contra la base de desarrollo la semilla es justo lo que quieres; contra producción, un desastre.
 
 ---
 

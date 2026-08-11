@@ -1,6 +1,6 @@
 # Fusión de DataCueva dentro de la app de reservas
 
-**Estado: aprobado el 2026-08-11. Sin empezar.** Ninguna fase está en marcha.
+**Estado: aprobado el 2026-08-11. Fase 0 en curso** — el punto 1 (base de datos de desarrollo) está hecho; faltan Node 22 y Vitest.
 
 ---
 
@@ -12,7 +12,7 @@ La exploración descubrió que DataCueva **no es la app menor**: corre Next 16 /
 
 Por eso la fusión no es "copiar carpetas": es traer un sistema más rico dentro de uno más simple sin perder lo que lo hace rico, y sin cortar un servicio en producción.
 
-**Resultado buscado:** un solo despliegue, una sola base de datos, un solo inicio de sesión con usuarios reales y roles, y el préstamo de equipos operable desde `/admin`.
+**Resultado buscado:** un solo despliegue, una sola base para las dos apps, un solo inicio de sesión con usuarios reales y roles, y el préstamo de equipos operable desde `/admin`.
 
 ---
 
@@ -78,7 +78,7 @@ Regla: **cada fase deja la aplicación desplegable y funcionando.** Cada fase qu
 
 ### ☐ Fase 0 — Fontanería. Ni una línea de DataCueva
 
-1. **Base de datos de desarrollo.** Segundo proyecto Supabase (gratuito), `prisma migrate deploy` + sembrar la Sala Principal. El `.env` local pasa a apuntar ahí. **Esto resuelve el aviso número uno de `CLAUDE.md`**, que lleva todo el proyecto siendo el mayor riesgo.
+1. ✅ **Base de datos de desarrollo** — hecho el 2026-08-11. Proyecto `vkixgpvztkvbuwamhqdv`, con las 4 migraciones aplicadas, RLS activo en las cuatro tablas y sembrado (1 sala, 6 reservas, 2 bloqueos). El `.env` local apunta ahí; producción solo vive en Vercel. **Resuelto el que era el mayor riesgo del repositorio.** Queda pendiente decidir sobre `_prisma_migrations`, que no tiene RLS en ninguno de los dos proyectos.
 2. **Node 20 → 22.** `engines.node`, `.nvmrc`, `@types/node`, CI. Va en su propio PR: `nvm use` está roto en esta máquina por el espacio en `NVM_HOME` y eso come tiempo. 22.x, no 24.x — no hay margen para experimentar con Prisma 5.22.
 3. **Vitest instalado con cero tests**, script `test` y paso en `ci.yml`.
 
