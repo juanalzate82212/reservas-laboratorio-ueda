@@ -109,7 +109,7 @@ Todas están documentadas en [`.env.example`](.env.example). Resumen:
 | `DIRECT_URL` | Conexión directa, **puerto 5432** — solo para migraciones (PgBouncer no soporta DDL) |
 | `ADMIN_PASSWORD` | Contraseña única del panel de administración |
 | `AUTH_SECRET` | Clave para firmar el JWT de sesión. Generar con `openssl rand -base64 32` |
-| `NEXT_PUBLIC_APP_URL` | URL pública de la app — **es lo que codifica el QR**; un valor incorrecto rompe la función principal |
+| `NEXT_PUBLIC_APP_URL` | URL pública de la app. **Es lo que codifica el QR** y la base de la URL absoluta de la imagen de Open Graph; un valor incorrecto rompe la función principal y deja el enlace compartido sin vista previa |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASSWORD` | Credenciales de envío de correo |
 | `MAIL_FROM` | Remitente, en formato `Nombre <correo>`. Debe coincidir con `SMTP_USER` o ser un alias suyo |
 | `MAIL_TO_ADMIN` | Buzón interno donde caen los **avisos** al laboratorio: solicitud nueva por revisar, y cancelación hecha por el solicitante. Hoy es la misma cuenta que envía. Si se deja vacía, esos avisos no se mandan y solo queda constancia en consola |
@@ -150,10 +150,12 @@ prisma/
   seed.ts                Datos de ejemplo (destructivo)
 scripts/
   check-datetime.ts      Verificación de los casos límite de fecha/hora
+  generar-imagenes-marca.mjs  Rehace los iconos y la imagen de Open Graph
 src/
   app/
     page.tsx             Landing pública con el calendario
     error.tsx …          Pantallas de error, 404 y carga en voz de marca
+    icon.png …           Iconos y tarjeta de Open Graph (Next los enlaza solo)
     reservar/            Wizard de solicitud (3 pasos)
     reserva/             Búsqueda por código (funciona sin JavaScript)
     reserva/[codigo]/    Estado de una reserva, con opción de cancelarla
