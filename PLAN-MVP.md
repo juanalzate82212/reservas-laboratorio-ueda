@@ -6,7 +6,7 @@
 
 ## ⚠️ Cómo leer este documento hoy
 
-**Estado: Fases 0–9 completas. La aplicación está en producción** (https://reservas-laboratorio-ueda.vercel.app). La Fase 10 está parcialmente hecha.
+**Estado: las diez fases están completas y la aplicación está en producción** (https://reservas-laboratorio-ueda.vercel.app), con el criterio de aceptación final confirmado por el usuario.
 
 Este sigue siendo el **contrato de alcance, modelo de datos, reglas de negocio y contratos de API** — sigue vigente y hay que respetarlo. Pero fue escrito *antes* de construir, y varias decisiones posteriores lo modificaron. Donde eso pasó, el texto está ~~tachado~~ con una nota al lado.
 
@@ -756,9 +756,13 @@ Wizard de 3 pasos + confirmación, en página `/reservar`.
 
 **Aceptación:** recorrido completo end-to-end desde un teléfono real escaneando el QR impreso, terminando con el correo de confirmación recibido.
 
-> **🟡 PARCIAL.** Hechos: **1** (la ruta real es `app/admin/(protected)/qr/page.tsx`, dentro del route group), **4** (las tres, más un `global-error.tsx` que el plan no pedía), **5**, **6**, **7** y **9**. Parciales: **2** (falta la imagen OG) y **3** (el calendario, `EmptyState`, las pantallas del punto 4 y el wizard sí; falta repasar el panel). Pendiente: solo el **2**.
+> **✅ COMPLETA.** Hechos: **1** (la ruta real es `app/admin/(protected)/qr/page.tsx`, dentro del route group), **2**, **4** (las tres, más un `global-error.tsx` que el plan no pedía), **5**, **6**, **7** y **9**. Parcial: **3** (el calendario, `EmptyState`, las pantallas del punto 4 y el wizard sí; falta repasar el panel — anotado en `BACKLOG.md`, no bloquea).
 >
 > El punto **5** se auditó con axe-core y Playwright sobre el build de producción, no a ojo: doce pantallas sin incumplimientos. Salieron seis defectos reales —cuatro de contraste, el foco de teclado invisible en las flechas del calendario y el foco perdido al cerrar un diálogo—, todos corregidos. Ver "Accesibilidad" en `CLAUDE.md`.
+>
+> El punto **2** cubre además los iconos de pestaña y de iOS, que el plan no pedía pero hacían falta. Los tres ficheros los enlaza Next por convención de nombre y se generan con `scripts/generar-imagenes-marca.mjs` — ver "Imágenes de marca" en `CLAUDE.md`.
+>
+> **Aceptación cumplida:** el usuario confirmó el recorrido completo de punta a punta el 2026-08-11.
 >
 > El punto **8 queda anulado a propósito**: contradice la decisión del usuario de limpiar los datos de prueba para uso real.
 >

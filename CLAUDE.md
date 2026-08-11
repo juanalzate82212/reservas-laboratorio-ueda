@@ -39,15 +39,17 @@ Regla mnemotécnica: **laboratorio = el lugar; Unidad = quién construyó la her
 | 7 — Correos automáticos | ✅ Completa (SMTP real verificado) |
 | 8 — Gestión de franjas | ✅ Completa |
 | 9 — Despliegue en Vercel | ✅ Completa (en producción, verificada) |
-| 10 — QR, pulido y cierre | 🟡 Parcial |
+| 10 — QR, pulido y cierre | ✅ Completa |
 
-De la Fase 10 están hechos el QR imprimible (`/admin/qr`), el `title`/`description` del layout raíz, las pantallas de estado (`error`, `not-found`, `loading` y `global-error`), el `README.md` y el `npm run build` limpio. El punto 8 (dataset de demostración) quedó **anulado a propósito** — ver "Datos" más abajo.
+**Las diez fases están cerradas.** De la Fase 10: el QR imprimible (`/admin/qr`), la metadata y las imágenes para compartir, las pantallas de estado (`error`, `not-found`, `loading` y `global-error`), la revisión de accesibilidad, la eliminación de `/kitchen-sink`, el `README.md` y el `npm run build` limpio. El punto 8 (dataset de demostración) quedó **anulado a propósito** — ver "Datos" más abajo. Del punto 3 falta repasar los estados de carga y vacíos del panel; está en el backlog y no bloquea nada.
 
 > **[BACKLOG.md](BACKLOG.md) es la única lista de lo que falta**, tanto de la Fase 10 como de los ajustes pedidos después del despliegue. **No repetir ese estado aquí**: eran dos listas con numeraciones distintas y se desincronizan. Este archivo guarda las *decisiones y sus porqués*; el backlog guarda las *tareas abiertas*.
 
 **Verificación de que la app funciona en producción** (hecha con peticiones reales, no solo comprobando que cargue): landing, `/reservar` y `/admin/login` responden `200`; `/admin` y `/admin/qr` sin sesión redirigen (`307`); `POST /api/admin/login` devuelve una cookie de sesión que efectivamente autoriza `GET /admin`, `GET /admin/qr` y `GET /api/admin/reservations`.
 
-Además, **el usuario hizo un recorrido completo de punta a punta el 2026-08-10** y reportó que la aplicación funciona correctamente en términos generales. Lo que sigue sin constar es que ese recorrido se hiciera desde un teléfono escaneando el QR ya impreso, que es la formulación literal del criterio de aceptación de las Fases 9 y 10 — anotado en `BACKLOG.md`.
+Además, **el usuario dio por cumplido el criterio de aceptación formal de las Fases 9 y 10** (2026-08-11): el recorrido completo de punta a punta funciona. No hay verificación pendiente.
+
+⚠️ **Un merge a `main` puede no desplegar, y nada avisa.** Pasó el 2026-08-10: el PR #33 se fusionó y Vercel no creó el despliegue de producción, dejando la app atrasada ~12 h. Fue puntual —el merge siguiente desplegó sin tocar nada— pero el fallo es silencioso: `ci.yml` no corre en `main` a propósito y Vercel no marca error. **Tras fusionar a `main`, comprobar producción con una petición real** a una ruta cuyo contenido haya cambiado, no darlo por hecho.
 
 ---
 
@@ -131,6 +133,10 @@ Decisión de negocio, no limitación técnica. Alcance de lo que cambió:
 - **Landing sin grid:** `CalendarGrid.tsx` (2 columnas + plegado por sala) se eliminó, reemplazado por `RoomAvailability.tsx` — un wrapper mínimo cuyo único propósito es permitir `next/dynamic(..., { ssr: false })` desde un Server Component. El calendario va directo, a todo el ancho.
 - **`TimeBlockForm.tsx` NO se tocó:** su dropdown de sala ya era genérico sobre `getActiveRooms()`; con una sola sala activa queda con dos opciones con sentido ("Todas las salas" / "Sala Principal").
 
+### No se rota `ADMIN_PASSWORD`
+
+Estuvo anotado como pendiente de seguridad —la contraseña actual se eligió durante el desarrollo y circuló en sesiones de trabajo, y la base ya guarda datos personales reales—. **El usuario decidió no rotarla (2026-08-11).** Es su decisión y está tomada con la información delante: **no volver a proponerlo**.
+
 ### Rechazar y cancelar no piden motivo
 
 El plan (§6) exigía `adminNote` obligatorio con un diálogo que forzaba a escribir el motivo. El usuario pidió lo contrario **antes** de construir la Fase 6: ambas acciones solo piden confirmación ("¿Estás seguro de…?").
@@ -158,6 +164,25 @@ Tras probar el wizard en el navegador, el usuario pidió:
 - **Navbar público igual al del admin:** `Header.tsx` tiene `variante="azul"` por defecto (antes `"blanco"`). Bastó cambiar el default porque los tres call sites públicos usan `<Header />` sin prop.
 - **Footer:** columna derecha con nombre del laboratorio → correo `mailto:` → link a la universidad, más una franja centrada con el año (`new Date().getFullYear()`) y el crédito a la Unidad.
 - **Grid del calendario más oscuro:** token `--borde-calendario: #c7c7c7` en `globals.css`. Va **solo** ahí, no en `tailwind.config.ts`, porque es exclusivo de `--fc-border-color` y ningún componente lo usa como utilidad — no aplica la regla de espejar ambos archivos.
+
+### Imágenes de marca: pestaña y enlace compartido
+
+Tres ficheros que **Next.js enlaza solo, por convención de nombre**, sin tocar `layout.tsx`: `src/app/icon.png` (pestaña), `apple-icon.png` y `opengraph-image.png` (+ su `opengraph-image.alt.txt`).
+
+**Hay dos logos y no son intercambiables:**
+
+| Fichero | Qué es | Alfa | Para qué |
+|---------|--------|------|----------|
+| `logo-uclam.png` | horizontal, 427×118 | **No** — fondo blanco horneado | cabecera, pie, tarjeta de Open Graph |
+| `logo-uclam-escudo.png` | escudo, 78×118 | **Sí** | iconos de pestaña y de iOS |
+
+Que el escudo **sí** traiga canal alfa es justo lo que lo hace servible como favicon: se recorta limpio sobre el color de pestaña de cada navegador, claro u oscuro. El horizontal no podría, y por eso en la tarjeta de OG va dentro de una tarjeta blanca, el mismo recurso que usa `Logo.tsx` sobre azul.
+
+**Se generan con [scripts/generar-imagenes-marca.mjs](scripts/generar-imagenes-marca.mjs)**, no a mano: son ficheros versionados (el despliegue no depende de nada en runtime) pero rehacerlos es un comando si cambia el logo o el texto. Necesita Playwright, que **no es dependencia** — se instala con `--no-save` igual que para las pruebas de interfaz. Es `.mjs` a propósito: `tsconfig.json` incluye `**/*.ts`, así que un `.ts` que importe `playwright` rompería `npm run typecheck` en CI.
+
+⚠️ **`metadataBase` en `layout.tsx` es lo que hace que el OG funcione.** Sin él, Next resuelve la URL de la imagen contra `localhost:3000` y ningún servicio externo puede descargarla: WhatsApp o Teams mostrarían el enlace pelado. Sale de `NEXT_PUBLIC_APP_URL`, la misma variable que codifica el QR.
+
+El escudo se rinde ajustado por **alto**, no por ancho: es vertical (78×118), así que en un lienzo cuadrado siempre sobra aire a los lados, y a 16 px de pestaña cada píxel cuenta. El icono de iOS va sobre blanco explícito porque iOS compone la transparencia sobre negro.
 
 ### QR imprimible (`/admin/qr`)
 

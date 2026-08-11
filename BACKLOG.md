@@ -4,24 +4,19 @@
 
 `CLAUDE.md` guarda las *decisiones y sus porqués*; este archivo guarda las *tareas abiertas*. No duplicar el estado de un pendiente allá.
 
-**Estado general:** fases 0–9 completas y los **nueve ajustes pedidos tras el despliegue, hechos**. La aplicación está en producción y el usuario verificó un recorrido completo de punta a punta el 2026-08-10. Lo que queda es el pulido de la Fase 10, dos detalles menores y el mantenimiento con fecha.
+**Estado general: las diez fases están completas**, y con ellas los nueve ajustes pedidos tras el despliegue. La aplicación está en producción y el usuario confirmó el recorrido de punta a punta. Lo que queda no es construcción: es **mantenimiento con fecha límite**, dos detalles menores y limpieza del repositorio.
 
 ---
 
-## Pendiente de la Fase 10 (pulido y cierre)
+## Fase 10, cerrada
 
-Nada de esto bloquea el uso de la aplicación; es lo que separa "funcional" de "terminado".
+Queda un solo resto, y es parcial:
 
-**La numeración es la del §9 → Fase 10 de [PLAN-MVP.md](PLAN-MVP.md)**, para que las dos listas se puedan cruzar sin traducir. Los puntos que no aparecen aquí (1, 4, 5, 6, 7, 9) están hechos, y el 8 quedó anulado a propósito — el porqué de cada uno está en el plan.
+| # | Tarea | Estado |
+|---|-------|--------|
+| 3 | Repasar estados de carga y vacíos | **Parcial.** El calendario, `EmptyState`, las pantallas de estado y el wizard ya los tienen; falta un repaso del panel. No bloquea nada. |
 
-| # | Tarea | Notas |
-|---|-------|-------|
-| 2 | Imagen de Open Graph | El `title` y la `description` del layout raíz ya están; falta la imagen para cuando se comparta el enlace. **Es lo único que queda de la Fase 10.** |
-| 3 | Repasar estados de carga y vacíos | Parcial. El calendario, `EmptyState`, las pantallas de estado y el wizard ya los tienen; falta un repaso del panel. |
-
-La revisión de accesibilidad (punto 5) se hizo con axe-core y Playwright sobre el build de producción: 12 pantallas sin incumplimientos, teclado y diálogos verificados. Ver "Accesibilidad" en `CLAUDE.md`.
-
-**Lo que quedó fuera de esa revisión, a propósito:** la rejilla del calendario sigue sin ser operable por teclado (FullCalendar no hace focusables las celdas). No incumple, porque el wizard es el camino equivalente y sí es navegable — pero si el wizard cambia, hay que volver a mirarlo.
+**Lo que quedó fuera de la revisión de accesibilidad, a propósito:** la rejilla del calendario sigue sin ser operable por teclado (FullCalendar no hace focusables las celdas). No incumple, porque el wizard es el camino equivalente y sí es navegable — pero si el wizard cambia, hay que volver a mirarlo.
 
 ---
 
@@ -50,7 +45,7 @@ La causa es la configuración de `useForm`: con `mode: "onTouched"` y errores pu
 
 ## Seguridad, antes de un uso más amplio
 
-- **Rotar `ADMIN_PASSWORD`.** La actual se eligió durante el desarrollo y ha circulado en sesiones de trabajo. Ahora que la aplicación recoge datos personales reales (nombre, documento, correo), conviene una contraseña fuerte y nueva, cambiada tanto en Vercel como en el `.env` local.
+- ~~**Rotar `ADMIN_PASSWORD`.**~~ **Descartado por decisión del usuario (2026-08-11).** Estaba anotado porque la contraseña actual se eligió durante el desarrollo y circuló en sesiones de trabajo. No se rota. **No volver a proponerlo**; si algún día cambia el criterio, lo pedirá él.
 - **Una sola contraseña de administrador, sin usuarios ni auditoría** (riesgo R5 del plan). Aceptado para el MVP; si el sistema pasa a uso institucional formal, se necesita SSO.
 - **Sin autenticación del solicitante** (riesgo R6): cualquiera con un correo `@amigo.edu.co` válido puede reservar a nombre de otro. Mitigado por la aprobación manual del administrador.
 
@@ -59,13 +54,8 @@ La causa es la configuración de `useForm`: con `mode: "onTouched"` y errores pu
 ## Limpieza del repositorio
 
 - **Los ficheros de las skills están duplicados en el historial.** En disco, `.claude/skills/frontend-design` y `.claude/skills/vercel-react-best-practices` son *junctions* de Windows que apuntan a `.agents/skills/`, pero git no los sigue como enlaces: **guarda las dos copias**, 115 ficheros por duplicado. Quien clone en Linux o macOS obtiene dos copias reales, que además pueden divergir. Elegir un directorio canónico y dejar el otro fuera del repositorio.
-- **19 ramas remotas ya fusionadas en `develop`** siguen publicadas en GitHub. Borrarlas no pierde nada: los commits están en `develop`.
 
----
-
-## Verificación pendiente
-
-- **Recorrido completo desde un teléfono real escaneando el QR impreso.** El usuario confirmó una prueba completa de punta a punta el 2026-08-10 y la app quedó "en términos generales funcionando correctamente"; lo que no consta es que se hiciera con el QR ya impreso y pegado en la puerta, que es la formulación literal del criterio de aceptación de las Fases 9 y 10. Es la última comprobación que valida el punto de entrada real del sistema.
+*(Las 14 ramas remotas ya fusionadas se borraron el 2026-08-11; solo quedan `main` y `develop`.)*
 
 ---
 

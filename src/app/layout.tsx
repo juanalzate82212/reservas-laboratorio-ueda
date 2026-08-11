@@ -23,10 +23,34 @@ const inter = Inter({
   display: "swap",
 });
 
+const TITULO = "Reservas Laboratorio de Analítica de Datos e Inteligencia Artificial";
+const DESCRIPCION =
+  "Consulta la disponibilidad de las salas del Laboratorio de Analítica de Datos e Inteligencia Artificial y solicita tu reserva.";
+
 export const metadata: Metadata = {
-  title: "Reservas Laboratorio de Analítica de Datos e Inteligencia Artificial",
-  description:
-    "Consulta la disponibilidad de las salas del Laboratorio de Analítica de Datos e Inteligencia Artificial y solicita tu reserva.",
+  /*
+   * Sin metadataBase, Next resuelve la URL de opengraph-image.png contra
+   * http://localhost:3000 y avisa en el build. Un og:image apuntando a
+   * localhost no lo puede descargar ningún servicio: WhatsApp, Teams o
+   * LinkedIn mostrarían el enlace pelado. Se usa la misma variable que
+   * codifica el QR, así que si esa está bien, esto también.
+   */
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
+  title: TITULO,
+  description: DESCRIPCION,
+  /*
+   * La imagen no se declara aquí: Next la toma de src/app/opengraph-image.png
+   * por convención de nombre de fichero, junto con su tamaño, su tipo y el
+   * alt de opengraph-image.alt.txt. Ver scripts/generar-imagenes-marca.mjs.
+   */
+  openGraph: {
+    title: TITULO,
+    description: DESCRIPCION,
+    siteName: "Laboratorio de Analítica de Datos e Inteligencia Artificial",
+    locale: "es_CO",
+    type: "website",
+  },
+  twitter: { card: "summary_large_image", title: TITULO, description: DESCRIPCION },
 };
 
 export const viewport: Viewport = {
