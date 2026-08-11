@@ -109,7 +109,7 @@ Todas están documentadas en [`.env.example`](.env.example). Resumen:
 | `DIRECT_URL` | Conexión directa, **puerto 5432** — solo para migraciones (PgBouncer no soporta DDL) |
 | `ADMIN_PASSWORD` | Contraseña única del panel de administración |
 | `AUTH_SECRET` | Clave para firmar el JWT de sesión. Generar con `openssl rand -base64 32` |
-| `NEXT_PUBLIC_APP_URL` | URL pública de la app — **es lo que codifica el QR**; un valor incorrecto rompe la función principal |
+| `NEXT_PUBLIC_APP_URL` | URL pública de la app. **Es lo que codifica el QR** y la base de la URL absoluta de la imagen de Open Graph; un valor incorrecto rompe la función principal y deja el enlace compartido sin vista previa |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASSWORD` | Credenciales de envío de correo |
 | `MAIL_FROM` | Remitente, en formato `Nombre <correo>`. Debe coincidir con `SMTP_USER` o ser un alias suyo |
 | `MAIL_TO_ADMIN` | Buzón interno donde caen los **avisos** al laboratorio: solicitud nueva por revisar, y cancelación hecha por el solicitante. Hoy es la misma cuenta que envía. Si se deja vacía, esos avisos no se mandan y solo queda constancia en consola |
@@ -117,6 +117,24 @@ Todas están documentadas en [`.env.example`](.env.example). Resumen:
 **Las dos URLs de base de datos no son intercambiables** y ambas deben estar declaradas. Omitir `DIRECT_URL` produce errores de *"prepared statement already exists"* que típicamente solo aparecen después de desplegar.
 
 **Sin `SMTP_PASSWORD`, la aplicación sigue funcionando:** el mailer escribe los correos en consola y los registra con estado `LOGGED` en vez de fallar, de modo que todo el flujo es desarrollable y demostrable sin credenciales.
+
+### Cómo obtener la contraseña de correo
+
+El correo institucional corre sobre **Google Workspace**, así que aplican las reglas de Gmail. La aplicación no tiene sistema de correo propio: inicia sesión en un buzón real y le pide que envíe, igual que haría Outlook.
+
+⚠️ **Google bloquea el acceso SMTP con la contraseña normal de la cuenta desde 2022.** Hace falta una *contraseña de aplicación*: 16 caracteres, específica para una aplicación, revocable por separado y que no da acceso al resto de la cuenta.
+
+Con la cuenta del laboratorio iniciada:
+
+1. En [myaccount.google.com/security](https://myaccount.google.com/security), activar la **verificación en 2 pasos**. Es requisito: sin ella la opción de contraseñas de aplicación **ni siquiera aparece**.
+2. Ir a [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) y crear una con un nombre reconocible.
+3. Google muestra la clave **una sola vez**, con el formato `abcd efgh ijkl mnop`. Copiarla y **quitarle los espacios** al pegarla en `SMTP_PASSWORD`.
+
+**Si `/apppasswords` da error o no carga**, el administrador de Google Workspace de la universidad tiene la función deshabilitada para el dominio — es una restricción común en instituciones. Hay que pedir a TI que la habiliten para esa cuenta, o que faciliten un relay SMTP institucional.
+
+> `MAIL_FROM` debe ser la dirección de `SMTP_USER` o un alias suyo: Gmail rechaza remitentes arbitrarios, y un `no-responder@…` inexistente hace fallar el envío. El límite de Google Workspace ronda los 2 000 destinatarios diarios, de sobra para este sistema.
+
+Para desarrollar sin credenciales, además del modo consola descrito arriba, [Ethereal](https://ethereal.email) genera credenciales SMTP falsas al instante: los correos no se entregan a nadie pero se ven renderizados en su web, útil para revisar el HTML de las plantillas.
 
 ---
 
@@ -150,10 +168,12 @@ prisma/
   seed.ts                Datos de ejemplo (destructivo)
 scripts/
   check-datetime.ts      Verificación de los casos límite de fecha/hora
+  generar-imagenes-marca.mjs  Rehace los iconos y la imagen de Open Graph
 src/
   app/
     page.tsx             Landing pública con el calendario
     error.tsx …          Pantallas de error, 404 y carga en voz de marca
+    icon.png …           Iconos y tarjeta de Open Graph (Next los enlaza solo)
     reservar/            Wizard de solicitud (3 pasos)
     reserva/             Búsqueda por código (funciona sin JavaScript)
     reserva/[codigo]/    Estado de una reserva, con opción de cancelarla
