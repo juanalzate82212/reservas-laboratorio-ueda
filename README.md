@@ -146,6 +146,8 @@ npm run build            # build de producción
 npm run start            # servir el build
 npm run lint             # ESLint
 npm run typecheck        # tsc --noEmit
+npm test                 # Vitest, una pasada
+npm run test:watch       # Vitest en modo vigilancia
 npm run check:datetime   # verifica los casos límite de fecha/hora
 
 npx prisma migrate dev   # crear y aplicar una migración nueva
@@ -155,7 +157,9 @@ npx prisma studio        # inspector visual de la base de datos
 npx prisma db seed       # ⚠️ destructivo: recrea los datos de ejemplo
 ```
 
-No hay framework de tests. La verificación se hace por criterios de aceptación: Prisma Studio, `curl` contra los Route Handlers, y `scripts/check-datetime.ts` para la capa horaria.
+Hay **Vitest**, pero la suite es todavía muy pequeña: un solo fichero, `src/lib/availability.test.ts`. El CI la ejecuta en cada PR.
+
+La verificación principal sigue siendo por **criterios de aceptación**: Prisma Studio, `curl` contra los Route Handlers, y `scripts/check-datetime.ts` para la capa horaria.
 
 ---
 

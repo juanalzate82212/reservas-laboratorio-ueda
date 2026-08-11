@@ -1,6 +1,6 @@
 # Fusión de DataCueva dentro de la app de reservas
 
-**Estado: aprobado el 2026-08-11. Fase 0 en curso** — los puntos 1 (base de datos de desarrollo) y 2 (Node 22) están hechos; falta Vitest.
+**Estado: aprobado el 2026-08-11. Fase 0 cerrada el 2026-08-11.** La siguiente es la fase 1, y **no se empieza sin explicarla al usuario y obtener su visto bueno** (regla 1 de "Cómo se trabaja este plan").
 
 ---
 
@@ -76,11 +76,15 @@ Resultado: **5 tablas nuevas**, no 6.
 
 Regla: **cada fase deja la aplicación desplegable y funcionando.** Cada fase que toque la base usa una migración aditiva. **Cada fase se explica y se aprueba antes de empezarla.**
 
-### ☐ Fase 0 — Fontanería. Ni una línea de DataCueva
+### ✅ Fase 0 — Fontanería. Ni una línea de DataCueva *(cerrada el 2026-08-11)*
 
 1. ✅ **Base de datos de desarrollo** — hecho el 2026-08-11. Proyecto `vkixgpvztkvbuwamhqdv`, con las 4 migraciones aplicadas, RLS activo en las cuatro tablas y sembrado (1 sala, 6 reservas, 2 bloqueos). El `.env` local apunta ahí; producción solo vive en Vercel. **Resuelto el que era el mayor riesgo del repositorio.** Queda pendiente decidir sobre `_prisma_migrations`, que no tiene RLS en ninguno de los dos proyectos.
 2. ✅ **Node 20 → 22** — hecho el 2026-08-11. `engines.node` a `22.x`, `.nvmrc` a `22.23.2`, `@types/node` a `22.20.1`. **`ci.yml` no se tocó**: ya usaba `node-version-file: .nvmrc`, así que el CI siguió a la versión sola. Se temía que costara por lo de `nvm use`, pero el usuario había reinstalado nvm/npm/node y el entorno local ya estaba en 22.23.2. Ninguna dependencia se resintió: `typecheck`, `lint`, `build` y `check:datetime` pasaron sin un solo cambio de código.
-3. **Vitest instalado con cero tests**, script `test` y paso en `ci.yml`.
+3. ✅ **Vitest** — hecho el 2026-08-11. `vitest@4.1.10` (fijado sin `^`, como todo aquí), `vitest.config.mts`, scripts `test` y `test:watch`, y un paso en `ci.yml` colocado **antes** del build, que es más lento.
+
+   ⚠️ **Desviación deliberada del plan: no entró con cero tests, sino con uno.** El plan pedía cero, lo que obligaba a `passWithNoTests: true` para que el paso de CI no fallara desde el primer día — y eso convierte "no encontré ningún test" en verde, así que un `include` mal escrito apagaría la suite entera en silencio. `lib/availability.ts` declara en su propia cabecera que sus tipos son estructurales *"para poder probarlo con objetos literales"*, así que fue el sitio obvio: 19 casos que fijan las reglas que `CLAUDE.md` ya declara (solapamiento estricto, `PENDING` ocupa franja, `WARNING` no es conflicto, precedencia de estados). **Comprobado que la suite tiene dientes** cambiando `<` por `<=` en `overlaps()`: fallaron exactamente los 2 tests de bordes, y se revirtió.
+
+   El alias `@/*` se declara a mano en `resolve.alias` en vez de instalar `vite-tsconfig-paths`. Es un único mapeo y una dependencia menos, pero **queda duplicado con `paths` de `tsconfig.json`**: al añadir otro alias hay que tocar los dos.
 
 *Cierra con: la app idéntica para el usuario, y la fecha límite del 2026-10-01 resuelta.*
 
@@ -182,7 +186,7 @@ Por fase, además de `npm run typecheck`, `npm run lint`, `npm run build` y `npm
 | Fase | Cómo se comprueba |
 |---|---|
 | 0 | El `.env` local apunta a la base de desarrollo: `npx prisma studio` muestra una base distinta de la de producción. Producción responde tras el despliegue de Node 22. |
-| 1 | `npm test` en verde con los 15 ficheros. El build no cambia de tamaño porque nada importa ese código todavía. |
+| 1 | `npm test` en verde con **16** ficheros (los 15 de DataCueva más el de `availability` que ya está). El build no cambia de tamaño porque nada importa ese código todavía. |
 | 2 | `prisma migrate deploy` completo **contra la base de desarrollo primero**. La suite de contrato pasa contra Prisma real. Comprobar a mano que `UPDATE auditoria` falla y que dos préstamos activos del mismo equipo dan error. |
 | 3 | Entrar por la puerta nueva y ejercitar **las siete acciones** del panel; luego repetir con la vieja. Comprobar que `auditoria` registra el correo real. En 3c, verificar en producción antes de borrar `ADMIN_PASSWORD` de Vercel. |
 | 4 | `curl` contra cada handler nuevo, con y sin sesión, y con un rol insuficiente (debe dar 403). `api.test.ts` en verde. |
