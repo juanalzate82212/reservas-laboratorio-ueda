@@ -78,7 +78,7 @@ Regla: **cada fase deja la aplicación desplegable y funcionando.** Cada fase qu
 
 ### ✅ Fase 0 — Fontanería. Ni una línea de DataCueva *(cerrada el 2026-08-11)*
 
-1. ✅ **Base de datos de desarrollo** — hecho el 2026-08-11. Proyecto `vkixgpvztkvbuwamhqdv`, con las 4 migraciones aplicadas, RLS activo en las cuatro tablas y sembrado (1 sala, 6 reservas, 2 bloqueos). El `.env` local apunta ahí; producción solo vive en Vercel. **Resuelto el que era el mayor riesgo del repositorio.** Queda pendiente decidir sobre `_prisma_migrations`, que no tiene RLS en ninguno de los dos proyectos.
+1. ✅ **Base de datos de desarrollo** — hecho el 2026-08-11. Proyecto `vkixgpvztkvbuwamhqdv`, con las 4 migraciones aplicadas, RLS activo en las cuatro tablas y sembrado (1 sala, 6 reservas, 2 bloqueos). El `.env` local apunta ahí; producción solo vive en Vercel. **Resuelto el que era el mayor riesgo del repositorio.** El usuario activó además RLS en `_prisma_migrations`, así que las cinco tablas de `public` lo tienen.
 2. ✅ **Node 20 → 22** — hecho el 2026-08-11. `engines.node` a `22.x`, `.nvmrc` a `22.23.2`, `@types/node` a `22.20.1`. **`ci.yml` no se tocó**: ya usaba `node-version-file: .nvmrc`, así que el CI siguió a la versión sola. Se temía que costara por lo de `nvm use`, pero el usuario había reinstalado nvm/npm/node y el entorno local ya estaba en 22.23.2. Ninguna dependencia se resintió: `typecheck`, `lint`, `build` y `check:datetime` pasaron sin un solo cambio de código.
 3. ✅ **Vitest** — hecho el 2026-08-11. `vitest@4.1.10` (fijado sin `^`, como todo aquí), `vitest.config.mts`, scripts `test` y `test:watch`, y un paso en `ci.yml` colocado **antes** del build, que es más lento.
 

@@ -37,7 +37,9 @@ Sigue siendo importante porque **el guard de `prisma/seed.ts` no protege**: comp
 
 ⚠️ **No dar por buena ninguna cifra de filas de producción que leas aquí: la app está en uso.** Míralo en vez de deducirlo.
 
-⚠️ **`_prisma_migrations` no tiene RLS**, en los dos proyectos. Es una decisión heredada ("tabla interna, sin datos sensibles") que conviene revisar: no guarda datos personales, pero con la llave `anon` **se puede escribir**, y corromper el historial de migraciones rompería los despliegues. Arreglarlo es una línea y es seguro, porque Prisma se conecta como `postgres`, que ignora RLS.
+**`_prisma_migrations` también tiene RLS**, desde el 2026-08-11. Antes no: se había excluido por considerarla "tabla interna, sin datos sensibles". Eso era cierto a medias — no guarda datos personales, pero con la llave `anon` **se podía escribir**, y corromper el historial de migraciones rompe los despliegues. Fue seguro activarlo porque Prisma se conecta como `postgres`, que ignora RLS.
+
+Con eso, **las cinco tablas de `public` tienen RLS y ninguna tiene políticas**, que es exactamente el estado buscado: el canal REST de Supabase queda cerrado del todo y la app no se entera. El linter de Supabase seguirá reportando `rls_enabled_no_policy` como **INFO** en las cinco; **no es un pendiente**, es la consecuencia esperada. Solo dejaría de serlo si algún día se usa `@supabase/supabase-js` desde el cliente.
 
 ---
 
