@@ -37,6 +37,16 @@ jobs:
       - name: Comprobar tipos
         run: npm run typecheck
 
+      # Va ANTES del build a propósito: es la comprobación más rápida de las
+      # dos, y si el dominio está roto no tiene sentido esperar a compilar la
+      # aplicación entera para enterarse.
+      #
+      # La suite arranca con un solo fichero (lib/availability.test.ts) y crece
+      # en la fase 1 de FUSION-DATACUEVA.md. No lleva variables de entorno
+      # porque nada de lo que prueba toca la base de datos.
+      - name: Tests
+        run: npm test
+
       - name: Build
         run: npm run build
         env:
