@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# skills de agente (contenido de terceros, no código del proyecto)
+# skills-lock.json SÍ se versiona: guarda de qué repo y con qué hash viene
+# cada una, igual que package-lock.json para node_modules. El árbol de
+# ficheros es caché reinstalable, y estaba DUPLICADO — en esta máquina
+# .claude/skills/ son junctions de Windows hacia .agents/skills/, pero git
+# no los sigue como enlaces y guardaba las dos copias (~230 ficheros).
+.claude/skills/
+.agents/skills/

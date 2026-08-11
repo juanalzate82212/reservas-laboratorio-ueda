@@ -5,8 +5,8 @@ import { cn } from "@/lib/utils";
 import logoUclam from "./logo-uclam.png";
 
 /*
- * Logo oficial (SVG solicitado a Comunicaciones, recibido como PNG —
- * riesgo R3 del plan, ya resuelto). El archivo no trae transparencia
+ * Logo oficial. Se pidió en SVG y llegó en PNG; se usa tal cual, sin
+ * reescalar ni recolorear. El archivo no trae transparencia
  * (confirmado inspeccionando los chunks del PNG: sin tRNS), es decir que
  * ya lleva su propio fondo blanco horneado en la imagen. Sobre una
  * superficie azul (variante="blanco": cabecera del admin, splash de

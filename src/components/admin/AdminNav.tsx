@@ -8,11 +8,7 @@ import { cn } from "@/lib/utils";
 
 import { ADMIN_RESERVATIONS_CHANGED_EVENT } from "./adminEvents";
 
-/*
- * Secciones del panel (§9, Fases 5-8 del plan). Franjas/Correos/QR todavía no
- * existen como páginas — el enlace está listo, la Fase que lo construye lo
- * completa.
- */
+/* Las cuatro secciones del panel. Todas existen como páginas. */
 const ENLACES = [
   { href: "/admin", label: "Solicitudes" },
   { href: "/admin/franjas", label: "Franjas" },

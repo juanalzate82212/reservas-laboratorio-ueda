@@ -118,6 +118,24 @@ Todas están documentadas en [`.env.example`](.env.example). Resumen:
 
 **Sin `SMTP_PASSWORD`, la aplicación sigue funcionando:** el mailer escribe los correos en consola y los registra con estado `LOGGED` en vez de fallar, de modo que todo el flujo es desarrollable y demostrable sin credenciales.
 
+### Cómo obtener la contraseña de correo
+
+El correo institucional corre sobre **Google Workspace**, así que aplican las reglas de Gmail. La aplicación no tiene sistema de correo propio: inicia sesión en un buzón real y le pide que envíe, igual que haría Outlook.
+
+⚠️ **Google bloquea el acceso SMTP con la contraseña normal de la cuenta desde 2022.** Hace falta una *contraseña de aplicación*: 16 caracteres, específica para una aplicación, revocable por separado y que no da acceso al resto de la cuenta.
+
+Con la cuenta del laboratorio iniciada:
+
+1. En [myaccount.google.com/security](https://myaccount.google.com/security), activar la **verificación en 2 pasos**. Es requisito: sin ella la opción de contraseñas de aplicación **ni siquiera aparece**.
+2. Ir a [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) y crear una con un nombre reconocible.
+3. Google muestra la clave **una sola vez**, con el formato `abcd efgh ijkl mnop`. Copiarla y **quitarle los espacios** al pegarla en `SMTP_PASSWORD`.
+
+**Si `/apppasswords` da error o no carga**, el administrador de Google Workspace de la universidad tiene la función deshabilitada para el dominio — es una restricción común en instituciones. Hay que pedir a TI que la habiliten para esa cuenta, o que faciliten un relay SMTP institucional.
+
+> `MAIL_FROM` debe ser la dirección de `SMTP_USER` o un alias suyo: Gmail rechaza remitentes arbitrarios, y un `no-responder@…` inexistente hace fallar el envío. El límite de Google Workspace ronda los 2 000 destinatarios diarios, de sobra para este sistema.
+
+Para desarrollar sin credenciales, además del modo consola descrito arriba, [Ethereal](https://ethereal.email) genera credenciales SMTP falsas al instante: los correos no se entregan a nadie pero se ven renderizados en su web, útil para revisar el HTML de las plantillas.
+
 ---
 
 ## Comandos
