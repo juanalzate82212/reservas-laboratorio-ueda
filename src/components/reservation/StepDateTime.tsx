@@ -191,9 +191,24 @@ export function StepDateTime({
     <div className="flex flex-col gap-5">
       {selectorDia}
 
+      {/*
+        Los rótulos de estos dos bloques eran <span> sueltos: visualmente
+        etiquetaban la rejilla de botones, pero nada los enlazaba con ella, así
+        que quien navega con lector de pantalla llegaba a un "08:00, botón"
+        sin saber de qué lista formaba parte. role="group" + aria-labelledby lo
+        enlaza, y aria-describedby lleva el error a los botones que lo causan
+        —el <p role="alert"> por sí solo se anuncia una vez y se pierde—.
+      */}
       <div className="flex flex-col gap-2">
-        <span className="text-body font-medium text-texto">Elige la hora de inicio</span>
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+        <span id="rotulo-hora" className="text-body font-medium text-texto">
+          Elige la hora de inicio
+        </span>
+        <div
+          role="group"
+          aria-labelledby="rotulo-hora"
+          aria-describedby={errorStartsAt ? "error-hora" : undefined}
+          className="grid grid-cols-3 gap-2 sm:grid-cols-4"
+        >
           {slots.map((slot) => {
             const estado = getSlotState(slot, reservas, bloqueos);
             const elegido = inicioElegido?.getTime() === slot.startsAt.getTime();
@@ -240,7 +255,7 @@ export function StepDateTime({
           })}
         </div>
         {errorStartsAt && (
-          <p role="alert" className="text-caption text-error">
+          <p id="error-hora" role="alert" className="text-caption text-error">
             {errorStartsAt}
           </p>
         )}
@@ -248,8 +263,10 @@ export function StepDateTime({
 
       {inicioElegido && (
         <div className="flex flex-col gap-2">
-          <span className="text-body font-medium text-texto">Elige la duración</span>
-          <div className="flex flex-wrap gap-2">
+          <span id="rotulo-duracion" className="text-body font-medium text-texto">
+            Elige la duración
+          </span>
+          <div role="group" aria-labelledby="rotulo-duracion" className="flex flex-wrap gap-2">
             {BOOKING_CONFIG.allowedDurations.map((minutos) => {
               const fin = addMinutes(inicioElegido, minutos);
               const cabe =

@@ -609,7 +609,7 @@ Diez fases. **Cada una termina en un estado ejecutable y verificable.** No empez
 6. Configurar `next/font/google` (Montserrat + Inter) en `app/layout.tsx`.
 7. Construir `components/ui/`: `Button` (primary/secondary/accent/ghost/danger), `Input`, `Select`, `Textarea`, `Card`, `Badge`, `Field` (label + error + ayuda), `EmptyState`.
 8. Construir `components/brand/`: `Logo`, `Header`, `Footer`, `ArcoDecorativo`.
-9. Crear `/kitchen-sink` (temporal) mostrando todos los componentes en todos sus estados.
+9. Crear `/kitchen-sink` (temporal) mostrando todos los componentes en todos sus estados. ~~Eliminada en la Fase 10, punto 6.~~
 
 **Aceptación:** `npm run dev` levanta sin errores; `/kitchen-sink` muestra los componentes con los colores institucionales; `npm run build` pasa limpio.
 
@@ -756,7 +756,9 @@ Wizard de 3 pasos + confirmación, en página `/reservar`.
 
 **Aceptación:** recorrido completo end-to-end desde un teléfono real escaneando el QR impreso, terminando con el correo de confirmación recibido.
 
-> **🟡 PARCIAL.** Hechos: **1** (la ruta real es `app/admin/(protected)/qr/page.tsx`, dentro del route group), **4** (las tres, más un `global-error.tsx` que el plan no pedía), **7** y **9**. Parciales: **2** (falta la imagen OG) y **3** (el calendario, `EmptyState` y las pantallas del punto 4 sí; el resto no se repasó). Pendientes: **5** y **6**.
+> **🟡 PARCIAL.** Hechos: **1** (la ruta real es `app/admin/(protected)/qr/page.tsx`, dentro del route group), **4** (las tres, más un `global-error.tsx` que el plan no pedía), **5**, **6**, **7** y **9**. Parciales: **2** (falta la imagen OG) y **3** (el calendario, `EmptyState`, las pantallas del punto 4 y el wizard sí; falta repasar el panel). Pendiente: solo el **2**.
+>
+> El punto **5** se auditó con axe-core y Playwright sobre el build de producción, no a ojo: doce pantallas sin incumplimientos. Salieron seis defectos reales —cuatro de contraste, el foco de teclado invisible en las flechas del calendario y el foco perdido al cerrar un diálogo—, todos corregidos. Ver "Accesibilidad" en `CLAUDE.md`.
 >
 > El punto **8 queda anulado a propósito**: contradice la decisión del usuario de limpiar los datos de prueba para uso real.
 >

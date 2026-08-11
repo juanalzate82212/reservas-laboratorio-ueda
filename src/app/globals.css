@@ -29,10 +29,41 @@
   --naranja-700: #c77700;
   --naranja-500: #f39200;
   --naranja-100: #fde6c7;
+  /*
+   * Naranja de MARCA como TEXTO sobre fondo claro, igual que --azul-texto.
+   * Ni #F39200 ni #C77700 sirven para eso: el segundo se queda en 3.17 sobre
+   * --superficie, y ahí va la etiqueta "Festivo" del calendario. Este da 4.93.
+   * Solo para texto e iconos que se leen; el naranja de FONDO sigue siendo
+   * --naranja-500, que es el de la identidad.
+   */
+  --naranja-texto: #9a5c00;
+
+  /*
+   * Azul de MARCA como TEXTO sobre fondo claro.
+   *
+   * #007B99 es el azul institucional y se queda como está para fondos, iconos
+   * y bordes. Pero como texto pequeño no llega a WCAG AA sobre ninguna de
+   * nuestras superficies claras: 4.89 sobre blanco (justo), 4.49 sobre
+   * --superficie y 4.28 sobre --azul-50, contra el 4.5 exigido. Medido con
+   * axe-core sobre el build de producción, no estimado.
+   *
+   * Este token es el mismo --azul-700 del propio documento de marca, que
+   * autoriza ajustar los valores derivados "si es necesario por contraste"
+   * (§12) y fija WCAG AA como meta (§2.4). Da 6.73 / 6.18 / 5.89.
+   *
+   * Regla: azul de FONDO o de icono → --color-azul. Azul de TEXTO → este.
+   */
+  --azul-texto: #00647d;
 
   /* Neutrales (derivado) */
   --texto: #2e2e2e;
-  --texto-secundario: #848585;
+  /*
+   * El gris de marca #848585 (Pantone 423 C) NO cambia: sigue en --color-gris
+   * para gráficos. Pero como texto se queda en 3.70 sobre blanco y 3.39 sobre
+   * --superficie, así que el neutral de texto se oscurece a este, el más claro
+   * que pasa AA sobre ambos fondos (4.97 / 4.56) conservando el matiz.
+   */
+  --texto-secundario: #6f7070;
   --borde: #e1e1e1;
   --superficie: #f5f5f5;
   --fondo: #ffffff;
@@ -58,7 +89,15 @@
   --primary-hover: var(--azul-700);
   --primary-active: var(--azul-900);
   --accent: var(--naranja-500);
-  --accent-hover: var(--naranja-700);
+  /*
+   * El hover ACLARA en vez de oscurecer, al revés que el azul. No es un
+   * descuido: sobre naranja el texto va oscuro (#2E2E2E, regla de marca), así
+   * que oscurecer el fondo acerca los dos y hunde el contraste — con el
+   * --naranja-700 que había aquí, el botón principal caía a 3.92 al pasar el
+   * ratón, por debajo del 4.5 exigido. Aclarando queda en 4.90 y el botón
+   * sigue reaccionando de forma visible.
+   */
+  --accent-hover: #e08600;
 
   /* Radios y sombra */
   --radius: 8px;
@@ -132,6 +171,24 @@
   box-shadow: none !important;
   font-weight: 500;
   text-transform: none;
+}
+
+/*
+ * Repone el foco de teclado en los botones de FullCalendar.
+ *
+ * El `box-shadow: none !important` de arriba está para borrar el resplandor
+ * propio de FullCalendar, pero se llevaba por delante el anillo de foco global
+ * (:focus-visible más arriba), porque Tailwind dibuja `ring-*` con box-shadow
+ * y aquello lleva !important. Resultado: las flechas de navegación eran los
+ * dos únicos controles de toda la aplicación que se podían enfocar sin que se
+ * viera nada — detectado tabulando la landing, no leyendo el CSS.
+ *
+ * Se repone con `outline`, no con box-shadow, para no depender de ganarle el
+ * !important a la regla de al lado.
+ */
+.fc .fc-button:focus-visible {
+  outline: 2px solid var(--azul-500);
+  outline-offset: 2px;
 }
 
 .fc .fc-toolbar-title {
@@ -230,7 +287,8 @@
   margin-top: 2px;
   font-size: 0.65rem;
   font-weight: 600;
-  color: var(--naranja-700);
+  /* Naranja de texto: #C77700 se quedaba en 3.17 sobre --superficie. */
+  color: var(--naranja-texto);
   text-transform: none;
 }
 
