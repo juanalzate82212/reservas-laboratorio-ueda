@@ -42,7 +42,7 @@ La causa es la configuración de `useForm`: con `mode: "onTouched"` y errores pu
 
 | Asunto | Plazo | Detalle |
 |--------|-------|---------|
-| **Node.js 20.x quedará obsoleto en Vercel** | **2026-10-01** | Los despliegues fallarán a partir de esa fecha. Subir `engines.node` en `package.json` y `.nvmrc` a **22.x** (no 24.x: no hay margen para experimentar con Prisma 5.22), y volver a verificar la paridad con el entorno local (ver "Entorno local" en `CLAUDE.md`: `nvm use` no funciona en esta máquina). **Es también el punto 2 de la fase 0 de [FUSION-DATACUEVA.md](FUSION-DATACUEVA.md)** — hacerlo una sola vez. |
+| ~~**Node.js 20.x quedará obsoleto en Vercel**~~ | ~~2026-10-01~~ | ✅ **Hecho el 2026-08-11**, con margen de mes y medio. `engines.node`, `.nvmrc` y `@types/node` a 22.x; el CI ya leía `.nvmrc`, así que no hubo que tocar `ci.yml`. Era también el punto 2 de la fase 0 de [FUSION-DATACUEVA.md](FUSION-DATACUEVA.md). |
 | **Festivos de 2027** | Antes de enero 2027 | `HOLIDAYS_CO` solo cubre 2026. Al añadir el año nuevo **no basta con calcular Pascua y aplicar la Ley Emiliani**: hay que comprobar si se creó algún festivo por ley (ya pasó en 2026 con la Ley 2578). `holidays.ts` emite `console.warn` si falta el año en curso. |
 
 ---

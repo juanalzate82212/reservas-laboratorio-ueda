@@ -62,7 +62,7 @@ Las reglas viven en `src/config/booking.ts` y `src/config/holidays.ts`, no repar
 
 ## Requisitos
 
-- **Node.js 20.x** (el repo fija `20.20.2` en `.nvmrc`, para paridad con Vercel)
+- **Node.js 22.x** (el repo fija `22.23.2` en `.nvmrc`, para paridad con Vercel)
 - Una cuenta de [Supabase](https://supabase.com) con un proyecto PostgreSQL
 - Una cuenta de correo de Google Workspace con contraseña de aplicación (opcional en desarrollo)
 
@@ -218,7 +218,7 @@ Para desplegar desde cero:
 4. `NEXT_PUBLIC_APP_URL` debe ser el dominio real — es lo que codifica el QR.
 5. Aplicar las migraciones: `DATABASE_URL="$DIRECT_URL" npx prisma migrate deploy`.
 
-> **Node 20.x quedará obsoleto en Vercel el 2026-10-01.** Antes de esa fecha hay que subir `engines.node` en `package.json` y `.nvmrc` a 22.x o 24.x.
+> **Vercel no tiene desplegable de versión de Node**: respeta `engines.node` de `package.json`. El repo declara `22.x` desde el 2026-08-11, así que la retirada de Node 20 del 2026-10-01 ya no afecta.
 
 ### Flujo de ramas
 

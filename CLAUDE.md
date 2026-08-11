@@ -358,9 +358,9 @@ Cuatro paquetes están por encima de lo que pedía el plan **por advisories de s
 
 ## Entorno local
 
-Node **20.20.2** vía nvm-windows, para paridad con Vercel (`engines: 20.x`, `.nvmrc`).
+Node **22.23.2** vía nvm-windows, para paridad con Vercel (`engines: 22.x`, `.nvmrc`). Se subió desde 20.20.2 el 2026-08-11, antes de que Vercel retire Node 20 el **2026-10-01**. Fue un cambio de una línea en tres ficheros: ninguna dependencia lo notó, ni `@types/node` 22 produjo un solo error de tipos.
 
-⚠️ **`nvm use` falla en esta máquina** porque `NVM_HOME` contiene un espacio y el `elevate.cmd` de nvm-windows no entrecomilla la ruta. El enlace `C:\nvm4w\nodejs` se creó a mano con `mklink /D` elevado; para cambiar de versión hay que repetir esa operación, o reinstalar nvm en una ruta sin espacios. **Esto va a doler en la migración a Node 22** (ver `BACKLOG.md`). Una terminal nueva resuelve `node` sin problema.
+⚠️ **`nvm use` falló históricamente en esta máquina** porque `NVM_HOME` contenía un espacio y el `elevate.cmd` de nvm-windows no entrecomilla la ruta; había que rehacer el enlace `C:\nvm4w\nodejs` con `mklink /D` elevado. **El usuario reinstaló nvm, npm y node desde cero el 2026-08-11 y el problema desapareció**, pero la ruta con espacio sigue siendo la causa: si reaparece al cambiar de versión, es eso y no otra cosa.
 
 ---
 
