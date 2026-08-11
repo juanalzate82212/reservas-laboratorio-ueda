@@ -4,7 +4,11 @@
 
 `CLAUDE.md` guarda las *decisiones y sus porqués*; este archivo guarda las *tareas abiertas*. No duplicar el estado de un pendiente allá.
 
-**Estado general: las diez fases están completas**, y con ellas los nueve ajustes pedidos tras el despliegue. La aplicación está en producción y el usuario confirmó el recorrido de punta a punta. Lo que queda no es construcción: es **mantenimiento con fecha límite**, dos detalles menores y limpieza del repositorio.
+**Estado general: las diez fases del MVP están completas**, y con ellas los nueve ajustes pedidos tras el despliegue. La aplicación está en producción y el usuario confirmó el recorrido de punta a punta.
+
+> 🚧 **Hay un proyecto grande aprobado y sin empezar: [FUSION-DATACUEVA.md](FUSION-DATACUEVA.md)** — absorber la app de préstamo de equipos dentro de este panel de admin. Tiene su propio plan por fases y **no se gestiona desde este backlog**. Su fase 0 se solapa con dos pendientes de aquí (Node 22 y una base de datos de desarrollo), así que conviene mirarlo antes de atacarlos por separado.
+
+Lo que queda debajo no es construcción del MVP: es **mantenimiento con fecha límite**, dos detalles menores y limpieza del repositorio.
 
 ---
 
@@ -38,7 +42,7 @@ La causa es la configuración de `useForm`: con `mode: "onTouched"` y errores pu
 
 | Asunto | Plazo | Detalle |
 |--------|-------|---------|
-| **Node.js 20.x quedará obsoleto en Vercel** | **2026-10-01** | Los despliegues fallarán a partir de esa fecha. Subir `engines.node` en `package.json` y `.nvmrc` a 22.x o 24.x, y volver a verificar la paridad con el entorno local (ver "Entorno local" en `CLAUDE.md`: `nvm use` no funciona en esta máquina). |
+| **Node.js 20.x quedará obsoleto en Vercel** | **2026-10-01** | Los despliegues fallarán a partir de esa fecha. Subir `engines.node` en `package.json` y `.nvmrc` a **22.x** (no 24.x: no hay margen para experimentar con Prisma 5.22), y volver a verificar la paridad con el entorno local (ver "Entorno local" en `CLAUDE.md`: `nvm use` no funciona en esta máquina). **Es también el punto 2 de la fase 0 de [FUSION-DATACUEVA.md](FUSION-DATACUEVA.md)** — hacerlo una sola vez. |
 | **Festivos de 2027** | Antes de enero 2027 | `HOLIDAYS_CO` solo cubre 2026. Al añadir el año nuevo **no basta con calcular Pascua y aplicar la Ley Emiliani**: hay que comprobar si se creó algún festivo por ley (ya pasó en 2026 con la Ley 2578). `holidays.ts` emite `console.warn` si falta el año en curso. |
 
 ---
