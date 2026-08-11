@@ -41,11 +41,13 @@ Regla mnemotécnica: **laboratorio = el lugar; Unidad = quién construyó la her
 | 9 — Despliegue en Vercel | ✅ Completa (en producción, verificada) |
 | 10 — QR, pulido y cierre | 🟡 Parcial |
 
-De la Fase 10 están hechos el QR imprimible (`/admin/qr`), el `title`/`description` del layout raíz, el `README.md` y el `npm run build` limpio. El punto 8 (dataset de demostración) quedó **anulado a propósito** — ver "Datos" más abajo.
+De la Fase 10 están hechos el QR imprimible (`/admin/qr`), el `title`/`description` del layout raíz, las pantallas de estado (`error`, `not-found`, `loading` y `global-error`), el `README.md` y el `npm run build` limpio. El punto 8 (dataset de demostración) quedó **anulado a propósito** — ver "Datos" más abajo.
 
 > **[BACKLOG.md](BACKLOG.md) es la única lista de lo que falta**, tanto de la Fase 10 como de los ajustes pedidos después del despliegue. **No repetir ese estado aquí**: eran dos listas con numeraciones distintas y se desincronizan. Este archivo guarda las *decisiones y sus porqués*; el backlog guarda las *tareas abiertas*.
 
 **Verificación de que la app funciona en producción** (hecha con peticiones reales, no solo comprobando que cargue): landing, `/reservar` y `/admin/login` responden `200`; `/admin` y `/admin/qr` sin sesión redirigen (`307`); `POST /api/admin/login` devuelve una cookie de sesión que efectivamente autoriza `GET /admin`, `GET /admin/qr` y `GET /api/admin/reservations`.
+
+Además, **el usuario hizo un recorrido completo de punta a punta el 2026-08-10** y reportó que la aplicación funciona correctamente en términos generales. Lo que sigue sin constar es que ese recorrido se hiciera desde un teléfono escaneando el QR ya impreso, que es la formulación literal del criterio de aceptación de las Fases 9 y 10 — anotado en `BACKLOG.md`.
 
 ---
 
@@ -61,7 +63,9 @@ Consecuencias que hay que tener presentes siempre:
 
 **Antes de ejecutar cualquier cosa que escriba en la base, mirar primero qué hay.** Ya hubo un incidente cercano: se detectaron filas de `EmailLog` desconocidas que resultaron ser pruebas que el usuario estaba haciendo en paralelo contra la app en vivo.
 
-**Estado de los datos hoy:** el usuario borró los datos de demo a propósito para dejar la app lista para uso real. Queda 1 reserva `PENDING` suya, de prueba. Por eso el punto 8 de la Fase 10 ("dataset de demostración poblado") quedó anulado: contradice lo que el usuario quiere. **No resembrar sin pedirlo.**
+**Estado de los datos:** el usuario pidió vaciar `Reservation` y `EmailLog` a propósito (2026-08-10) para dejar la app lista para uso real; `Room` se conservó. Por eso el punto 8 de la Fase 10 ("dataset de demostración poblado") quedó anulado: contradice lo que el usuario quiere. **No resembrar sin pedirlo.**
+
+⚠️ **No dar por buena ninguna cifra de filas que leas aquí: la app está en uso.** Desde entonces el usuario ha hecho pruebas de punta a punta y cualquiera puede reservar desde el QR. Si necesitas saber qué hay, míralo (`npx prisma studio`) en vez de deducirlo de este archivo.
 
 ---
 

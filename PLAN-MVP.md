@@ -18,9 +18,14 @@ Desviaciones principales respecto a lo que se lee aquí:
 |------|------------------|-------------|
 | Salas | Dos salas (Principal y de Reuniones) | **Solo Sala Principal.** Decisión de producto tras la Fase 8. El modelo `Room` se mantuvo genérico. |
 | Rechazar / cancelar | `adminNote` obligatorio | **Solo confirmación**, sin capturar motivo. Pedido antes de construir la Fase 6. |
-| Formulario de reserva | Nombre, cargo, documento, correo, motivo libre, asistentes opcional | Se añadieron **programa académico**, **tipo de actividad** y **aceptación de responsabilidad**; `attendees` pasó a obligatorio; el campo libre `purpose` se eliminó. |
+| Formulario de reserva | Nombre, cargo, documento, correo, motivo libre, asistentes opcional | Se añadieron **programa académico**, **tipo de actividad** y **aceptación de responsabilidad**; `attendees` pasó a obligatorio y se valida contra el aforo; el campo libre `purpose` se eliminó; el cargo pasó de texto libre a lista cerrada. |
+| Estados de la reserva | Cuatro: pendiente, confirmada, rechazada, cancelada | Hay un **quinto, `EXPIRED`** (vencida), para la solicitud que nadie revisó y cuya franja ya pasó. Es el único que no decide una persona. |
+| Cancelación | Solo el administrador | El **solicitante también puede cancelar** la suya, con código + documento, hasta que empieza. |
+| Correos | Tres plantillas, todas al solicitante | Son **seis**: se añadieron dos avisos internos al laboratorio (`MAIL_TO_ADMIN`) y el acuse de autocancelación. El de confirmación lleva botón de Google Calendar. |
 | Versiones del §2 | Ver tabla | Cinco paquetes cambiaron por advisories de seguridad — ver la tabla de desviaciones en `CLAUDE.md`. |
 | Logo (riesgo R3) | SVG oficial pendiente | Resuelto: se entregó en **PNG**, sin canal alfa. |
+
+> Las cuatro filas del medio salen de una tanda de nueve ajustes que el usuario pidió **después** de desplegar, ya con la aplicación en uso. Están todos hechos; el detalle de cada decisión está en `CLAUDE.md`.
 
 ---
 
@@ -254,6 +259,7 @@ enum ReservationStatus {
   CONFIRMED
   REJECTED
   CANCELLED
+  EXPIRED    // ← añadido tras el despliegue. Ver la nota bajo la tabla de estados.
 }
 
 enum TimeBlockKind {
@@ -361,7 +367,10 @@ model EmailLog {
 | `PENDING` | Solicitud enviada, esperando revisión | **Sí** (bloqueo blando) | No |
 | `CONFIRMED` | Aprobada por el admin | Sí | ✅ Confirmación |
 | `REJECTED` | Rechazada por el admin | No | ✅ Rechazo con motivo |
-| `CANCELLED` | Estaba confirmada y el admin la canceló | No | ✅ Notificación de cancelación |
+| `CANCELLED` | La canceló el admin, o el propio solicitante | No | ✅ Notificación de cancelación |
+| `EXPIRED` | Nadie la revisó y su franja ya terminó | No | No |
+
+> **Añadido tras el despliegue.** `EXPIRED` es el único estado que **no decide una persona**, así que no hay ninguna acción de usuario donde colgarlo: se aplica **al leer**, con un `updateMany` idempotente en `lib/expiration.ts` que corre antes de las tres lecturas que importan. Se descartó una tarea programada porque Vercel Hobby solo permite una ejecución diaria, y una solicitud vencida por la mañana seguiría figurando "En revisión" hasta la madrugada. `decidedAt` se deja en `null` a propósito: eso es justo lo que significa "se venció sin que nadie la mirara". Es terminal, y de paso arregla un fallo real — el tope de `maxPendingPerEmail` cuenta solo `PENDING`, así que antes tres solicitudes vencidas bloqueaban ese correo para siempre.
 
 **Tipos de `TimeBlock`:**
 
@@ -459,6 +468,7 @@ export const HOLIDAYS_CO: Record<number, string[]> = {
 10. No solapa con ninguna reserva `PENDING` o `CONFIRMED` de la misma sala.
 11. No solapa con ningún `TimeBlock` de tipo `BLOCKED` (de esa sala o global).
 12. Máximo `maxPendingPerEmail` solicitudes `PENDING` simultáneas por correo.
+13. **`attendees` no supera el aforo de la sala.** Añadida tras el despliegue: al probar la app se aceptaban 100 y hasta 183 asistentes en una sala de 25. El tope **no** vive en `BOOKING_CONFIG` sino en `Room.capacity`, porque es un dato de la sala y no una regla global; `buildCreateReservationSchema({ maxAttendees })` inyecta ese valor y el handler lo revalida contra la fila real (`route.ts`, tras leer la sala).
 
 > **Revisión post-Fase 4 (pedida por el usuario antes de la Fase 6):** el formulario del wizard estaba incompleto frente a lo que administración necesita para revisar una solicitud. Se agregaron cuatro campos, los cuatro obligatorios (cubiertos por la regla 1): `academicProgram` (lista cerrada, `AcademicProgram`), `activityType` (lista cerrada + `OTRO` con detalle abierto en `activityTypeOther`, obligatorio solo si se elige `OTRO`), y `responsibilityAccepted` (checkbox de aceptación del uso responsable del espacio, debe ser `true`). De paso, `attendees` pasó de opcional a obligatorio y `purpose` (motivo libre) se eliminó del modelo — lo reemplaza `activityType`, que es más útil para el admin al decidir. Las opciones de ambas listas viven en `src/config/reservationOptions.ts`, fuente única para el `<select>`, el Zod compartido y el paso de revisión.
 
@@ -490,6 +500,7 @@ Formato de error uniforme:
 | `GET` | `/api/availability?roomId=&from=&to=` | Para el rango: reservas ocupadas (**anonimizadas**: solo `startsAt`, `endsAt`, `status`; nunca nombre ni correo), `timeBlocks`, y `closedDays` (fines de semana y festivos, con su motivo, para que el calendario los etiquete). `from`/`to` en ISO 8601. |
 | `POST` | `/api/reservations` | Crea la solicitud. Devuelve `{ code }`. |
 | `GET` | `/api/reservations/[code]` | Consulta pública del estado por código (no expone documento ni correo completo). |
+| `POST` | `/api/reservations/[code]/cancel` | **Añadida tras el despliegue.** El propio solicitante cancela, con `{ requesterDocId }` como llave junto al código. Sin sesión: son dos datos que solo junta quien reservó. |
 
 ### Admin (requieren cookie `admin_session`)
 
@@ -505,11 +516,16 @@ Formato de error uniforme:
 
 **Transiciones permitidas** (validar en el servidor, `409` si no):
 ```
-PENDING   → CONFIRMED | REJECTED
+PENDING   → CONFIRMED | REJECTED | CANCELLED | EXPIRED
 CONFIRMED → CANCELLED
 REJECTED  → (final)
 CANCELLED → (final)
+EXPIRED   → (final)
 ```
+
+> **Actualizado tras el despliegue.** Dos añadidos sobre el original: `PENDING → CANCELLED` (el solicitante puede retirar su propia solicitud antes de que la revisen) y `PENDING → EXPIRED`, que no lo dispara nadie. Que `EXPIRED` sea terminal no necesitó código extra: `ALLOWED_FROM` en el `PATCH` solo admite origen `PENDING` o `CONFIRMED`, así que las tres acciones del admin sobre una vencida ya devuelven `409 INVALID_TRANSITION`.
+>
+> La cancelación del solicitante usa **compare-and-set** —el estado va en el `WHERE` del `updateMany`, no solo en una comprobación previa— para que no pise una decisión que el admin acabe de tomar.
 
 > **Revisión pre-Fase 6:** el plan original exigía `adminNote` (motivo) al rechazar o cancelar. El usuario pidió explícitamente lo contrario antes de construir la Fase 6: esas acciones solo piden confirmación en la UI ("¿Estás seguro de...?"), sin capturar un motivo. `adminNote` sigue existiendo en el modelo (nullable) — la Fase 6 no lo escribe nunca, pero queda disponible por si una fase futura decide retomar la captura de motivo. Consecuencia para la Fase 7: el correo de rechazo no podrá incluir una razón específica, porque no se recoge.
 
@@ -517,13 +533,27 @@ CANCELLED → (final)
 
 ## 7. Correos
 
-Tres plantillas en `lib/mail/templates.ts`, HTML con **estilos inline** (los clientes de correo no soportan Tailwind ni hojas externas). Diseño: cabecera azul `#007B99` con el logo en blanco, cuerpo blanco, datos en tabla, pie con la frase institucional.
+~~Tres~~ **Seis** plantillas en `lib/mail/templates.ts`, HTML con **estilos inline** (los clientes de correo no soportan Tailwind ni hojas externas). Diseño: cabecera azul `#007B99` con el logo en blanco, cuerpo blanco, datos en tabla, pie con la frase institucional.
+
+**Al solicitante:**
 
 | Disparador | Asunto | Contenido clave |
 |------------|--------|-----------------|
-| `CONFIRM` | `Reserva confirmada — {Sala}, {fecha} {hora}` | Sala, fecha, hora inicio–fin, código, nombre. **Si la franja solapa un `TimeBlock` de tipo `WARNING`, incluir el aviso destacado** (ej. "En este horario no hay préstamo de equipos de cómputo"). |
+| `CONFIRM` | `Reserva confirmada — {Sala}, {fecha} {hora}` | Sala, fecha, hora inicio–fin, código, nombre. **Si la franja solapa un `TimeBlock` de tipo `WARNING`, incluir el aviso destacado** (ej. "En este horario no hay préstamo de equipos de cómputo"). **Añadido tras el despliegue:** botón "Añadir a Google Calendar". |
 | `REJECT` | `Solicitud de reserva no aprobada — {Sala}, {fecha}` | Datos de la solicitud + `adminNote` como motivo (si existe) + invitación a solicitar otro horario. |
 | `CANCEL` | `Reserva cancelada — {Sala}, {fecha} {hora}` | Datos + `adminNote` (si existe) + disculpa breve, en la voz de marca (§9 del documento de identidad: sin dramatismo, explicar y ofrecer salida). |
+| `selfCancel` | `Cancelaste tu reserva — {Sala}, {fecha} {hora}` | **Añadida tras el despliegue.** Acuse de la cancelación que hizo el propio solicitante. Es plantilla aparte y no reutiliza `CANCEL` a propósito: la redacción de esa ("lamentamos informarte") es la de una cancelación que se sufre, no una que se decide. |
+
+**Al laboratorio** (`MAIL_TO_ADMIN`, añadidos tras el despliegue):
+
+| Disparador | Asunto | Para qué |
+|------------|--------|----------|
+| Solicitud nueva | `Nueva solicitud por revisar — {fecha} {hora}` | Que nadie tenga que entrar al panel a mirar si llegó algo. |
+| Cancela el solicitante | `Reserva cancelada por el solicitante — {fecha} {hora}` | La franja se liberó sin que el admin hiciera nada; conviene enterarse. |
+
+> **El acuse de autocancelación es parte de la seguridad, no cortesía.** El número de documento no es un secreto, así que si alguien cancelara una reserva ajena, el dueño se entera en el momento.
+>
+> ⚠️ **El enlace de Google Calendar usa el instante UTC real** (`fechaParaGoogleCalendar()`), **no** `toBogotaWallClockIso()`. Ese truco es exclusivo del límite con FullCalendar; aquí metería 5 h de desfase en el calendario de quien pulse el botón.
 
 > **Nota (Fase 7, consecuencia de la revisión pre-Fase 6):** como `adminNote` ya no se captura en ningún punto del flujo (§6), `REJECT`/`CANCEL` casi nunca tendrán motivo que mostrar — la plantilla lo incluye solo si el campo tiene valor (relevante para las tres filas de la semilla que lo traían de antes de ese cambio). El correo explica que la solicitud no fue aprobada / fue cancelada e invita a solicitar otro horario, sin citar una razón específica.
 
@@ -672,7 +702,7 @@ Wizard de 3 pasos + confirmación, en página `/reservar`.
 ### Fase 7 — Correos automáticos
 1. Obtener las credenciales SMTP siguiendo el §10.
 2. `lib/mail/mailer.ts` con el fallback a consola + `EmailLog`.
-3. `lib/mail/templates.ts` con las tres plantillas del §7.
+3. `lib/mail/templates.ts` con las tres plantillas del §7 (las otras tres llegaron después del despliegue).
 4. Conectar el envío a `PATCH /api/admin/reservations/[id]`, **después** de la escritura en BD.
 5. `app/admin/correos/page.tsx`: listado de `EmailLog` con vista previa y botón "Reintentar".
 
@@ -726,7 +756,7 @@ Wizard de 3 pasos + confirmación, en página `/reservar`.
 
 **Aceptación:** recorrido completo end-to-end desde un teléfono real escaneando el QR impreso, terminando con el correo de confirmación recibido.
 
-> **🟡 PARCIAL.** Hechos: **1** (la ruta real es `app/admin/(protected)/qr/page.tsx`, dentro del route group), **7** y **9**. Parciales: **2** (falta la imagen OG) y **3** (el calendario y `EmptyState` sí, el resto no se repasó). Pendientes: **4**, **5**, **6**.
+> **🟡 PARCIAL.** Hechos: **1** (la ruta real es `app/admin/(protected)/qr/page.tsx`, dentro del route group), **4** (las tres, más un `global-error.tsx` que el plan no pedía), **7** y **9**. Parciales: **2** (falta la imagen OG) y **3** (el calendario, `EmptyState` y las pantallas del punto 4 sí; el resto no se repasó). Pendientes: **5** y **6**.
 >
 > El punto **8 queda anulado a propósito**: contradice la decisión del usuario de limpiar los datos de prueba para uso real.
 >
@@ -848,7 +878,15 @@ SMTP_SECURE="false"
 SMTP_USER="lab.analitica@amigo.edu.co"
 SMTP_PASSWORD=""                             # contraseña de aplicación de 16 caracteres, sin espacios
 MAIL_FROM="Laboratorio de Analítica de Datos e Inteligencia Artificial <lab.analitica@amigo.edu.co>"
+
+# Buzón interno de los AVISOS al laboratorio (§7). Añadida tras el despliegue.
+# Hoy coincide con SMTP_USER —el laboratorio se avisa a sí mismo— pero es
+# variable aparte a propósito: el día que los avisos deban ir a otra persona se
+# cambia esto y no el remitente de todos los correos. Vacía = no se envían.
+MAIL_TO_ADMIN="lab.analitica@amigo.edu.co"
 ```
+
+Son **doce** variables. El [`.env.example`](.env.example) del repositorio es la versión viva de este bloque y va bastante más comentado; si los dos difieren, manda el `.env.example`.
 
 ---
 
@@ -858,10 +896,10 @@ MAIL_FROM="Laboratorio de Analítica de Datos e Inteligencia Artificial <lab.ana
 |------|----------|
 | Horario de atención | **8:00–12:00 y 13:00–17:00**, de lunes a viernes. Receso de 12:00 a 13:00 no reservable. Una reserva no puede cruzarlo. |
 | Días cerrados | **Sábados, domingos y festivos colombianos.** Los festivos viven en `config/holidays.ts` (§5.1); los cierres excepcionales los crea el admin como `TimeBlock`. |
-| Salas | **Sala Principal**: aforo 20, con equipos de cómputo. ~~**Sala de Reuniones**: aforo 7, sin equipos.~~ **Retirada tras la Fase 8** (decisión de producto: solo se reserva Sala Principal). El modelo `Room` se mantuvo genérico por si se reactiva una segunda sala; el wizard y la landing ya no muestran selector de sala. Ver `CLAUDE.md`. |
+| Salas | **Sala Principal**: aforo ~~20~~ **25** (valor real, corregido tras el despliegue), con equipos de cómputo. ~~**Sala de Reuniones**: aforo 7, sin equipos.~~ **Retirada tras la Fase 8** (decisión de producto: solo se reserva Sala Principal). El modelo `Room` se mantuvo genérico por si se reactiva una segunda sala; el wizard y la landing ya no muestran selector de sala. Ver `CLAUDE.md`. |
 | Duración de reservas | De **30 minutos a 4 horas**, en bloques de 30 min. |
 | Correo institucional | **Google Workspace** → SMTP de Gmail con contraseña de aplicación (§10). |
-| Acuse de recibo | **No se envía.** Solo hay correo al confirmar, rechazar o cancelar. La pantalla de éxito con el código cumple esa función. |
+| Acuse de recibo | **No se envía al solicitante.** Solo hay correo al confirmar, rechazar o cancelar; la pantalla de éxito con el código cumple esa función. **Matiz posterior:** al *laboratorio* sí se le avisa de cada solicitud nueva (`MAIL_TO_ADMIN`, §7) — es otra cosa. |
 | Persistencia | **Supabase PostgreSQL** (capa gratuita) vía Prisma. |
 | Despliegue | **Vercel** (plan Hobby). |
 | Aprobación | **Siempre manual.** No hay auto-confirmación en el MVP. |
@@ -895,8 +933,11 @@ npx prisma migrate dev       # crear y aplicar migración en desarrollo
 npx prisma migrate deploy    # aplicar migraciones en producción
 npx prisma generate          # regenerar el cliente tras cambiar el schema
 npx prisma studio            # inspector de base de datos
-npx prisma db seed           # cargar datos de ejemplo
+npx prisma db seed           # ⚠️ DESTRUCTIVO — leer la advertencia de abajo
+npm run check:datetime       # casos límite de fecha/hora (no está en el CI)
 ```
+
+> ⚠️ **`npx prisma db seed` borra `Reservation` y `TimeBlock` enteros** antes de recrear los datos de ejemplo, y **no hay una base de datos de desarrollo separada**: el `.env` local apunta al mismo proyecto de Supabase que producción. El guard de `seed.ts` comprueba `NODE_ENV`, que en una terminal local nunca vale `"production"`, así que **no protege**. Mirar con `npx prisma studio` antes de ejecutar cualquier cosa que escriba.
 
 ---
 
