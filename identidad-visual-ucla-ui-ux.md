@@ -299,7 +299,7 @@ Extra para UI (derivado):
 - **Nombre:** Universidad Católica Luis Amigó.
 - **Sede principal:** Transversal 51 A No. 67 B 90 — Medellín, Colombia.
 - **Sedes:** Apartadó, Bogotá, Manizales y Montería (Cali aparece también en piezas de referencia — verificar con la Universidad).
-- **Contacto:** ucatolicaluisamigo@amigo.edu.co · www.ucatolicaluisamigo.edu.co · Tel. 57 (4) 4487666.
+- **Contacto:** ucatolicaluisamigo@amigo.edu.co · www.funlam.edu.co · Tel. 57 (4) 4487666.
 - **Frase institucional:** "Formación humana y profesional al servicio del desarrollo y la transformación social".
 - Fuente: Manual de Identidad Visual, Oficina de Comunicaciones y Relaciones Públicas. © 2022.
 

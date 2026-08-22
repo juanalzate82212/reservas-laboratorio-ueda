@@ -28,10 +28,10 @@ export function Footer({ className }: { className?: string }) {
             lab.analitica@amigo.edu.co
           </a>
           <a
-            href="https://www.ucatolicaluisamigo.edu.co"
+            href="https://www.funlam.edu.co"
             className="rounded text-primary-texto hover:underline"
           >
-            ucatolicaluisamigo.edu.co
+            funlam.edu.co
           </a>
         </div>
       </div>

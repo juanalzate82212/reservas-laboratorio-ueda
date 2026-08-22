@@ -6,7 +6,7 @@
 
 **Estado general: las diez fases del MVP están completas**, y con ellas los nueve ajustes pedidos tras el despliegue. La aplicación está en producción y el usuario confirmó el recorrido de punta a punta.
 
-Lo que queda debajo son **cinco arreglos pedidos por el usuario**, dos ideas nuevas para el panel, un vencimiento (los festivos de 2027) y dos detalles menores.
+Lo que queda debajo son **tres arreglos pedidos por el usuario**, dos ideas nuevas para el panel, un vencimiento (los festivos de 2027) y dos detalles menores.
 
 ---
 
@@ -26,13 +26,9 @@ Queda un solo resto, y es parcial:
 
 Cola de trabajo activa. Se resuelven **de a poco**, cada uno en su rama y su PR.
 
-### 1. Quitar "Estudiante" de la lista de cargos
+### 1. ~~Quitar "Estudiante" de la lista de cargos~~ ✅ Hecho el 2026-08-22
 
-`REQUESTER_ROLES` en [src/config/reservationOptions.ts](src/config/reservationOptions.ts). Es un cambio de una línea **en apariencia**, pero hay que mirar dos cosas antes:
-
-- **No rompe las reservas existentes.** `requesterRole` es `String`, no un enum de Prisma, y `labelForRequesterRole()` devuelve el valor crudo si no lo reconoce. Una reserva antigua con `ESTUDIANTE` seguirá listándose; solo dejará de poder elegirse en el formulario. Esto es a propósito y está explicado en `CLAUDE.md`.
-- ⚠️ **Comprobar antes cuántas filas de producción lo usan**, para saber qué se va a ver en el panel. Mirarlo, no deducirlo.
-- El `z.enum` de `lib/validation/reservation.ts` se deriva de esa lista, así que el servidor empezará a rechazar `ESTUDIANTE` en solicitudes nuevas. Correcto, pero es el efecto real del cambio.
+Fuera de `REQUESTER_ROLES`. El usuario confirmó que **ninguna reserva de producción lo usaba**, así que no quedan filas huérfanas. Las dos reservas de ejemplo de `prisma/seed.ts` que lo usaban pasaron a `INVESTIGADOR` y `DOCENTE`, para que la semilla no genere valores que el formulario ya no ofrece.
 
 ### 2. La tabla de solicitudes está desalineada
 
@@ -59,11 +55,11 @@ Dos caminos, y conviene decidir cuál antes de tocar:
 
 Al ampliarlo, **volver a comprobar el nivel de corrección de errores**: se bajó de `H` a `M` cuando se quitó el logo incrustado, y a otro tamaño conviene reconfirmar que se lee bien impreso. Probar con una impresión real, no solo con la previsualización.
 
-### 5. El dominio del pie debe ser `funlam.edu.co`
+### 5. ~~El dominio del pie debe ser `funlam.edu.co`~~ ✅ Hecho el 2026-08-22
 
-[src/components/brand/Footer.tsx](src/components/brand/Footer.tsx) enlaza a `https://www.ucatolicaluisamigo.edu.co`.
+Cambiado en `Footer.tsx` (enlace y texto) y en `identidad-visual-ucla-ui-ux.md`, por decisión del usuario, para que los dos no se contradigan.
 
-⚠️ **Ojo:** `identidad-visual-ucla-ui-ux.md` —documento de cumplimiento obligatorio— también dice `www.ucatolicaluisamigo.edu.co` en su bloque de contacto. Cambiar solo el pie deja los dos en contradicción. **Actualizar ambos**, o confirmar con el usuario si el manual se queda como está por ser un documento de marca cerrado. No tocar `@amigo.edu.co`: ese es el dominio de correo y es otra cosa.
+⚠️ **El correo de contacto del manual sigue siendo `ucatolicaluisamigo@amigo.edu.co`**, sin tocar: es una dirección, no el enlace al sitio, y cambiarla sería inventar un dato. Si también debe cambiar, hay que preguntarlo.
 
 ---
 
