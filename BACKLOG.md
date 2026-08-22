@@ -4,7 +4,9 @@
 
 `CLAUDE.md` guarda las *decisiones y sus porqués*; este archivo guarda las *tareas abiertas*. No duplicar el estado de un pendiente allá.
 
-**Estado general: las diez fases están completas**, y con ellas los nueve ajustes pedidos tras el despliegue. La aplicación está en producción y el usuario confirmó el recorrido de punta a punta. Lo que queda no es construcción: es **mantenimiento con fecha límite**, dos detalles menores y limpieza del repositorio.
+**Estado general: las diez fases del MVP están completas**, y con ellas los nueve ajustes pedidos tras el despliegue. La aplicación está en producción y el usuario confirmó el recorrido de punta a punta.
+
+Lo que queda debajo no es construcción del MVP: es **un vencimiento** (los festivos de 2027) y **dos detalles menores**.
 
 ---
 
@@ -38,7 +40,7 @@ La causa es la configuración de `useForm`: con `mode: "onTouched"` y errores pu
 
 | Asunto | Plazo | Detalle |
 |--------|-------|---------|
-| **Node.js 20.x quedará obsoleto en Vercel** | **2026-10-01** | Los despliegues fallarán a partir de esa fecha. Subir `engines.node` en `package.json` y `.nvmrc` a 22.x o 24.x, y volver a verificar la paridad con el entorno local (ver "Entorno local" en `CLAUDE.md`: `nvm use` no funciona en esta máquina). |
+| ~~**Node.js 20.x quedará obsoleto en Vercel**~~ | ~~2026-10-01~~ | ✅ **Hecho el 2026-08-11**, con margen de mes y medio. `engines.node`, `.nvmrc` y `@types/node` a 22.x; el CI ya leía `.nvmrc`, así que no hubo que tocar `ci.yml`. |
 | **Festivos de 2027** | Antes de enero 2027 | `HOLIDAYS_CO` solo cubre 2026. Al añadir el año nuevo **no basta con calcular Pascua y aplicar la Ley Emiliani**: hay que comprobar si se creó algún festivo por ley (ya pasó en 2026 con la Ley 2578). `holidays.ts` emite `console.warn` si falta el año en curso. |
 
 ---
@@ -53,7 +55,7 @@ La causa es la configuración de `useForm`: con `mode: "onTouched"` y errores pu
 
 ## Limpieza del repositorio
 
-- **Los ficheros de las skills están duplicados en el historial.** En disco, `.claude/skills/frontend-design` y `.claude/skills/vercel-react-best-practices` son *junctions* de Windows que apuntan a `.agents/skills/`, pero git no los sigue como enlaces: **guarda las dos copias**, 115 ficheros por duplicado. Quien clone en Linux o macOS obtiene dos copias reales, que además pueden divergir. Elegir un directorio canónico y dejar el otro fuera del repositorio.
+~~**Los ficheros de las skills están duplicados en el historial.**~~ ✅ **Hecho.** `.claude/skills/` y `.agents/skills/` están en `.gitignore`; lo versionado es `skills-lock.json`. El árbol de ficheros es caché reinstalable.
 
 *(Las 14 ramas remotas ya fusionadas se borraron el 2026-08-11; solo quedan `main` y `develop`.)*
 
@@ -76,5 +78,11 @@ No implementar sin pedirlo explícitamente.
 
 ## Ideas registradas, sin compromiso
 
+- ⛔ **Fusión con DataCueva — explorada y CANCELADA el 2026-08-22.** La idea era absorber la app de préstamo de equipos ([DataCueva](https://github.com/JuanSNuno/DataCueva)) dentro de este panel, con una sola base y usuarios con roles en lugar de la contraseña compartida. Hubo plan aprobado por fases (`FUSION-DATACUEVA.md`) y se completó su fase 0; el usuario canceló antes de traer una sola línea de DataCueva. **No reabrir sin que lo pida.**
+
+  **Nada de aquel trabajo se revirtió, y no hace falta**: la fase 0 eran tres tareas que este repositorio necesitaba igual —la base de datos de desarrollo, Node 22 y Vitest— y ninguna tocó código de la aplicación. El plan sí se borró, porque señalaba un trabajo que no va a ocurrir.
+
+  El análisis completo (inventario real de DataCueva, por qué no se subía a Next 16, el porte de Drizzle a Prisma) vive en el historial: `git log --all --oneline -- FUSION-DATACUEVA.md`. Si algún día se retoma, es material aprovechable — pero estaba **equivocado en tres puntos** que solo se descubrieron al leer el repositorio de verdad, así que hay que reverificarlo antes de fiarse.
+
 - **Reactivar una segunda sala.** Se retiró "Sala de Reuniones" por decisión de producto, pero el modelo `Room` se dejó genérico a propósito. Volver a tener dos salas requeriría reponer el selector en el wizard y decidir cómo se muestran dos calendarios en la landing; no requiere migración de base de datos.
-- **Dataset de demostración.** El punto 8 de la Fase 10 pedía dejar la semana en curso poblada con reservas de ejemplo. Quedó anulado: el usuario limpió los datos de prueba a propósito para dejar la aplicación lista para uso real. Si alguna vez hace falta para una demostración, `prisma/seed.ts` sigue funcionando — pero **es destructivo y apunta a la base de producción** (ver `CLAUDE.md`).
+- **Dataset de demostración.** El punto 8 de la Fase 10 pedía dejar la semana en curso poblada con reservas de ejemplo. Quedó anulado: el usuario limpió los datos de prueba a propósito para dejar la aplicación lista para uso real. Si alguna vez hace falta para una demostración, `prisma/seed.ts` sigue funcionando y desde el 2026-08-11 apunta a la base de **desarrollo** — pero **sigue siendo destructivo**: borra `Reservation` y `TimeBlock` completos. Confirmar a qué proyecto apunta el `.env` antes de correrlo (ver `CLAUDE.md`).

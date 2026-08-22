@@ -62,7 +62,7 @@ Las reglas viven en `src/config/booking.ts` y `src/config/holidays.ts`, no repar
 
 ## Requisitos
 
-- **Node.js 20.x** (el repo fija `20.20.2` en `.nvmrc`, para paridad con Vercel)
+- **Node.js 22.x** (el repo fija `22.23.2` en `.nvmrc`, para paridad con Vercel)
 - Una cuenta de [Supabase](https://supabase.com) con un proyecto PostgreSQL
 - Una cuenta de correo de Google Workspace con contraseña de aplicación (opcional en desarrollo)
 
@@ -95,7 +95,7 @@ Levanta el servidor de desarrollo:
 npm run dev               # http://localhost:3000
 ```
 
-> ⚠️ **`npx prisma db seed` es destructivo.** Borra todas las reservas y franjas antes de recrear los datos de ejemplo. **Si tu `.env` apunta a la base de datos de producción, destruirás datos reales.** Ver "Una sola base de datos" más abajo.
+> ⚠️ **`npx prisma db seed` es destructivo.** Borra todas las reservas y franjas antes de recrear los datos de ejemplo. **Si tu `.env` apunta a la base de datos de producción, destruirás datos reales.** Ver "Dos bases de datos" más abajo.
 
 ---
 
@@ -146,6 +146,8 @@ npm run build            # build de producción
 npm run start            # servir el build
 npm run lint             # ESLint
 npm run typecheck        # tsc --noEmit
+npm test                 # Vitest, una pasada
+npm run test:watch       # Vitest en modo vigilancia
 npm run check:datetime   # verifica los casos límite de fecha/hora
 
 npx prisma migrate dev   # crear y aplicar una migración nueva
@@ -155,7 +157,9 @@ npx prisma studio        # inspector visual de la base de datos
 npx prisma db seed       # ⚠️ destructivo: recrea los datos de ejemplo
 ```
 
-No hay framework de tests. La verificación se hace por criterios de aceptación: Prisma Studio, `curl` contra los Route Handlers, y `scripts/check-datetime.ts` para la capa horaria.
+Hay **Vitest**, pero la suite es todavía muy pequeña: un solo fichero, `src/lib/availability.test.ts`. El CI la ejecuta en cada PR.
+
+La verificación principal sigue siendo por **criterios de aceptación**: Prisma Studio, `curl` contra los Route Handlers, y `scripts/check-datetime.ts` para la capa horaria.
 
 ---
 
@@ -218,7 +222,7 @@ Para desplegar desde cero:
 4. `NEXT_PUBLIC_APP_URL` debe ser el dominio real — es lo que codifica el QR.
 5. Aplicar las migraciones: `DATABASE_URL="$DIRECT_URL" npx prisma migrate deploy`.
 
-> **Node 20.x quedará obsoleto en Vercel el 2026-10-01.** Antes de esa fecha hay que subir `engines.node` en `package.json` y `.nvmrc` a 22.x o 24.x.
+> **Vercel no tiene desplegable de versión de Node**: respeta `engines.node` de `package.json`. El repo declara `22.x` desde el 2026-08-11, así que la retirada de Node 20 del 2026-10-01 ya no afecta.
 
 ### Flujo de ramas
 
@@ -230,13 +234,17 @@ El workflow [ci.yml](.github/workflows/ci.yml) corre lint, typecheck y build en 
 
 ---
 
-## ⚠️ Una sola base de datos
+## ⚠️ Dos bases de datos: comprueba a cuál apuntas
 
-**No existe una base de datos de desarrollo separada.** El entorno local y producción apuntan al mismo proyecto de Supabase.
+Hay **dos proyectos de Supabase**: uno de desarrollo y otro de producción. Tu `.env` local debe apuntar al de **desarrollo**; el de producción solo vive en las variables de entorno de Vercel.
 
-Esto significa que cualquier escritura desde tu máquina afecta a producción, y que **`npx prisma db seed` borraría datos reales**. El guard que trae `prisma/seed.ts` comprueba `NODE_ENV === "production"`, lo cual **no protege** en este caso: en una terminal local `NODE_ENV` no vale `"production"` aunque la conexión apunte a la base real.
+Antes de ejecutar cualquier cosa que escriba en la base, confirma el destino:
 
-Antes de ejecutar cualquier cosa que escriba en la base, inspecciona primero qué hay (`npx prisma studio`).
+```bash
+grep -oE 'postgres\.[a-z0-9]{20}' .env | head -1
+```
+
+Sigue importando porque **`npx prisma db seed` borra todas las reservas y franjas** antes de recrear los datos de ejemplo, y el guard de `prisma/seed.ts` **no protege**: comprueba `NODE_ENV === "production"`, que en una terminal local nunca vale eso aunque la cadena apunte a la base real. Contra la base de desarrollo la semilla es justo lo que quieres; contra producción, un desastre.
 
 ---
 

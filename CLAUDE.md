@@ -16,17 +16,30 @@ Sistema de reserva del **Laboratorio de Analítica de Datos e Inteligencia Artif
 
 ---
 
-## ⚠️ Datos: hay UNA sola base de datos
+## Datos: dos proyectos de Supabase
 
-**Local y producción apuntan al mismo proyecto de Supabase.** No existe una base de desarrollo separada: el `.env` local y las variables de Vercel llevan la misma cadena de conexión.
+**Hay una base de desarrollo separada desde el 2026-08-11.** Antes no la había —local y producción compartían proyecto— y ese era el mayor riesgo del repositorio.
 
-1. **Cualquier escritura desde la máquina local afecta producción.** No hay red de seguridad.
-2. **`npx prisma db seed` BORRA `Reservation` y `TimeBlock` completos** antes de recrear datos de demo. Ejecutarlo "para probar en local" destruiría datos reales.
-3. **El guard de `prisma/seed.ts` NO protege contra esto.** Comprueba `NODE_ENV === "production"`, que en una terminal local vale `"development"` o nada — aunque `DATABASE_URL` apunte a la base real. Solo evitaría correr la semilla *dentro* de un entorno de producción, no *contra* la base de producción.
+| Entorno | Proyecto | Quién lo usa |
+|---------|----------|--------------|
+| **Desarrollo** | `vkixgpvztkvbuwamhqdv` | el `.env` local y el MCP de `.mcp.json` |
+| **Producción** | `ceqqzubsxxuroawcnpvg` | solo las variables de entorno de Vercel |
 
-**Antes de ejecutar cualquier cosa que escriba en la base, mirar primero qué hay** (`npx prisma studio`). Ya hubo un incidente cercano: aparecieron filas de `EmailLog` desconocidas que resultaron ser pruebas que el usuario estaba haciendo en paralelo contra la app en vivo.
+⚠️ **Antes de ejecutar cualquier cosa que escriba en la base, confirmar a cuál apunta el `.env`.** La forma rápida, sin exponer la contraseña:
 
-El usuario pidió vaciar `Reservation` y `EmailLog` a propósito para dejar la app lista para uso real; `Room` se conservó. **No resembrar sin pedirlo.** Y ⚠️ **no dar por buena ninguna cifra de filas que leas aquí: la app está en uso**, así que míralo en vez de deducirlo.
+```bash
+grep -oE 'postgres\.[a-z0-9]{20}' .env | head -1
+```
+
+Sigue siendo importante porque **el guard de `prisma/seed.ts` no protege**: comprueba `NODE_ENV === "production"`, que en una terminal local vale `"development"` o nada, aunque `DATABASE_URL` apunte a producción. Y `npx prisma db seed` **borra `Reservation` y `TimeBlock` completos** antes de recrear los datos de demo. La separación de proyectos quita el riesgo por defecto, no la posibilidad de pegarse un tiro pegando la cadena equivocada.
+
+**En desarrollo la semilla es bienvenida**: deja 1 sala, 6 reservas y 2 bloqueos, que es justo lo que hace falta para trabajar. En producción **no resembrar sin pedirlo** — el usuario vació `Reservation` y `EmailLog` a propósito para dejar la app lista para uso real.
+
+⚠️ **No dar por buena ninguna cifra de filas de producción que leas aquí: la app está en uso.** Míralo en vez de deducirlo.
+
+**`_prisma_migrations` también tiene RLS**, desde el 2026-08-11. Antes no: se había excluido por considerarla "tabla interna, sin datos sensibles". Eso era cierto a medias — no guarda datos personales, pero con la llave `anon` **se podía escribir**, y corromper el historial de migraciones rompe los despliegues. Fue seguro activarlo porque Prisma se conecta como `postgres`, que ignora RLS.
+
+Con eso, **las cinco tablas de `public` tienen RLS y ninguna tiene políticas**, que es exactamente el estado buscado: el canal REST de Supabase queda cerrado del todo y la app no se entera. El linter de Supabase seguirá reportando `rls_enabled_no_policy` como **INFO** en las cinco; **no es un pendiente**, es la consecuencia esperada. Solo dejaría de serlo si algún día se usa `@supabase/supabase-js` desde el cliente.
 
 ---
 
@@ -46,6 +59,8 @@ npm run dev                  # desarrollo
 npm run build                # debe pasar limpio antes de cerrar cualquier trabajo
 npm run lint
 npm run typecheck
+npm test                     # Vitest, una pasada (sí está en CI)
+npm run test:watch           # Vitest en modo vigilancia
 npm run check:datetime       # casos límite de fecha/hora (no está en CI)
 
 npx prisma migrate dev       # crear y aplicar migración en desarrollo
@@ -55,7 +70,17 @@ npx prisma studio            # inspector de BD — el verificador principal
 npx prisma db seed           # ⚠️ DESTRUCTIVO: ver la sección de Datos
 ```
 
-**No hay framework de tests.** La verificación es por criterios de aceptación: `prisma studio`, `curl` contra los Route Handlers y `scripts/check-datetime.ts` para la capa horaria. Para bugs de interfaz y auditorías de accesibilidad, **Playwright y axe-core instalados temporalmente** (`npm install --no-save playwright @axe-core/playwright`) han sido efectivos; `package.json` y `package-lock.json` deben quedar intactos.
+**Hay Vitest desde el 2026-08-11, pero cubre muy poco todavía.** Hoy la suite es **un solo fichero**, `src/lib/availability.test.ts`: 19 casos sobre el solapamiento de franjas y el estado visual de cada hueco. Entró como preparación de un proyecto que luego se canceló (ver `BACKLOG.md`), y se conserva porque el arnés es útil por su cuenta — sobre todo para los arreglos que quedan pendientes.
+
+**Eso no sustituye la verificación por criterios de aceptación**, que sigue siendo el método principal: `prisma studio`, `curl` contra los Route Handlers y `scripts/check-datetime.ts` para la capa horaria. Un test verde no dice nada sobre las nueve décimas partes de esta aplicación.
+
+⚠️ **No poner `passWithNoTests` en `vitest.config.mts`.** Es el atajo evidente con la suite casi vacía y convierte "no encontré ningún test" en verde: un `include` o un `exclude` mal escritos apagarían la suite entera sin que nadie se entere. Por eso entró con un test de verdad y no con cero.
+
+⚠️ **`vitest.config.mts` es `.mts`, no `.ts`.** El proyecto es CommonJS (sin `"type": "module"`, del que dependen `next.config`, `postcss` y `tailwind`), así que Vite cargaba el config como CJS y avisaba de que `import.meta.url` es sintaxis ESM — algo que dejará de tolerar cuando `configLoader: "native"` sea el valor por defecto. Por eso el `include` de `tsconfig.json` lleva también el patrón de los `.mts`: sin él, `npm run typecheck` dejaría de mirar ese fichero.
+
+⚠️ **El alias `@/*` está declarado dos veces**: en `paths` de `tsconfig.json` y a mano en `resolve.alias` de `vitest.config.mts` (se evitó `vite-tsconfig-paths` por una dependencia menos). Añadir un alias nuevo obliga a tocar los dos, igual que pasa con los tokens de `globals.css` y `tailwind.config.ts`.
+
+Para bugs de interfaz y auditorías de accesibilidad, **Playwright y axe-core instalados temporalmente** (`npm install --no-save playwright @axe-core/playwright`) han sido efectivos; `package.json` y `package-lock.json` deben quedar intactos.
 
 **`npm run check:datetime` no está en el CI** porque no necesita base de datos, pero es la red de seguridad de la capa horaria: correrlo al cerrar cualquier trabajo que toque fechas.
 
@@ -346,9 +371,9 @@ Cuatro paquetes están por encima de lo que pedía el plan **por advisories de s
 
 ## Entorno local
 
-Node **20.20.2** vía nvm-windows, para paridad con Vercel (`engines: 20.x`, `.nvmrc`).
+Node **22.23.2** vía nvm-windows, para paridad con Vercel (`engines: 22.x`, `.nvmrc`). Se subió desde 20.20.2 el 2026-08-11, antes de que Vercel retire Node 20 el **2026-10-01**. Fue un cambio de una línea en tres ficheros: ninguna dependencia lo notó, ni `@types/node` 22 produjo un solo error de tipos.
 
-⚠️ **`nvm use` falla en esta máquina** porque `NVM_HOME` contiene un espacio y el `elevate.cmd` de nvm-windows no entrecomilla la ruta. El enlace `C:\nvm4w\nodejs` se creó a mano con `mklink /D` elevado; para cambiar de versión hay que repetir esa operación, o reinstalar nvm en una ruta sin espacios. **Esto va a doler en la migración a Node 22** (ver `BACKLOG.md`). Una terminal nueva resuelve `node` sin problema.
+⚠️ **`nvm use` falló históricamente en esta máquina** porque `NVM_HOME` contenía un espacio y el `elevate.cmd` de nvm-windows no entrecomilla la ruta; había que rehacer el enlace `C:\nvm4w\nodejs` con `mklink /D` elevado. **El usuario reinstaló nvm, npm y node desde cero el 2026-08-11 y el problema desapareció**, pero la ruta con espacio sigue siendo la causa: si reaparece al cambiar de versión, es eso y no otra cosa.
 
 ---
 
