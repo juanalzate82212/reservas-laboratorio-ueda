@@ -22,7 +22,6 @@
  */
 export const REQUESTER_ROLES = [
   { value: "DOCENTE", label: "Docente" },
-  { value: "ESTUDIANTE", label: "Estudiante" },
   { value: "ADMINISTRATIVO", label: "Administrativo" },
   { value: "COORDINADOR", label: "Coordinador" },
   { value: "INVESTIGADOR", label: "Investigador" },
