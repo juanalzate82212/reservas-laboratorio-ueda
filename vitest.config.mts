@@ -3,14 +3,11 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 /*
- * Vitest entra en el proyecto como fontanería del punto 3 de la fase 0 de
- * FUSION-DATACUEVA.md: hoy no hay ni un test, pero la fase 1 trae los 15
- * ficheros de prueba puros de DataCueva y necesitan encontrar la mesa puesta.
- *
  * Vitest NO sustituye la verificación por criterios de aceptación que describe
- * CLAUDE.md (prisma studio, curl contra los Route Handlers, check-datetime).
- * La cubre por debajo: el dominio de DataCueva sí es TypeScript puro y sí se
- * puede probar en memoria, que es justo lo que la app de reservas nunca tuvo.
+ * CLAUDE.md (prisma studio, curl contra los Route Handlers, check-datetime),
+ * que sigue siendo el método principal de este proyecto. La cubre por debajo,
+ * en la parte del código que es función pura de sus argumentos y se puede
+ * probar con objetos literales — hoy, solo `lib/availability.ts`.
  *
  * ⚠️ Es `.mts` y no `.ts`. El resto del proyecto es CommonJS (no hay
  * `"type": "module"` en package.json, y next.config / postcss / tailwind

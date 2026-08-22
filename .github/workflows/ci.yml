@@ -41,9 +41,9 @@ jobs:
       # dos, y si el dominio está roto no tiene sentido esperar a compilar la
       # aplicación entera para enterarse.
       #
-      # La suite arranca con un solo fichero (lib/availability.test.ts) y crece
-      # en la fase 1 de FUSION-DATACUEVA.md. No lleva variables de entorno
-      # porque nada de lo que prueba toca la base de datos.
+      # La suite es hoy un solo fichero (lib/availability.test.ts). No lleva
+      # variables de entorno porque nada de lo que prueba toca la base de datos;
+      # el día que un test la necesite, habrá que añadirlas aquí como en Build.
       - name: Tests
         run: npm test
 
