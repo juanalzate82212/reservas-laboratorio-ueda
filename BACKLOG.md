@@ -6,7 +6,7 @@
 
 **Estado general: las diez fases del MVP están completas**, y con ellas los nueve ajustes pedidos tras el despliegue. La aplicación está en producción y el usuario confirmó el recorrido de punta a punta.
 
-Lo que queda debajo son **tres arreglos pedidos por el usuario**, dos ideas nuevas para el panel, un vencimiento (los festivos de 2027) y dos detalles menores.
+Lo que queda debajo son **dos arreglos pedidos por el usuario**, dos ideas nuevas para el panel, un vencimiento (los festivos de 2027) y dos detalles menores.
 
 ---
 
@@ -30,13 +30,13 @@ Cola de trabajo activa. Se resuelven **de a poco**, cada uno en su rama y su PR.
 
 Fuera de `REQUESTER_ROLES`. El usuario confirmó que **ninguna reserva de producción lo usaba**, así que no quedan filas huérfanas. Las dos reservas de ejemplo de `prisma/seed.ts` que lo usaban pasaron a `INVESTIGADOR` y `DOCENTE`, para que la semilla no genere valores que el formulario ya no ofrece.
 
-### 2. La tabla de solicitudes está desalineada
+### 2. ~~La tabla de solicitudes está desalineada~~ ✅ Hecho el 2026-08-22
 
-En `/admin`, los datos no cuadran con sus cabeceras: el horario aparece bajo "Solicitante".
+La causa era que la cabecera tenía cinco `<th>` y cada fila un solo `<td colSpan={5}>` con un CSS grid dentro: dos algoritmos de reparto independientes. Ahora hay celdas reales, una por columna, y el navegador dimensiona cabecera y cuerpo a la vez.
 
-**Causa localizada** en [src/components/admin/ReservationTable.tsx](src/components/admin/ReservationTable.tsx): la cabecera es un `<thead>` con cinco `<th>`, pero **cada fila es un `<td colSpan={5}>` que dentro lleva un CSS grid** (`grid-cols-[1fr_1fr_1fr_auto_auto]`). Son **dos algoritmos de reparto distintos** —el de tablas dimensiona por contenido, el grid por fracciones— así que no pueden coincidir salvo por casualidad.
+Medido en navegador con la API interceptada: **0 px de desfase** en las 15 intersecciones (3 filas × 5 columnas), tanto en las cajas de celda como en la posición real del texto.
 
-No se arregla retocando anchos: hay que elegir **uno** de los dos. O tabla de verdad (celdas reales, y el botón expandible dentro de una celda), o grid en todo, cabecera incluida, y entonces `<table>` sobra. La segunda seguramente sea más simple, porque la fila ya es un `<button>` expandible.
+De paso se recuperaron las semánticas de columna (`<th scope="col">` y una celda por dato, que antes no existían) y el chevron pasó a ser un `<button>` con `aria-expanded` y nombre propio.
 
 ### 3. La vista previa de un correo es interactiva, y no debería
 
