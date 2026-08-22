@@ -11,7 +11,7 @@ import {
 
 /*
  * Primer test del repositorio, y a la vez la prueba de que el arnés funciona:
- * si el alias `@/*` de vitest.config.ts no resolviera, este fichero ni
+ * si el alias `@/*` de vitest.config.mts no resolviera, este fichero ni
  * importaría.
  *
  * No es un test de relleno. `lib/availability.ts` dice en su cabecera que sus

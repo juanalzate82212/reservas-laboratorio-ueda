@@ -37,13 +37,14 @@ Sigue siendo importante porque **el guard de `prisma/seed.ts` no protege**: comp
 
 ⚠️ **No dar por buena ninguna cifra de filas de producción que leas aquí: la app está en uso.** Míralo en vez de deducirlo.
 
-⚠️ **`_prisma_migrations` no tiene RLS**, en los dos proyectos. Es una decisión heredada ("tabla interna, sin datos sensibles") que conviene revisar: no guarda datos personales, pero con la llave `anon` **se puede escribir**, y corromper el historial de migraciones rompería los despliegues. Arreglarlo es una línea y es seguro, porque Prisma se conecta como `postgres`, que ignora RLS.
+**`_prisma_migrations` también tiene RLS**, desde el 2026-08-11. Antes no: se había excluido por considerarla "tabla interna, sin datos sensibles". Eso era cierto a medias — no guarda datos personales, pero con la llave `anon` **se podía escribir**, y corromper el historial de migraciones rompe los despliegues. Fue seguro activarlo porque Prisma se conecta como `postgres`, que ignora RLS.
+
+Con eso, **las cinco tablas de `public` tienen RLS y ninguna tiene políticas**, que es exactamente el estado buscado: el canal REST de Supabase queda cerrado del todo y la app no se entera. El linter de Supabase seguirá reportando `rls_enabled_no_policy` como **INFO** en las cinco; **no es un pendiente**, es la consecuencia esperada. Solo dejaría de serlo si algún día se usa `@supabase/supabase-js` desde el cliente.
 
 ---
 
 ## Documentos
 
-- ⚠️ **[FUSION-DATACUEVA.md](FUSION-DATACUEVA.md)** — **el trabajo grande que viene**: absorber la app de préstamo de equipos ([DataCueva](https://github.com/JuanSNuno/DataCueva)) dentro de este panel de admin, con una sola base para las dos apps y usuarios con roles en vez de la contraseña compartida. Plan aprobado y por fases. **Si vas a trabajar en eso, léelo entero antes de tocar nada, y respeta su regla número 1: cada fase se explica al usuario y se aprueba antes de empezarla.**
 - **[BACKLOG.md](BACKLOG.md)** — lo que falta y lo que se dejó fuera de alcance. No implementar nada listado como fuera de alcance; si aparece la tentación, anotarla ahí y seguir.
 - **[identidad-visual-ucla-ui-ux.md](identidad-visual-ucla-ui-ux.md)** — tokens, tipografía, logo y voz de redacción. **De cumplimiento obligatorio.**
 - **[PLAN-MVP.md](PLAN-MVP.md)** — la especificación numerada que citan los comentarios del código (`§5 del plan`, `§8 del plan`…). Es referencia de contrato, no estado actual: **donde difiera del código, manda el código.**
@@ -69,11 +70,11 @@ npx prisma studio            # inspector de BD — el verificador principal
 npx prisma db seed           # ⚠️ DESTRUCTIVO: ver la sección de Datos
 ```
 
-**Hay Vitest desde el 2026-08-11, pero cubre muy poco todavía.** Entró como fontanería de la fase 0 de `FUSION-DATACUEVA.md`, para que la fase 1 tenga dónde aterrizar los tests de dominio que llegan de DataCueva. Hoy la suite es **un solo fichero**, `src/lib/availability.test.ts`.
+**Hay Vitest desde el 2026-08-11, pero cubre muy poco todavía.** Hoy la suite es **un solo fichero**, `src/lib/availability.test.ts`: 19 casos sobre el solapamiento de franjas y el estado visual de cada hueco. Entró como preparación de un proyecto que luego se canceló (ver `BACKLOG.md`), y se conserva porque el arnés es útil por su cuenta — sobre todo para los arreglos que quedan pendientes.
 
 **Eso no sustituye la verificación por criterios de aceptación**, que sigue siendo el método principal: `prisma studio`, `curl` contra los Route Handlers y `scripts/check-datetime.ts` para la capa horaria. Un test verde no dice nada sobre las nueve décimas partes de esta aplicación.
 
-⚠️ **No poner `passWithNoTests` en `vitest.config.mts`.** Es el atajo evidente con la suite casi vacía y convierte "no encontré ningún test" en verde: un `include` o un `exclude` mal escritos apagarían la suite entera sin que nadie se entere. Por eso la fase 0 entró con un test de verdad y no con cero, como decía el plan.
+⚠️ **No poner `passWithNoTests` en `vitest.config.mts`.** Es el atajo evidente con la suite casi vacía y convierte "no encontré ningún test" en verde: un `include` o un `exclude` mal escritos apagarían la suite entera sin que nadie se entere. Por eso entró con un test de verdad y no con cero.
 
 ⚠️ **`vitest.config.mts` es `.mts`, no `.ts`.** El proyecto es CommonJS (sin `"type": "module"`, del que dependen `next.config`, `postcss` y `tailwind`), así que Vite cargaba el config como CJS y avisaba de que `import.meta.url` es sintaxis ESM — algo que dejará de tolerar cuando `configLoader: "native"` sea el valor por defecto. Por eso el `include` de `tsconfig.json` lleva también el patrón de los `.mts`: sin él, `npm run typecheck` dejaría de mirar ese fichero.
 
