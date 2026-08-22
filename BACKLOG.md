@@ -6,7 +6,7 @@
 
 **Estado general: las diez fases del MVP están completas**, y con ellas los nueve ajustes pedidos tras el despliegue. La aplicación está en producción y el usuario confirmó el recorrido de punta a punta.
 
-Lo que queda debajo son **dos arreglos pedidos por el usuario**, dos ideas nuevas para el panel, un vencimiento (los festivos de 2027) y dos detalles menores.
+Lo que queda debajo es **un arreglo pedido por el usuario**, dos ideas nuevas para el panel, un vencimiento (los festivos de 2027) y dos detalles menores.
 
 ---
 
@@ -38,24 +38,13 @@ Medido en navegador con la API interceptada: **0 px de desfase** en las 15 inter
 
 De paso se recuperaron las semánticas de columna (`<th scope="col">` y una celda por dato, que antes no existían) y el chevron pasó a ser un `<button>` con `aria-expanded` y nombre propio.
 
-### 3. La vista previa de un correo es interactiva, y no debería
-
-En `/admin/correos`, al expandir un correo sus enlaces **funcionan**: "Añadir a Google Calendar" navega y da un error de Google, y el enlace a la app abre la página, todo dentro del recuadro de la previsualización.
-
-**Por qué pasa:** [src/components/admin/EmailLogRow.tsx](src/components/admin/EmailLogRow.tsx) usa `<iframe sandbox="" srcDoc={log.body}>`. El `sandbox=""` sin tokens bloquea scripts, formularios y same-origin —que es para lo que se puso, y **eso hay que conservarlo**—, pero **no bloquea la navegación por enlace**: un `<a href>` sigue navegando el propio iframe.
-
-Dos caminos, y conviene decidir cuál antes de tocar:
-
-- Inyectar en el `srcDoc` una regla `a { pointer-events: none }`. Una línea, pero altera el HTML que se está previsualizando, que es justo lo que este panel existe para auditar.
-- Dejar el HTML intacto y poner una capa transparente encima del iframe que se coma los clics. No toca el contenido, pero hay que cuidar que no rompa el desplazamiento dentro del recuadro.
-
-### 4. El QR impreso desaprovecha la hoja
+### 3. El QR impreso desaprovecha la hoja
 
 `/admin/qr` genera el `QRCodeSVG` a `size={280}`, que en papel carta queda pequeño. Hay que subirlo en el medio `print` sin descolocar el resto de la composición ni tocar la vista en pantalla. El `@page { size: letter }` ya está en `globals.css`.
 
 Al ampliarlo, **volver a comprobar el nivel de corrección de errores**: se bajó de `H` a `M` cuando se quitó el logo incrustado, y a otro tamaño conviene reconfirmar que se lee bien impreso. Probar con una impresión real, no solo con la previsualización.
 
-### 5. ~~El dominio del pie debe ser `funlam.edu.co`~~ ✅ Hecho el 2026-08-22
+### 4. ~~El dominio del pie debe ser `funlam.edu.co`~~ ✅ Hecho el 2026-08-22
 
 Cambiado en `Footer.tsx` (enlace y texto) y en `identidad-visual-ucla-ui-ux.md`, por decisión del usuario, para que los dos no se contradigan.
 

@@ -41,12 +41,27 @@ export default function QrPage() {
         <Card className="mx-auto flex w-full max-w-md flex-col items-center gap-6 p-10 print:max-w-none print:border-none print:p-0 print:shadow-none">
           <Logo />
 
+          {/*
+           * El tamaño de impresión se fija por CSS, no con el prop `size`.
+           * `size` marca los atributos width/height del <svg>, y ese valor
+           * tiene que seguir siendo 280 en pantalla para no romper la tarjeta
+           * del panel. Como QRCodeSVG dibuja con `viewBox`, una clase de
+           * ancho lo reescala sin perder nitidez — es un vector, no un mapa
+           * de bits, así que ampliarlo no lo degrada.
+           *
+           * 14cm sale de la caja imprimible real: `@page` en globals.css
+           * declara `size: letter` con `margin: 1in`, así que quedan 6.5in
+           * (16.5cm) de ancho útil. `print:max-w-full` es el seguro por si
+           * alguien cambia esos márgenes: el QR se encoge antes que salirse
+           * de la hoja.
+           */}
           <QRCodeSVG
             value={APP_URL}
             size={280}
             level="M"
             marginSize={2}
             title="Código QR para reservar el laboratorio"
+            className="h-auto w-[280px] print:w-[14cm] print:max-w-full"
           />
 
           <div className="flex flex-col items-center gap-1 text-center">
