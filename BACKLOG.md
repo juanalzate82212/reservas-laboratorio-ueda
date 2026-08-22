@@ -6,7 +6,7 @@
 
 **Estado general: las diez fases del MVP están completas**, y con ellas los nueve ajustes pedidos tras el despliegue. La aplicación está en producción y el usuario confirmó el recorrido de punta a punta.
 
-Lo que queda debajo no es construcción del MVP: es **un vencimiento** (los festivos de 2027) y **dos detalles menores**.
+Lo que queda debajo son **cinco arreglos pedidos por el usuario**, dos ideas nuevas para el panel, un vencimiento (los festivos de 2027) y dos detalles menores.
 
 ---
 
@@ -19,6 +19,51 @@ Queda un solo resto, y es parcial:
 | 3 | Repasar estados de carga y vacíos | **Parcial.** El calendario, `EmptyState`, las pantallas de estado y el wizard ya los tienen; falta un repaso del panel. No bloquea nada. |
 
 **Lo que quedó fuera de la revisión de accesibilidad, a propósito:** la rejilla del calendario sigue sin ser operable por teclado (FullCalendar no hace focusables las celdas). No incumple, porque el wizard es el camino equivalente y sí es navegable — pero si el wizard cambia, hay que volver a mirarlo.
+
+---
+
+## Arreglos pedidos por el usuario (2026-08-22)
+
+Cola de trabajo activa. Se resuelven **de a poco**, cada uno en su rama y su PR.
+
+### 1. Quitar "Estudiante" de la lista de cargos
+
+`REQUESTER_ROLES` en [src/config/reservationOptions.ts](src/config/reservationOptions.ts). Es un cambio de una línea **en apariencia**, pero hay que mirar dos cosas antes:
+
+- **No rompe las reservas existentes.** `requesterRole` es `String`, no un enum de Prisma, y `labelForRequesterRole()` devuelve el valor crudo si no lo reconoce. Una reserva antigua con `ESTUDIANTE` seguirá listándose; solo dejará de poder elegirse en el formulario. Esto es a propósito y está explicado en `CLAUDE.md`.
+- ⚠️ **Comprobar antes cuántas filas de producción lo usan**, para saber qué se va a ver en el panel. Mirarlo, no deducirlo.
+- El `z.enum` de `lib/validation/reservation.ts` se deriva de esa lista, así que el servidor empezará a rechazar `ESTUDIANTE` en solicitudes nuevas. Correcto, pero es el efecto real del cambio.
+
+### 2. La tabla de solicitudes está desalineada
+
+En `/admin`, los datos no cuadran con sus cabeceras: el horario aparece bajo "Solicitante".
+
+**Causa localizada** en [src/components/admin/ReservationTable.tsx](src/components/admin/ReservationTable.tsx): la cabecera es un `<thead>` con cinco `<th>`, pero **cada fila es un `<td colSpan={5}>` que dentro lleva un CSS grid** (`grid-cols-[1fr_1fr_1fr_auto_auto]`). Son **dos algoritmos de reparto distintos** —el de tablas dimensiona por contenido, el grid por fracciones— así que no pueden coincidir salvo por casualidad.
+
+No se arregla retocando anchos: hay que elegir **uno** de los dos. O tabla de verdad (celdas reales, y el botón expandible dentro de una celda), o grid en todo, cabecera incluida, y entonces `<table>` sobra. La segunda seguramente sea más simple, porque la fila ya es un `<button>` expandible.
+
+### 3. La vista previa de un correo es interactiva, y no debería
+
+En `/admin/correos`, al expandir un correo sus enlaces **funcionan**: "Añadir a Google Calendar" navega y da un error de Google, y el enlace a la app abre la página, todo dentro del recuadro de la previsualización.
+
+**Por qué pasa:** [src/components/admin/EmailLogRow.tsx](src/components/admin/EmailLogRow.tsx) usa `<iframe sandbox="" srcDoc={log.body}>`. El `sandbox=""` sin tokens bloquea scripts, formularios y same-origin —que es para lo que se puso, y **eso hay que conservarlo**—, pero **no bloquea la navegación por enlace**: un `<a href>` sigue navegando el propio iframe.
+
+Dos caminos, y conviene decidir cuál antes de tocar:
+
+- Inyectar en el `srcDoc` una regla `a { pointer-events: none }`. Una línea, pero altera el HTML que se está previsualizando, que es justo lo que este panel existe para auditar.
+- Dejar el HTML intacto y poner una capa transparente encima del iframe que se coma los clics. No toca el contenido, pero hay que cuidar que no rompa el desplazamiento dentro del recuadro.
+
+### 4. El QR impreso desaprovecha la hoja
+
+`/admin/qr` genera el `QRCodeSVG` a `size={280}`, que en papel carta queda pequeño. Hay que subirlo en el medio `print` sin descolocar el resto de la composición ni tocar la vista en pantalla. El `@page { size: letter }` ya está en `globals.css`.
+
+Al ampliarlo, **volver a comprobar el nivel de corrección de errores**: se bajó de `H` a `M` cuando se quitó el logo incrustado, y a otro tamaño conviene reconfirmar que se lee bien impreso. Probar con una impresión real, no solo con la previsualización.
+
+### 5. El dominio del pie debe ser `funlam.edu.co`
+
+[src/components/brand/Footer.tsx](src/components/brand/Footer.tsx) enlaza a `https://www.ucatolicaluisamigo.edu.co`.
+
+⚠️ **Ojo:** `identidad-visual-ucla-ui-ux.md` —documento de cumplimiento obligatorio— también dice `www.ucatolicaluisamigo.edu.co` en su bloque de contacto. Cambiar solo el pie deja los dos en contradicción. **Actualizar ambos**, o confirmar con el usuario si el manual se queda como está por ser un documento de marca cerrado. No tocar `@amigo.edu.co`: ese es el dominio de correo y es otra cosa.
 
 ---
 
@@ -83,6 +128,10 @@ No implementar sin pedirlo explícitamente.
   **Nada de aquel trabajo se revirtió, y no hace falta**: la fase 0 eran tres tareas que este repositorio necesitaba igual —la base de datos de desarrollo, Node 22 y Vitest— y ninguna tocó código de la aplicación. El plan sí se borró, porque señalaba un trabajo que no va a ocurrir.
 
   El análisis completo (inventario real de DataCueva, por qué no se subía a Next 16, el porte de Drizzle a Prisma) vive en el historial: `git log --all --oneline -- FUSION-DATACUEVA.md`. Si algún día se retoma, es material aprovechable — pero estaba **equivocado en tres puntos** que solo se descubrieron al leer el repositorio de verdad, así que hay que reverificarlo antes de fiarse.
+
+- **Calendario de solo lectura en el panel de admin.** Una sección más, al nivel de Solicitudes y Franjas, para ver la ocupación de un vistazo sin salir del panel. **Debe ser solo de vista**: hoy `RoomCalendar` es clicable y abre `/reservar?startsAt=`, y eso no tiene sentido para un administrador. Se reutilizaría el mismo componente con el `dateClick` desactivado — pero antes hay que releer las tres trampas de FullCalendar en `CLAUDE.md`, sobre todo el truco de zona horaria y el guard del bucle de `datesSet`, porque montarlo en otra pantalla las hereda todas.
+
+- **Dashboard de estadísticas en el panel.** Otra sección para ver métricas de uso. Sin definir todavía qué indicadores: **decidir eso primero**, porque marca si basta con contar sobre `Reservation` o hace falta guardar algo nuevo. Recordar que `Reportes, métricas y exportación` está listado como fuera de alcance del MVP más abajo — esto lo reabre a propósito, por petición del usuario.
 
 - **Reactivar una segunda sala.** Se retiró "Sala de Reuniones" por decisión de producto, pero el modelo `Room` se dejó genérico a propósito. Volver a tener dos salas requeriría reponer el selector en el wizard y decidir cómo se muestran dos calendarios en la landing; no requiere migración de base de datos.
 - **Dataset de demostración.** El punto 8 de la Fase 10 pedía dejar la semana en curso poblada con reservas de ejemplo. Quedó anulado: el usuario limpió los datos de prueba a propósito para dejar la aplicación lista para uso real. Si alguna vez hace falta para una demostración, `prisma/seed.ts` sigue funcionando y desde el 2026-08-11 apunta a la base de **desarrollo** — pero **sigue siendo destructivo**: borra `Reservation` y `TimeBlock` completos. Confirmar a qué proyecto apunta el `.env` antes de correrlo (ver `CLAUDE.md`).
