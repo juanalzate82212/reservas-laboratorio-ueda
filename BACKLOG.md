@@ -6,7 +6,7 @@
 
 **Estado general: las diez fases del MVP están completas**, y con ellas los nueve ajustes pedidos tras el despliegue. La aplicación está en producción y el usuario confirmó el recorrido de punta a punta.
 
-Lo que queda debajo es **un arreglo pedido por el usuario**, una idea nueva para el panel, un vencimiento (los festivos de 2027) y dos detalles menores.
+Lo que queda debajo es **un arreglo pedido por el usuario**, un vencimiento (los festivos de 2027) y dos detalles menores.
 
 ---
 
@@ -113,8 +113,6 @@ No implementar sin pedirlo explícitamente.
   **Nada de aquel trabajo se revirtió, y no hace falta**: la fase 0 eran tres tareas que este repositorio necesitaba igual —la base de datos de desarrollo, Node 22 y Vitest— y ninguna tocó código de la aplicación. El plan sí se borró, porque señalaba un trabajo que no va a ocurrir.
 
   El análisis completo (inventario real de DataCueva, por qué no se subía a Next 16, el porte de Drizzle a Prisma) vive en el historial: `git log --all --oneline -- FUSION-DATACUEVA.md`. Si algún día se retoma, es material aprovechable — pero estaba **equivocado en tres puntos** que solo se descubrieron al leer el repositorio de verdad, así que hay que reverificarlo antes de fiarse.
-
-- **Dashboard de estadísticas en el panel.** Otra sección para ver métricas de uso. Sin definir todavía qué indicadores: **decidir eso primero**, porque marca si basta con contar sobre `Reservation` o hace falta guardar algo nuevo. Recordar que `Reportes, métricas y exportación` está listado como fuera de alcance del MVP más abajo — esto lo reabre a propósito, por petición del usuario.
 
 - **Reactivar una segunda sala.** Se retiró "Sala de Reuniones" por decisión de producto, pero el modelo `Room` se dejó genérico a propósito. Volver a tener dos salas requeriría reponer el selector en el wizard y decidir cómo se muestran dos calendarios en la landing; no requiere migración de base de datos.
 - **Dataset de demostración.** El punto 8 de la Fase 10 pedía dejar la semana en curso poblada con reservas de ejemplo. Quedó anulado: el usuario limpió los datos de prueba a propósito para dejar la aplicación lista para uso real. Si alguna vez hace falta para una demostración, `prisma/seed.ts` sigue funcionando y desde el 2026-08-11 apunta a la base de **desarrollo** — pero **sigue siendo destructivo**: borra `Reservation` y `TimeBlock` completos. Confirmar a qué proyecto apunta el `.env` antes de correrlo (ver `CLAUDE.md`).

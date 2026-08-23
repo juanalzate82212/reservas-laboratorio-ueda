@@ -306,6 +306,22 @@ Corregido con `ALTER TABLE … ENABLE ROW LEVEL SECURITY;` sobre las cuatro tabl
 
 ---
 
+## Estadísticas del panel (`/admin/estadisticas`)
+
+**`GET /api/admin/stats` devuelve SOLO agregados.** Su `select` deja fuera `requesterName`, `requesterDocId` y `requesterEmail` a propósito: aunque la respuesta va detrás de sesión, un agregado no necesita saber de quién es cada fila, y lo que no se lee no se puede filtrar por accidente. **No ampliar ese `select` sin pensarlo.**
+
+**Una sola consulta con `select` estrecho y la agregación en TypeScript** (`lib/stats.ts`), no ocho `groupBy`. La hora del día hay que calcularla en hora de **Bogotá** y `toBogota()` ya lo hace bien; en SQL exigiría `AT TIME ZONE` a mano. Además son dos consultas en total, secuenciales — con `connection_limit=1` un `Promise.all` está prohibido.
+
+**Qué cuenta cada bloque, y la interfaz lo dice:** `porHora` y `ocupacion` cuentan **solo `CONFIRMED`** (miden uso real); los rankings de cargo, actividad, programa y día cuentan **todas las solicitudes** (miden demanda). La tendencia de 12 meses **ignora el filtro de mes** a propósito. El filtro va sobre `startsAt`, no `createdAt`: responde a "cuánto se usó", no a "cuánto se pidió".
+
+**El índice de ocupación reutiliza `getOpeningRangesFor()`**, que ya descuenta fines de semana, festivos y el receso. No reimplementar esa aritmética: `stats.test.ts` fija que agosto de 2026 tiene 152 horas hábiles, y esa cifra sale de dos festivos de tipos distintos.
+
+⚠️ **Nada de gráficos categóricos multicolor, y no es una preferencia.** El validador del skill `dataviz` reprueba la paleta de marca como paleta categórica: `#007B99` y `#2E7D5B` quedan en ΔE 9,9, por debajo del mínimo de 15 **incluso con visión normal de color**, y `#F39200` se queda en 2,29 de contraste. Por eso todos los rankings son **barras de una sola serie del mismo azul** —la longitud codifica, el color no— y **no hay ningún circular**. Antes de tocar un gráfico, cargar el skill `dataviz`.
+
+⚠️ **`--texto-secundario` (#6F7070) NO pasa AA sobre el naranja suave `accent-soft` (#FDE6C7)**: da 4,09. Sobre la tarjeta destacada el texto pequeño va con `text-texto`. Lo detectó axe sobre el build de producción, no se dedujo.
+
+---
+
 ## Accesibilidad
 
 Auditada con **axe-core sobre el build de producción** (no en `dev`) más recorridos de teclado con Playwright: 12 pantallas incluidas las del panel con sesión real, los tres pasos del wizard, el formulario con errores visibles, el diálogo abierto y una semana **con festivo** — esta última importa, porque la etiqueta "Festivo" tiene su propio color y una semana cualquiera no la muestra.
