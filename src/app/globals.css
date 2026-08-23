@@ -297,6 +297,16 @@
   cursor: pointer;
 }
 
+/*
+ * Calendario en solo lectura (panel de administración): no se puede pulsar
+ * nada, así que la celda no debe invitar al clic. Va aquí y no como utilidad
+ * de Tailwind porque el nodo que lleva el cursor lo dibuja FullCalendar y
+ * ningún componente nuestro puede ponerle una clase.
+ */
+.fc-solo-lectura .fc-timegrid-slot-lane {
+  cursor: default;
+}
+
 /* Página del QR (admin/qr): formato imprimible, tamaño carta. */
 @media print {
   @page {

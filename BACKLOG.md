@@ -6,7 +6,7 @@
 
 **Estado general: las diez fases del MVP están completas**, y con ellas los nueve ajustes pedidos tras el despliegue. La aplicación está en producción y el usuario confirmó el recorrido de punta a punta.
 
-Lo que queda debajo es **un arreglo pedido por el usuario**, dos ideas nuevas para el panel, un vencimiento (los festivos de 2027) y dos detalles menores.
+Lo que queda debajo es **un arreglo pedido por el usuario**, una idea nueva para el panel, un vencimiento (los festivos de 2027) y dos detalles menores.
 
 ---
 
@@ -113,8 +113,6 @@ No implementar sin pedirlo explícitamente.
   **Nada de aquel trabajo se revirtió, y no hace falta**: la fase 0 eran tres tareas que este repositorio necesitaba igual —la base de datos de desarrollo, Node 22 y Vitest— y ninguna tocó código de la aplicación. El plan sí se borró, porque señalaba un trabajo que no va a ocurrir.
 
   El análisis completo (inventario real de DataCueva, por qué no se subía a Next 16, el porte de Drizzle a Prisma) vive en el historial: `git log --all --oneline -- FUSION-DATACUEVA.md`. Si algún día se retoma, es material aprovechable — pero estaba **equivocado en tres puntos** que solo se descubrieron al leer el repositorio de verdad, así que hay que reverificarlo antes de fiarse.
-
-- **Calendario de solo lectura en el panel de admin.** Una sección más, al nivel de Solicitudes y Franjas, para ver la ocupación de un vistazo sin salir del panel. **Debe ser solo de vista**: hoy `RoomCalendar` es clicable y abre `/reservar?startsAt=`, y eso no tiene sentido para un administrador. Se reutilizaría el mismo componente con el `dateClick` desactivado — pero antes hay que releer las tres trampas de FullCalendar en `CLAUDE.md`, sobre todo el truco de zona horaria y el guard del bucle de `datesSet`, porque montarlo en otra pantalla las hereda todas.
 
 - **Dashboard de estadísticas en el panel.** Otra sección para ver métricas de uso. Sin definir todavía qué indicadores: **decidir eso primero**, porque marca si basta con contar sobre `Reservation` o hace falta guardar algo nuevo. Recordar que `Reportes, métricas y exportación` está listado como fuera de alcance del MVP más abajo — esto lo reabre a propósito, por petición del usuario.
 

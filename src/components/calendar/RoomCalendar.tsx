@@ -66,7 +66,25 @@ function siguienteDia(dayKey: string): string {
   return fecha.toISOString().slice(0, 10);
 }
 
-export function RoomCalendar({ room }: { room: ActiveRoom }) {
+export interface RoomCalendarProps {
+  room: ActiveRoom;
+  /*
+   * Apaga la interacción: el calendario pinta lo mismo pero no se puede
+   * pulsar nada. Es lo que necesita el panel de administración, donde el
+   * calendario sirve para VER la ocupación — quien administra no reserva
+   * desde ahí, y llevarlo al wizard público sería un callejón.
+   *
+   * Por defecto `false`, así la llamada del calendario público no cambia.
+   * Se resolvió con un prop en vez de duplicando el componente a propósito:
+   * estas 480 líneas cargan las tres trampas de FullCalendar que documenta
+   * CLAUDE.md (el truco de zona horaria, el guard del bucle de `datesSet` y
+   * el MutationObserver que nombra las flechas). Una copia aparte las
+   * duplicaría, y el día que se arregle una, la otra se queda atrás.
+   */
+  soloLectura?: boolean;
+}
+
+export function RoomCalendar({ room, soloLectura = false }: RoomCalendarProps) {
   const router = useRouter();
   const calendarRef = useRef<FullCalendar>(null);
   // Envoltorio del calendario: se usa para corregir la accesibilidad de la
@@ -382,7 +400,16 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
         </p>
       )}
 
-      <div ref={contenedorRef} className="relative overflow-hidden rounded border border-borde">
+      <div
+        ref={contenedorRef}
+        className={cn(
+          "relative overflow-hidden rounded border border-borde",
+          // globals.css pone `cursor: pointer` en las celdas porque pulsarlas
+          // abre el wizard. Sin esto, en el panel seguirían invitando a un
+          // clic que ya no hace nada.
+          soloLectura && "fc-solo-lectura",
+        )}
+      >
         {(cargando || navegando) && (
           // El anillo girando es el mismo gesto de carga que Button.tsx (§5.1
           // del documento de marca) — no un spinner distinto inventado aquí.
@@ -434,8 +461,15 @@ export function RoomCalendar({ room }: { room: ActiveRoom }) {
               festivos.has(fullCalendarDayKey(arg.date)) ? ["fc-dia-festivo-header"] : []
             }
             datesSet={handleDatesSet}
-            dateClick={handleDateClick}
-            eventClick={handleEventClick}
+            /*
+             * En solo lectura no se pasan los manejadores, en vez de pasarlos
+             * y salir al principio: así FullCalendar ni siquiera registra los
+             * escuchadores. `eventClick` también se va — su aviso ("esa franja
+             * ya está reservada") está redactado para quien intenta reservar,
+             * y en el panel no viene a cuento.
+             */
+            dateClick={soloLectura ? undefined : handleDateClick}
+            eventClick={soloLectura ? undefined : handleEventClick}
           />
         </div>
       </div>

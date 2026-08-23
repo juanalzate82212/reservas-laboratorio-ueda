@@ -212,6 +212,10 @@ Contrapartida: los `Date` que FullCalendar construye internamente traen los camp
 
 Por lo mismo, el prop `now` se sobrescribe: sin eso, el indicador de hora actual usaría la hora real del sistema, desalineada 5 h de la grilla.
 
+> **`RoomCalendar` se usa en dos sitios con el mismo código.** El público (`/`) y el panel (`/admin/calendario`), que lo monta con `soloLectura`: mismo calendario, sin `dateClick` ni `eventClick`, y con la clase `fc-solo-lectura` que devuelve el cursor a `default` (las celdas llevan `cursor: pointer` en `globals.css` porque pulsarlas abre el wizard). Se resolvió con un prop en vez de duplicando el componente **porque las tres trampas de abajo viajan con él**: una copia aparte las duplicaría y se quedaría atrás en cuanto se arregle una. El prop es `false` por defecto, así que el calendario público no cambió.
+>
+> El calendario del panel **no muestra de quién es cada reserva**, y es deliberado: se alimenta de `GET /api/availability`, que nunca devuelve datos personales. Para eso está la bandeja de Solicitudes.
+
 ### 2. AVISO va de fondo, no en primer plano
 
 El calendario es clicable y abre `/reservar?startsAt=` al tocar una franja libre. Por eso los `TimeBlock` de tipo `WARNING` —que **sí** son reservables— se renderizan como evento de **fondo**: un evento de fondo no intercepta el clic, así que `dateClick` sigue disparando con la media hora exacta que se tocó. Si fuera de primer plano, `eventClick` solo entregaría el rango completo del bloque, que puede durar horas.
