@@ -6,7 +6,7 @@
 
 **Estado general: las diez fases del MVP están completas**, y con ellas los nueve ajustes pedidos tras el despliegue. La aplicación está en producción y el usuario confirmó el recorrido de punta a punta.
 
-Lo que queda debajo no es construcción del MVP: es **un vencimiento** (los festivos de 2027) y **dos detalles menores**.
+Lo que queda debajo es **un arreglo pedido por el usuario**, un vencimiento (los festivos de 2027) y dos detalles menores.
 
 ---
 
@@ -19,6 +19,36 @@ Queda un solo resto, y es parcial:
 | 3 | Repasar estados de carga y vacíos | **Parcial.** El calendario, `EmptyState`, las pantallas de estado y el wizard ya los tienen; falta un repaso del panel. No bloquea nada. |
 
 **Lo que quedó fuera de la revisión de accesibilidad, a propósito:** la rejilla del calendario sigue sin ser operable por teclado (FullCalendar no hace focusables las celdas). No incumple, porque el wizard es el camino equivalente y sí es navegable — pero si el wizard cambia, hay que volver a mirarlo.
+
+---
+
+## Arreglos pedidos por el usuario (2026-08-22)
+
+Cola de trabajo activa. Se resuelven **de a poco**, cada uno en su rama y su PR.
+
+### 1. ~~Quitar "Estudiante" de la lista de cargos~~ ✅ Hecho el 2026-08-22
+
+Fuera de `REQUESTER_ROLES`. El usuario confirmó que **ninguna reserva de producción lo usaba**, así que no quedan filas huérfanas. Las dos reservas de ejemplo de `prisma/seed.ts` que lo usaban pasaron a `INVESTIGADOR` y `DOCENTE`, para que la semilla no genere valores que el formulario ya no ofrece.
+
+### 2. ~~La tabla de solicitudes está desalineada~~ ✅ Hecho el 2026-08-22
+
+La causa era que la cabecera tenía cinco `<th>` y cada fila un solo `<td colSpan={5}>` con un CSS grid dentro: dos algoritmos de reparto independientes. Ahora hay celdas reales, una por columna, y el navegador dimensiona cabecera y cuerpo a la vez.
+
+Medido en navegador con la API interceptada: **0 px de desfase** en las 15 intersecciones (3 filas × 5 columnas), tanto en las cajas de celda como en la posición real del texto.
+
+De paso se recuperaron las semánticas de columna (`<th scope="col">` y una celda por dato, que antes no existían) y el chevron pasó a ser un `<button>` con `aria-expanded` y nombre propio.
+
+### 3. El QR impreso desaprovecha la hoja
+
+`/admin/qr` genera el `QRCodeSVG` a `size={280}`, que en papel carta queda pequeño. Hay que subirlo en el medio `print` sin descolocar el resto de la composición ni tocar la vista en pantalla. El `@page { size: letter }` ya está en `globals.css`.
+
+Al ampliarlo, **volver a comprobar el nivel de corrección de errores**: se bajó de `H` a `M` cuando se quitó el logo incrustado, y a otro tamaño conviene reconfirmar que se lee bien impreso. Probar con una impresión real, no solo con la previsualización.
+
+### 4. ~~El dominio del pie debe ser `funlam.edu.co`~~ ✅ Hecho el 2026-08-22
+
+Cambiado en `Footer.tsx` (enlace y texto) y en `identidad-visual-ucla-ui-ux.md`, por decisión del usuario, para que los dos no se contradigan.
+
+⚠️ **El correo de contacto del manual sigue siendo `ucatolicaluisamigo@amigo.edu.co`**, sin tocar: es una dirección, no el enlace al sitio, y cambiarla sería inventar un dato. Si también debe cambiar, hay que preguntarlo.
 
 ---
 

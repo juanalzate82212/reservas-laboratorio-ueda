@@ -212,6 +212,10 @@ Contrapartida: los `Date` que FullCalendar construye internamente traen los camp
 
 Por lo mismo, el prop `now` se sobrescribe: sin eso, el indicador de hora actual usaría la hora real del sistema, desalineada 5 h de la grilla.
 
+> **`RoomCalendar` se usa en dos sitios con el mismo código.** El público (`/`) y el panel (`/admin/calendario`), que lo monta con `soloLectura`: mismo calendario, sin `dateClick` ni `eventClick`, y con la clase `fc-solo-lectura` que devuelve el cursor a `default` (las celdas llevan `cursor: pointer` en `globals.css` porque pulsarlas abre el wizard). Se resolvió con un prop en vez de duplicando el componente **porque las tres trampas de abajo viajan con él**: una copia aparte las duplicaría y se quedaría atrás en cuanto se arregle una. El prop es `false` por defecto, así que el calendario público no cambió.
+>
+> El calendario del panel **no muestra de quién es cada reserva**, y es deliberado: se alimenta de `GET /api/availability`, que nunca devuelve datos personales. Para eso está la bandeja de Solicitudes.
+
 ### 2. AVISO va de fondo, no en primer plano
 
 El calendario es clicable y abre `/reservar?startsAt=` al tocar una franja libre. Por eso los `TimeBlock` de tipo `WARNING` —que **sí** son reservables— se renderizan como evento de **fondo**: un evento de fondo no intercepta el clic, así que `dateClick` sigue disparando con la media hora exacta que se tocó. Si fuera de primer plano, `eventClick` solo entregaría el rango completo del bloque, que puede durar horas.
@@ -282,6 +286,8 @@ Corregido con `ALTER TABLE … ENABLE ROW LEVEL SECURITY;` sobre las cuatro tabl
 - **Nodemailer no corre en Edge Runtime.** Los handlers que envían correo necesitan `export const runtime = "nodejs"`.
 - **`"postinstall": "prisma generate"`** en `package.json`: Vercel cachea `node_modules` y sin esto el build falla con errores de tipos confusos tras cambiar el schema.
 - **Supabase free pausa el proyecto tras 7 días sin actividad.** Verificar que esté despierto antes de cualquier demostración.
+
+  ⚠️ **Un proyecto pausado no da un error de red: el pooler responde `FATAL: (ENOTFOUND) tenant/user postgres.<ref> not found`.** Ese mensaje parece decir que el proyecto fue *borrado*, y no es así — se despausa desde el panel de Supabase y vuelve tal cual. Pasó el 2026-08-22 con la base de desarrollo. **No confundirlo** con el fallo intermitente del puerto 6543 (*"Can't reach database server"*, que es de handshake) ni con `P2024` (saturación del pool, que exige conexión ya establecida).
 - **`NEXT_PUBLIC_APP_URL` es lo que codifica el QR** y la base de `metadataBase`. Un valor incorrecto rompe la función principal y deja el enlace compartido sin vista previa.
 - **La lista de festivos puede cambiar por ley a mitad de año.** La **Ley 2578 de 2026** creó el festivo de la Virgen de Chiquinquirá; son **19**, no 18. Al añadir un año no basta con calcular Pascua y aplicar la Ley Emiliani: hay que comprobar si se creó alguno nuevo. `holidays.ts` emite `console.warn` si falta el año en curso.
 - **`z.coerce.number()` sobre un campo opcional vacío.** Un `<input type="number">` sin valor llega como `""`, y `Number("")` da **`0`, no `NaN`** — sin un `z.preprocess` que convierta `""` a `undefined`, dejar el campo en blanco falla la validación de "mayor que cero" en vez de aceptarse vacío.
@@ -297,6 +303,22 @@ Corregido con `ALTER TABLE … ENABLE ROW LEVEL SECURITY;` sobre las cuatro tabl
 - **`Dialog`** es siempre controlado desde fuera (`open`/`onOpenChange`), sin `Trigger` propio, porque cada sitio de uso ya decide cuándo abrirlo.
 - **Los tokens viven en dos sitios** que hay que mantener sincronizados: el bloque `:root` de [globals.css](src/app/globals.css) (para CSS crudo: FullCalendar, plantillas de correo) y `tailwind.config.ts` (para las utilidades). Los componentes usan solo las utilidades.
 - **El `<Toaster/>` de sonner ya está en el layout raíz**; para notificar, `import { toast } from "sonner"`.
+
+---
+
+## Estadísticas del panel (`/admin/estadisticas`)
+
+**`GET /api/admin/stats` devuelve SOLO agregados.** Su `select` deja fuera `requesterName`, `requesterDocId` y `requesterEmail` a propósito: aunque la respuesta va detrás de sesión, un agregado no necesita saber de quién es cada fila, y lo que no se lee no se puede filtrar por accidente. **No ampliar ese `select` sin pensarlo.**
+
+**Una sola consulta con `select` estrecho y la agregación en TypeScript** (`lib/stats.ts`), no ocho `groupBy`. La hora del día hay que calcularla en hora de **Bogotá** y `toBogota()` ya lo hace bien; en SQL exigiría `AT TIME ZONE` a mano. Además son dos consultas en total, secuenciales — con `connection_limit=1` un `Promise.all` está prohibido.
+
+**Qué cuenta cada bloque, y la interfaz lo dice:** `porHora` y `ocupacion` cuentan **solo `CONFIRMED`** (miden uso real); los rankings de cargo, actividad, programa y día cuentan **todas las solicitudes** (miden demanda). La tendencia de 12 meses **ignora el filtro de mes** a propósito. El filtro va sobre `startsAt`, no `createdAt`: responde a "cuánto se usó", no a "cuánto se pidió".
+
+**El índice de ocupación reutiliza `getOpeningRangesFor()`**, que ya descuenta fines de semana, festivos y el receso. No reimplementar esa aritmética: `stats.test.ts` fija que agosto de 2026 tiene 152 horas hábiles, y esa cifra sale de dos festivos de tipos distintos.
+
+⚠️ **Nada de gráficos categóricos multicolor, y no es una preferencia.** El validador del skill `dataviz` reprueba la paleta de marca como paleta categórica: `#007B99` y `#2E7D5B` quedan en ΔE 9,9, por debajo del mínimo de 15 **incluso con visión normal de color**, y `#F39200` se queda en 2,29 de contraste. Por eso todos los rankings son **barras de una sola serie del mismo azul** —la longitud codifica, el color no— y **no hay ningún circular**. Antes de tocar un gráfico, cargar el skill `dataviz`.
+
+⚠️ **`--texto-secundario` (#6F7070) NO pasa AA sobre el naranja suave `accent-soft` (#FDE6C7)**: da 4,09. Sobre la tarjeta destacada el texto pequeño va con `text-texto`. Lo detectó axe sobre el build de producción, no se dedujo.
 
 ---
 

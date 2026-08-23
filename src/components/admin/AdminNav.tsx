@@ -8,10 +8,12 @@ import { cn } from "@/lib/utils";
 
 import { ADMIN_RESERVATIONS_CHANGED_EVENT } from "./adminEvents";
 
-/* Las cuatro secciones del panel. Todas existen como páginas. */
+/* Las seis secciones del panel. Todas existen como páginas. */
 const ENLACES = [
   { href: "/admin", label: "Solicitudes" },
+  { href: "/admin/calendario", label: "Calendario" },
   { href: "/admin/franjas", label: "Franjas" },
+  { href: "/admin/estadisticas", label: "Estadísticas" },
   { href: "/admin/correos", label: "Correos" },
   { href: "/admin/qr", label: "QR" },
 ];
