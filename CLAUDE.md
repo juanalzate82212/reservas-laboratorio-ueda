@@ -6,7 +6,7 @@ Guía para Claude Code (claude.ai/code) al trabajar en este repositorio. **Es la
 
 ## Qué es esto
 
-Sistema de reserva del **Laboratorio de Analítica de Datos e Inteligencia Artificial** de la Universidad Católica Luis Amigó. El público llega por un código QR → ve la disponibilidad en un calendario → solicita una franja. Un único administrador (una contraseña, sin sistema de usuarios) aprueba, rechaza o cancela solicitudes y gestiona bloqueos de horario. Todo el texto visible va en español.
+Sistema de reserva del **Laboratorio de Analítica de Datos e Inteligencia Artificial** de la Universidad Católica Luis Amigó. El público llega por un código QR → ve la disponibilidad en un calendario → solicita una franja. Un único administrador (una contraseña, sin sistema de usuarios) aprueba, rechaza o cancela solicitudes desde un panel con seis secciones: Solicitudes, Calendario (solo lectura), Franjas, Estadísticas, Correos y QR. Todo el texto visible va en español.
 
 **Hay una sola sala reservable, "Sala Principal"**, pero el modelo `Room` es genérico a propósito: hubo una segunda sala y se retiró por decisión de producto, no por limitación técnica. Por eso conviven `getActiveRoom()` y `getActiveRooms()`, y el selector de sala de `TimeBlockForm` sigue existiendo aunque hoy solo ofrezca dos opciones. **No "simplificar" eso**: reactivar una segunda sala debe seguir siendo un cambio de datos, no una migración.
 
@@ -70,7 +70,9 @@ npx prisma studio            # inspector de BD — el verificador principal
 npx prisma db seed           # ⚠️ DESTRUCTIVO: ver la sección de Datos
 ```
 
-**Hay Vitest desde el 2026-08-11, pero cubre muy poco todavía.** Hoy la suite es **un solo fichero**, `src/lib/availability.test.ts`: 19 casos sobre el solapamiento de franjas y el estado visual de cada hueco. Entró como preparación de un proyecto que luego se canceló (ver `BACKLOG.md`), y se conserva porque el arnés es útil por su cuenta — sobre todo para los arreglos que quedan pendientes.
+**Hay Vitest desde el 2026-08-11, pero cubre poco.** Dos ficheros y 46 casos: `lib/availability.test.ts` (solapamiento de franjas y estado visual de cada hueco) y `lib/stats.test.ts` (la aritmética del dashboard). Entró como preparación de un proyecto que luego se canceló, y se conserva porque el arnés es útil por su cuenta.
+
+**Lo probado tiene algo en común:** son funciones **puras**, sin Prisma ni petición, que se ejercitan con objetos literales. Ese es el criterio para decidir si algo nuevo merece un test aquí. Lo demás —handlers, componentes, la capa de correo— sigue verificándose por criterios de aceptación.
 
 **Eso no sustituye la verificación por criterios de aceptación**, que sigue siendo el método principal: `prisma studio`, `curl` contra los Route Handlers y `scripts/check-datetime.ts` para la capa horaria. Un test verde no dice nada sobre las nueve décimas partes de esta aplicación.
 
