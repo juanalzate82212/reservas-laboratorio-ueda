@@ -87,11 +87,12 @@ async function main() {
   });
 
   /*
-   * ⚠️ Entra INACTIVO a propósito, igual que en la migración. Mientras
-   * `getActiveRoom()` siga siendo `rooms[0]` sobre `orderBy: { slug: "asc" }`,
-   * activar un laboratorio desde los datos puede cambiar la portada pública
-   * sin desplegar código y sin un solo error. Se activa en la fase 2, cuando
-   * el portal ya exista. El aforo es provisional.
+   * Activo desde la fase 2: ya existe el portal, y la portada dejó de ser el
+   * calendario de un laboratorio concreto, así que añadir uno nuevo ya no
+   * puede cambiar en silencio lo que ve el público.
+   *
+   * El aforo y el correo de contacto siguen pendientes de confirmar con el
+   * laboratorio.
    */
   await prisma.room.upsert({
     where: { slug: "redes-infraestructura" },
@@ -105,7 +106,7 @@ async function main() {
       capacity: 25,
       hasComputers: true,
       colorToken: "azul",
-      isActive: false,
+      isActive: true,
       mailKey: "REDES",
       mailFromName: "Laboratorio de Redes e Infraestructura",
     },

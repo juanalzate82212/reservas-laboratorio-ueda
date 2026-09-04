@@ -16,7 +16,7 @@ import {
 export const metadata: Metadata = {
   title: "Consultar el estado de una reserva",
   description:
-    "Escribe el código que recibiste al solicitar tu reserva del Laboratorio de Analítica de Datos e Inteligencia Artificial para ver en qué estado está.",
+    "Escribe el código que recibiste al solicitar tu reserva para ver en qué estado está.",
 };
 
 /*
