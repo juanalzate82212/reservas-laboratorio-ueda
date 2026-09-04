@@ -16,25 +16,9 @@
 
 ---
 
-## Errores conocidos
-
-### Los errores de validación no se borran al corregirlos
-
-Afecta a **todo el wizard público**. Si alguien pulsa "Siguiente" sin completar un campo, ve el error en rojo; al corregirlo, el mensaje **sigue ahí** hasta que vuelve a pulsar "Siguiente". No bloquea nada —el paso avanza igual—, pero parece que la corrección no se registró.
-
-Causa: con `mode: "onTouched"` y errores puestos por `trigger()` en vez de por un `handleSubmit`, `isSubmitted` se queda en `false` y el `reValidateMode: "onChange"` por defecto nunca llega a activarse. Se arreglaría revalidando el campo en su `onChange` cuando ya tiene error.
-
-### Estados de carga del panel, sin repasar
-
-El calendario, `EmptyState`, las pantallas de estado y el wizard ya los tienen. Falta un repaso de las pantallas del panel. No bloquea nada.
-
----
-
 ## Detalles menores, sin compromiso
 
 - **Distinguir quién canceló.** Una cancelación del administrador y una del solicitante quedan idénticas en la base: `CANCELLED` con `decidedAt`. Si llega a importar, es un campo nuevo en `Reservation` y su migración, no un apaño de presentación.
-- **El correo de contacto del manual de identidad** sigue siendo `ucatolicaluisamigo@amigo.edu.co`. Al cambiar el sitio web a `funlam.edu.co` no se tocó, porque una dirección de correo es otra cosa y cambiarla sería inventar un dato. **Preguntar antes de tocarla.**
-- **Reactivar una segunda sala.** No requiere migración —el modelo `Room` se dejó genérico a propósito—, pero sí reponer el selector del wizard y decidir cómo se muestran dos calendarios en la landing.
 
 ---
 
@@ -52,18 +36,3 @@ El calendario, `EmptyState`, las pantallas de estado y el wizard ya los tienen. 
 - **Edición** de una reserva ya creada por el solicitante. La **cancelación** por el solicitante es distinta y sí existe (`POST /api/reservations/[code]/cancel`).
 
 ---
-
-## Riesgos aceptados
-
-Conocidos y asumidos para el uso actual. Habría que reabrirlos si el sistema pasa a uso institucional formal.
-
-- **Una sola contraseña de administrador, sin usuarios ni auditoría** (R5 del plan). Con SSO dejaría de serlo.
-- **Sin autenticación del solicitante** (R6): cualquiera con un correo `@amigo.edu.co` válido puede reservar a nombre de otro. Lo mitiga la aprobación manual.
-
----
-
-## Cerrado, y no se reabre
-
-⛔ **Fusión con DataCueva — cancelada por el usuario el 2026-08-22.** Absorber la app de préstamo de equipos dentro de este panel. Llegó a haber un plan aprobado por fases y se completó su fase 0. **No reabrir sin que lo pida.**
-
-Nada de aquel trabajo se revirtió, porque su fase 0 eran tres cosas que este repositorio necesitaba igual: la base de datos de desarrollo, Node 22 y Vitest. El análisis completo sigue en el historial —`git log --all --oneline -- FUSION-DATACUEVA.md`—, pero estaba **equivocado en tres puntos** que solo se vieron al leer el repositorio de verdad: hay que reverificarlo antes de fiarse de él.
