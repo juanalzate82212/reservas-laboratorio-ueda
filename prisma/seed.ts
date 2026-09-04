@@ -8,6 +8,7 @@ import { addDays } from "date-fns";
 
 import type { RequesterRoleValue } from "../src/config/reservationOptions";
 import { fromBogota, isOpenDay, toBogotaDayKey } from "../src/lib/datetime";
+import { hashPassword } from "../src/lib/password";
 import { generateReservationCode } from "../src/lib/reservation-code";
 
 /*
@@ -37,25 +38,76 @@ async function main() {
     );
   }
 
-  const [lunes, martes, miercoles, jueves] = proximosDiasHabiles(4);
-  console.log(`Sembrando sobre los días: ${[lunes, martes, miercoles, jueves].join(", ")}`);
+  /*
+   * El guard de arriba NO basta y está documentado en CLAUDE.md: comprueba
+   * NODE_ENV, que en una terminal local nunca vale "production" aunque la
+   * cadena de conexión apunte a la base real. Esto mira a DÓNDE se va a
+   * escribir, que es lo que de verdad importa.
+   */
+  const REF_PRODUCCION = "ceqqzubsxxuroawcnpvg";
+  const destino = `${process.env.DATABASE_URL ?? ""} ${process.env.DIRECT_URL ?? ""}`;
+  if (destino.includes(REF_PRODUCCION)) {
+    throw new Error(
+      `La semilla borra Reservation y TimeBlock completas y el .env apunta al proyecto de PRODUCCIÓN (${REF_PRODUCCION}). Abortando.`,
+    );
+  }
 
-  // --- Salas (idempotentes: la migración no debe perderlas) ---
+  const [lunes, martes, miercoles, jueves] = proximosDiasHabiles(4);
+  console.log(
+    `Sembrando sobre los días: ${[lunes, martes, miercoles, jueves].join(", ")}`,
+  );
+
+  // --- Laboratorios (idempotentes: la migración no debe perderlos) ---
+  //
+  // El laboratorio ES la sala (ver PLAN-MULTI-LAB.md): dar de alta uno nuevo es
+  // una fila más aquí, más sus variables SMTP_<mailKey>_*.
+  //
   // `capacity` no es decorativo: es el tope de asistentes que valida el
   // formulario y POST /api/reservations. Ojo con `update: {}` — si la fila ya
   // existe, la semilla NO la toca, así que cambiar el aforo aquí solo sirve
-  // para una base nueva; en una que ya tiene la sala hay que actualizarla
-  // aparte.
-  const salaPrincipal = await prisma.room.upsert({
-    where: { slug: "sala-principal" },
+  // para una base nueva; en una que ya lo tiene hay que actualizarlo aparte.
+  const analitica = await prisma.room.upsert({
+    where: { slug: "analitica-datos-ia" },
     update: {},
     create: {
-      slug: "sala-principal",
-      name: "Sala Principal",
-      description: "Sala amplia con equipos de cómputo para prácticas y clases.",
+      slug: "analitica-datos-ia",
+      name: "Laboratorio de Analítica de Datos e Inteligencia Artificial",
+      shortName: "Analítica de Datos e IA",
+      description:
+        "Laboratorio con equipos de cómputo para prácticas, talleres, evaluaciones y semilleros de investigación.",
       capacity: 25,
       hasComputers: true,
       colorToken: "azul",
+      isActive: true,
+      mailKey: "ANALITICA",
+      mailFromName:
+        "Laboratorio de Analítica de Datos e Inteligencia Artificial",
+      contactEmail: "lab.analitica@amigo.edu.co",
+    },
+  });
+
+  /*
+   * ⚠️ Entra INACTIVO a propósito, igual que en la migración. Mientras
+   * `getActiveRoom()` siga siendo `rooms[0]` sobre `orderBy: { slug: "asc" }`,
+   * activar un laboratorio desde los datos puede cambiar la portada pública
+   * sin desplegar código y sin un solo error. Se activa en la fase 2, cuando
+   * el portal ya exista. El aforo es provisional.
+   */
+  await prisma.room.upsert({
+    where: { slug: "redes-infraestructura" },
+    update: {},
+    create: {
+      slug: "redes-infraestructura",
+      name: "Laboratorio de Redes e Infraestructura",
+      shortName: "Redes e Infraestructura",
+      description:
+        "Laboratorio para prácticas de redes, conectividad e infraestructura tecnológica.",
+      capacity: 25,
+      hasComputers: true,
+      colorToken: "azul",
+      isActive: false,
+      mailKey: "REDES",
+      mailFromName: "Laboratorio de Redes e Infraestructura",
     },
   });
 
@@ -63,10 +115,12 @@ async function main() {
   await prisma.reservation.deleteMany();
   await prisma.timeBlock.deleteMany();
 
-  // Decisión de producto: solo Sala Principal es reservable. La sala de
-  // reuniones se retira del todo (ver CLAUDE.md) — sus reservas de demo ya
-  // se borraron arriba, así que la fila puede eliminarse sin violar la FK.
-  await prisma.room.deleteMany({ where: { slug: "sala-reuniones" } });
+  /*
+   * Aquí había un `room.deleteMany({ where: { slug: "sala-reuniones" } })`.
+   * Se retiró al pasar a multi-laboratorio: ahora cada fila de Room es un
+   * laboratorio real, y una semilla que borre salas por slug es una forma
+   * silenciosa de tirar un laboratorio entero con sus datos.
+   */
 
   const reservas: Array<{
     roomId: string;
@@ -87,7 +141,7 @@ async function main() {
     adminNote?: string;
   }> = [
     {
-      roomId: salaPrincipal.id,
+      roomId: analitica.id,
       dia: lunes,
       desde: "08:00",
       hasta: "10:00",
@@ -101,7 +155,7 @@ async function main() {
       attendees: 18,
     },
     {
-      roomId: salaPrincipal.id,
+      roomId: analitica.id,
       dia: lunes,
       desde: "13:00",
       hasta: "15:00",
@@ -115,7 +169,7 @@ async function main() {
       attendees: 6,
     },
     {
-      roomId: salaPrincipal.id,
+      roomId: analitica.id,
       dia: martes,
       desde: "09:00",
       hasta: "11:00",
@@ -129,7 +183,7 @@ async function main() {
       attendees: 12,
     },
     {
-      roomId: salaPrincipal.id,
+      roomId: analitica.id,
       dia: martes,
       desde: "14:00",
       hasta: "16:00",
@@ -146,7 +200,7 @@ async function main() {
         "Esa franja está reservada para mantenimiento de los equipos. Puedes solicitarla el miércoles en el mismo horario.",
     },
     {
-      roomId: salaPrincipal.id,
+      roomId: analitica.id,
       dia: miercoles,
       desde: "08:00",
       hasta: "12:00",
@@ -160,7 +214,7 @@ async function main() {
       attendees: 5,
     },
     {
-      roomId: salaPrincipal.id,
+      roomId: analitica.id,
       dia: miercoles,
       desde: "13:00",
       hasta: "14:00",
@@ -213,7 +267,7 @@ async function main() {
   // Aviso: la franja SÍ se puede reservar, pero se pinta en naranja.
   await prisma.timeBlock.create({
     data: {
-      roomId: salaPrincipal.id,
+      roomId: analitica.id,
       startsAt: fromBogota(martes, "13:00"),
       endsAt: fromBogota(martes, "17:00"),
       kind: "WARNING",
@@ -221,14 +275,45 @@ async function main() {
     },
   });
 
-  const [salas, totalReservas, bloqueos] = await Promise.all([
-    prisma.room.count(),
-    prisma.reservation.count(),
-    prisma.timeBlock.count(),
-  ]);
+  /*
+   * Primer administrador, para no quedarse fuera del panel al retirar
+   * ADMIN_PASSWORD. Es un upsert por correo y NO se borra arriba: las cuentas
+   * no son datos de demostración, y resembrar no debe dejar la app sin acceso.
+   *
+   * La contraseña se toma de ADMIN_PASSWORD, la que ya está en uso. Se guarda
+   * hasheada; el texto plano no llega a la base.
+   */
+  const correoAdmin =
+    process.env.SEED_ADMIN_EMAIL ?? "lab.analitica@amigo.edu.co";
+  const claveAdmin = process.env.ADMIN_PASSWORD;
+
+  if (claveAdmin) {
+    await prisma.adminUser.upsert({
+      where: { email: correoAdmin },
+      update: {},
+      create: {
+        email: correoAdmin,
+        name: "Administrador general",
+        passwordHash: await hashPassword(claveAdmin),
+        role: "SUPER_ADMIN",
+        roomId: null,
+      },
+    });
+  } else {
+    console.warn(
+      "ADMIN_PASSWORD sin definir: no se sembró ningún administrador. El panel quedará sin acceso.",
+    );
+  }
+
+  // Secuencial, NO Promise.all: con connection_limit=1 estas consultas
+  // competirían por la única conexión en vez de esperar turno (ver CLAUDE.md).
+  const salas = await prisma.room.count();
+  const totalReservas = await prisma.reservation.count();
+  const bloqueos = await prisma.timeBlock.count();
+  const admins = await prisma.adminUser.count();
 
   console.log(
-    `Listo: ${salas} salas, ${totalReservas} reservas, ${bloqueos} bloqueos.`,
+    `Listo: ${salas} laboratorios, ${totalReservas} reservas, ${bloqueos} bloqueos, ${admins} administradores.`,
   );
 }
 
