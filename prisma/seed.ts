@@ -94,7 +94,7 @@ async function main() {
    * El aforo y el correo de contacto siguen pendientes de confirmar con el
    * laboratorio.
    */
-  await prisma.room.upsert({
+  const redes = await prisma.room.upsert({
     where: { slug: "redes-infraestructura" },
     update: {},
     create: {
@@ -229,6 +229,96 @@ async function main() {
       attendees: 20,
       adminNote: "Se canceló por jornada institucional.",
     },
+
+    /*
+     * --- Laboratorio de Redes e Infraestructura ---
+     *
+     * ⚠️ `lunes`/`martes`/`miercoles`/`jueves` son nombres POSICIONALES: son
+     * los cuatro próximos días hábiles, no esos días de la semana. Sembrando un
+     * lunes, `lunes` cae en martes.
+     *
+     * Las horas se eligen a propósito para que el AISLAMIENTO se vea de un
+     * vistazo, no solo se pueda deducir: el primer día, Redes ocupa
+     * 09:00–11:00 y Analítica 08:00–10:00 — se pisan en reloj y los dos
+     * calendarios siguen siendo independientes. Sirve también para comprobar a
+     * ojo la fase 3, en la que cada encargado solo debe ver lo suyo.
+     *
+     * Ninguna cae en el cuarto día de 08:00 a 12:00: ahí está el bloqueo
+     * GLOBAL, que por diseño (roomId null) alcanza a los dos laboratorios.
+     */
+    {
+      roomId: redes.id,
+      dia: lunes,
+      desde: "09:00",
+      hasta: "11:00",
+      status: "CONFIRMED",
+      requesterName: "Mauricio Betancur Ossa",
+      requesterRole: "DOCENTE",
+      requesterDocId: "70123456",
+      requesterEmail: "mauricio.betancur@amigo.edu.co",
+      academicProgram: "INGENIERIA_SISTEMAS",
+      activityType: "CLASE_PRACTICA",
+      attendees: 22,
+    },
+    {
+      roomId: redes.id,
+      dia: lunes,
+      desde: "14:00",
+      hasta: "16:00",
+      status: "PENDING",
+      requesterName: "Paula Andrea Jaramillo",
+      requesterRole: "COORDINADOR",
+      requesterDocId: "1037894561",
+      requesterEmail: "paula.jaramillo@amigo.edu.co",
+      academicProgram: "TECNOLOGIA_DESARROLLO_SOFTWARE",
+      activityType: "TALLER",
+      attendees: 14,
+    },
+    {
+      roomId: redes.id,
+      dia: martes,
+      desde: "08:00",
+      hasta: "10:00",
+      status: "REJECTED",
+      requesterName: "Andrés Felipe Cardona",
+      requesterRole: "ADMINISTRATIVO",
+      requesterDocId: "8234567",
+      requesterEmail: "andres.cardona@amigo.edu.co",
+      academicProgram: "INGENIERIA_SISTEMAS_APARTADO",
+      activityType: "OTRO",
+      activityTypeOther: "Capacitación interna del área de sistemas.",
+      attendees: 10,
+      adminNote:
+        "Esa mañana hay migración del cableado. Puedes solicitarla el mismo día en la tarde.",
+    },
+    {
+      roomId: redes.id,
+      dia: miercoles,
+      desde: "15:00",
+      hasta: "17:00",
+      status: "CONFIRMED",
+      requesterName: "Natalia Serna Quintero",
+      requesterRole: "INVESTIGADOR",
+      requesterDocId: "1152903847",
+      requesterEmail: "natalia.serna@amigo.edu.co",
+      academicProgram: "INGENIERIA_SISTEMAS",
+      activityType: "SEMILLERO_INVESTIGACION",
+      attendees: 8,
+    },
+    {
+      roomId: redes.id,
+      dia: jueves,
+      desde: "13:00",
+      hasta: "15:00",
+      status: "PENDING",
+      requesterName: "Sebastián Rivera Duque",
+      requesterRole: "DOCENTE",
+      requesterDocId: "1019283746",
+      requesterEmail: "sebastian.rivera@amigo.edu.co",
+      academicProgram: "TECNOLOGIA_DESARROLLO_SOFTWARE",
+      activityType: "EVALUACION",
+      attendees: 18,
+    },
   ];
 
   for (const r of reservas) {
@@ -254,7 +344,14 @@ async function main() {
     });
   }
 
-  // Bloqueo duro y global (roomId null = todas las salas).
+  /*
+   * Bloqueo duro y GLOBAL: roomId null alcanza a TODOS los laboratorios, no
+   * solo al de Analítica. Con dos labs eso ya se nota — el cuarto día hábil
+   * por la mañana aparece cerrado en los dos calendarios.
+   *
+   * En la fase 3 este es el único tipo de franja que un LAB_ADMIN NO podrá
+   * crear: solo el SUPER_ADMIN, porque afecta a laboratorios que no administra.
+   */
   await prisma.timeBlock.create({
     data: {
       roomId: null,
@@ -273,6 +370,23 @@ async function main() {
       endsAt: fromBogota(martes, "17:00"),
       kind: "WARNING",
       reason: "Sin préstamo de equipos de cómputo esta tarde.",
+    },
+  });
+
+  /*
+   * Bloqueo duro que afecta SOLO a Redes, para tener el contraste con el
+   * global de arriba. Cae en el tercer día hábil de 08:00 a 12:00, la misma
+   * franja en la que Analítica tiene una reserva confirmada: mismo horario, un
+   * laboratorio cerrado y el otro ocupado. Es la clase de franja que en la fase
+   * 3 sí podrá crear el encargado de Redes por su cuenta.
+   */
+  await prisma.timeBlock.create({
+    data: {
+      roomId: redes.id,
+      startsAt: fromBogota(miercoles, "08:00"),
+      endsAt: fromBogota(miercoles, "12:00"),
+      kind: "BLOCKED",
+      reason: "Migración del cableado estructurado.",
     },
   });
 
@@ -306,16 +420,37 @@ async function main() {
     );
   }
 
-  // Secuencial, NO Promise.all: con connection_limit=1 estas consultas
-  // competirían por la única conexión en vez de esperar turno (ver CLAUDE.md).
-  const salas = await prisma.room.count();
-  const totalReservas = await prisma.reservation.count();
-  const bloqueos = await prisma.timeBlock.count();
+  /*
+   * Recuento POR LABORATORIO y no solo el total: con un total agregado, un
+   * laboratorio que se quedara sin datos de demostración pasaría inadvertido
+   * — que es justo lo que pasó al añadir el segundo.
+   *
+   * Secuencial, NO Promise.all: con connection_limit=1 estas consultas
+   * competirían por la única conexión en vez de esperar turno (ver CLAUDE.md).
+   */
+  const laboratorios = await prisma.room.findMany({
+    select: {
+      slug: true,
+      isActive: true,
+      _count: { select: { reservations: true, timeBlocks: true } },
+    },
+    orderBy: { slug: "asc" },
+  });
+  const bloqueosGlobales = await prisma.timeBlock.count({
+    where: { roomId: null },
+  });
   const admins = await prisma.adminUser.count();
 
-  console.log(
-    `Listo: ${salas} laboratorios, ${totalReservas} reservas, ${bloqueos} bloqueos, ${admins} administradores.`,
-  );
+  console.log("");
+  console.log("Listo:");
+  for (const lab of laboratorios) {
+    const estado = lab.isActive ? "activo" : "inactivo";
+    console.log(
+      `  ${lab.slug} (${estado}): ${lab._count.reservations} reservas, ${lab._count.timeBlocks} franjas propias`,
+    );
+  }
+  console.log(`  franjas globales (afectan a todos): ${bloqueosGlobales}`);
+  console.log(`  administradores: ${admins}`);
 }
 
 main()
