@@ -8,11 +8,25 @@ import { createTimeBlockSchema } from "@/lib/validation/timeBlock";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  if (!(await getAdminSession())) {
+  const sesion = await getAdminSession();
+  if (!sesion) {
     return errorResponse(401, "UNAUTHORIZED", "Inicia sesión para ver las franjas.");
   }
 
+  /*
+   * ⚠️ Aquí el alcance NO es alcanceDeSala(): un LAB_ADMIN tiene que VER las
+   * franjas globales (roomId null) porque le cierran su propio calendario, y
+   * ocultarlas le haría ver huecos libres que en realidad no lo están.
+   *
+   * Ver no es tocar: crearlas y borrarlas sí queda reservado al SUPER_ADMIN
+   * (ver POST aquí abajo y DELETE en [id]/route.ts). La UI las marca como
+   * globales y no ofrece el botón de eliminar.
+   */
   const timeBlocks = await prisma.timeBlock.findMany({
+    where:
+      sesion.role === "SUPER_ADMIN"
+        ? {}
+        : { OR: [{ roomId: sesion.roomId }, { roomId: null }] },
     orderBy: { startsAt: "asc" },
     include: { room: { select: { id: true, name: true } } },
   });
@@ -21,7 +35,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await getAdminSession())) {
+  const sesion = await getAdminSession();
+  if (!sesion) {
     return errorResponse(401, "UNAUTHORIZED", "Inicia sesión para crear franjas.");
   }
 
@@ -36,6 +51,33 @@ export async function POST(request: Request) {
   const { roomId, startsAt, endsAt, kind, reason } = parsed.data;
   const start = new Date(startsAt);
   const end = new Date(endsAt);
+
+  /*
+   * Una franja global (roomId null) cierra el calendario de TODOS los
+   * laboratorios, incluidos los que quien la crea no administra. Por eso es lo
+   * único que un LAB_ADMIN no puede crear: es la decisión explícita del
+   * usuario, y sin ella el aislamiento se podría saltar por la puerta de al
+   * lado — no leyendo datos ajenos, pero sí bloqueando laboratorios ajenos.
+   *
+   * 403 y no 404: aquí no se está revelando la existencia de nada, y quien lo
+   * intenta merece saber por qué no puede.
+   */
+  if (sesion.role === "LAB_ADMIN") {
+    if (!roomId) {
+      return errorResponse(
+        403,
+        "GLOBAL_TIME_BLOCK_FORBIDDEN",
+        "Una franja para todos los laboratorios solo la puede crear el administrador general.",
+      );
+    }
+    if (roomId !== sesion.roomId) {
+      return errorResponse(
+        403,
+        "ROOM_FORBIDDEN",
+        "Solo puedes crear franjas de tu propio laboratorio.",
+      );
+    }
+  }
 
   if (roomId) {
     const room = await prisma.room.findFirst({ where: { id: roomId, isActive: true }, select: { id: true } });

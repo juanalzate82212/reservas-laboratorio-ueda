@@ -91,14 +91,20 @@ export async function POST(request: NextRequest) {
   // correo. Secuencial a propósito (ver expirarReservasVencidas).
   await expirarReservasVencidas();
 
+  /*
+   * El tope es POR LABORATORIO, no global. Existe para que una sola persona no
+   * acapare la cola de revisión DE UN LABORATORIO, y quien revisa es distinto
+   * en cada uno: bloquear en Redes a quien tiene tres pendientes en Analítica
+   * sería un efecto colateral de haber juntado los datos, no la regla.
+   */
   const pendientesDelCorreo = await prisma.reservation.count({
-    where: { requesterEmail, status: "PENDING" },
+    where: { requesterEmail, status: "PENDING", roomId },
   });
   if (pendientesDelCorreo >= BOOKING_CONFIG.maxPendingPerEmail) {
     return errorResponse(
       409,
       "TOO_MANY_PENDING",
-      `Ya tienes ${BOOKING_CONFIG.maxPendingPerEmail} solicitudes en revisión con ese correo. Espera a que el administrador responda antes de enviar otra.`,
+      `Ya tienes ${BOOKING_CONFIG.maxPendingPerEmail} solicitudes en revisión en este laboratorio con ese correo. Espera a que el encargado responda antes de enviar otra.`,
     );
   }
 
@@ -179,6 +185,7 @@ export async function POST(request: NextRequest) {
     try {
       await enviarCorreoAlLaboratorio({
         reservationId: reservation.id,
+        roomId: room.id,
         ...newRequestAdminTemplate(
           {
             code: reservation.code,

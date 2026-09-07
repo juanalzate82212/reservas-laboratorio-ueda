@@ -50,13 +50,55 @@ const CAMPOS = {
  * usuario. Sin el parámetro, el periodo es todo el histórico.
  */
 export async function GET(request: NextRequest) {
-  if (!(await getAdminSession())) {
-    return errorResponse(401, "UNAUTHORIZED", "Inicia sesión para ver las estadísticas.");
+  const sesion = await getAdminSession();
+  if (!sesion) {
+    return errorResponse(
+      401,
+      "UNAUTHORIZED",
+      "Inicia sesión para ver las estadísticas.",
+    );
   }
 
   const mes = request.nextUrl.searchParams.get("mes");
   if (mes && !FORMATO_MES.test(mes)) {
-    return errorResponse(400, "VALIDATION_ERROR", "El mes debe tener el formato AAAA-MM.");
+    return errorResponse(
+      400,
+      "VALIDATION_ERROR",
+      "El mes debe tener el formato AAAA-MM.",
+    );
+  }
+
+  /*
+   * ⚠️ Estas cifras son SIEMPRE de UN laboratorio, nunca de varios sumados, y
+   * no es una preferencia de presentación: `ocupacion.indice` es
+   * horasReservadas / horasHabiles, y horasHabiles sale del horario de
+   * atención, que es UNO. Agregando dos laboratorios, el numerador suma las
+   * horas de ambos contra el denominador de un solo calendario y el índice
+   * puede pasar de 1 — una ocupación del 140 %, que no significa nada.
+   *
+   * Un LAB_ADMIN ve el suyo y el parámetro se ignora. Un SUPER_ADMIN elige con
+   * `?roomId=`; sin él, el primero por slug, y la respuesta dice cuál para que
+   * la pantalla no tenga que adivinarlo.
+   */
+  const roomIdPedido = request.nextUrl.searchParams.get("roomId");
+  const sala =
+    sesion.role === "LAB_ADMIN"
+      ? await prisma.room.findUnique({
+          where: { id: sesion.roomId },
+          select: { id: true, name: true },
+        })
+      : await prisma.room.findFirst({
+          where: roomIdPedido ? { id: roomIdPedido } : { isActive: true },
+          orderBy: { slug: "asc" },
+          select: { id: true, name: true },
+        });
+
+  if (!sala) {
+    return errorResponse(
+      404,
+      "ROOM_NOT_FOUND",
+      "No encontramos ese laboratorio.",
+    );
   }
 
   // Antes de contar: si no, las solicitudes que ya pasaron su franja seguirían
@@ -77,13 +119,16 @@ export async function GET(request: NextRequest) {
   // mes no significaría nada. Siempre son los últimos 12 hasta hoy.
   const desdeTendencia = rangoDelMes(meses[0]).desde;
   const filasTendencia = await prisma.reservation.findMany({
-    where: { startsAt: { gte: desdeTendencia } },
+    where: { roomId: sala.id, startsAt: { gte: desdeTendencia } },
     select: { startsAt: true },
   });
 
   const rango = mes ? rangoDelMes(mes) : null;
   const filas = await prisma.reservation.findMany({
-    where: rango ? { startsAt: { gte: rango.desde, lt: rango.hasta } } : {},
+    where: {
+      roomId: sala.id,
+      ...(rango ? { startsAt: { gte: rango.desde, lt: rango.hasta } } : {}),
+    },
     select: CAMPOS,
     orderBy: { startsAt: "asc" },
   });
@@ -100,13 +145,18 @@ export async function GET(request: NextRequest) {
     (filas.length > 0
       ? {
           desde: filas[0].startsAt,
-          hasta: new Date(filas[filas.length - 1].endsAt.getTime() + 24 * 60 * 60 * 1000),
+          hasta: new Date(
+            filas[filas.length - 1].endsAt.getTime() + 24 * 60 * 60 * 1000,
+          ),
         }
       : { desde: ahora, hasta: ahora });
 
   const estadisticas = calcularEstadisticas(filas, periodo);
 
   return NextResponse.json({
+    // De qué laboratorio son estas cifras. La pantalla lo rotula: sin esto,
+    // un SUPER_ADMIN no sabría cuál le tocó por defecto.
+    sala,
     periodo: {
       mes: mes ?? null,
       etiqueta: mes ? etiquetaDeMes(mes) : "Todo el histórico",

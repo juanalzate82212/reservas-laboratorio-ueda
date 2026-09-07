@@ -21,6 +21,12 @@ export interface TimeBlockFormProps {
   rooms: Array<{ id: string; name: string }>;
   enviando: boolean;
   onSubmit: (values: TimeBlockFormValues) => void;
+  /**
+   * Si puede crear franjas GLOBALES (las que cierran todos los laboratorios).
+   * Solo el administrador general. Ver POST /api/admin/time-blocks, que es
+   * quien lo impide de verdad: esto solo evita ofrecer algo que va a fallar.
+   */
+  puedeCrearGlobales?: boolean;
 }
 
 const CAMPOS_VACIOS = {
@@ -38,17 +44,28 @@ const CAMPOS_VACIOS = {
  * abarcar varios días (ej. "semana de receso") — por eso pide fecha de
  * inicio y fecha de fin por separado, en vez de un solo día + duración.
  */
-export function TimeBlockForm({ rooms, enviando, onSubmit }: TimeBlockFormProps) {
+export function TimeBlockForm({
+  rooms,
+  enviando,
+  onSubmit,
+  puedeCrearGlobales = false,
+}: TimeBlockFormProps) {
   const [campos, setCampos] = useState(CAMPOS_VACIOS);
 
-  function actualizar<K extends keyof typeof CAMPOS_VACIOS>(campo: K, valor: (typeof CAMPOS_VACIOS)[K]) {
+  function actualizar<K extends keyof typeof CAMPOS_VACIOS>(
+    campo: K,
+    valor: (typeof CAMPOS_VACIOS)[K],
+  ) {
     setCampos((prev) => ({ ...prev, [campo]: valor }));
   }
 
   function manejarEnvio(event: FormEvent) {
     event.preventDefault();
 
-    const startsAt = fromBogota(campos.fechaInicio, campos.horaInicio).toISOString();
+    const startsAt = fromBogota(
+      campos.fechaInicio,
+      campos.horaInicio,
+    ).toISOString();
     const endsAt = fromBogota(campos.fechaFin, campos.horaFin).toISOString();
 
     onSubmit({
@@ -62,9 +79,19 @@ export function TimeBlockForm({ rooms, enviando, onSubmit }: TimeBlockFormProps)
 
   return (
     <form onSubmit={manejarEnvio} className="grid gap-5 sm:grid-cols-2">
-      <Field label="Sala">
-        <Select value={campos.salaId} onChange={(e) => actualizar("salaId", e.target.value)}>
-          <option value="">Todas las salas</option>
+      <Field label="Laboratorio">
+        <Select
+          value={campos.salaId}
+          onChange={(e) => actualizar("salaId", e.target.value)}
+        >
+          {/*
+            "Todos" cierra el calendario de laboratorios que quien administra
+            uno solo no gestiona, así que solo se le ofrece al administrador
+            general.
+          */}
+          {puedeCrearGlobales && (
+            <option value="">Todos los laboratorios</option>
+          )}
           {rooms.map((room) => (
             <option key={room.id} value={room.id}>
               {room.name}
@@ -76,7 +103,9 @@ export function TimeBlockForm({ rooms, enviando, onSubmit }: TimeBlockFormProps)
       <Field label="Tipo">
         <Select
           value={campos.tipo}
-          onChange={(e) => actualizar("tipo", e.target.value as "BLOCKED" | "WARNING")}
+          onChange={(e) =>
+            actualizar("tipo", e.target.value as "BLOCKED" | "WARNING")
+          }
         >
           <option value="BLOCKED">Bloqueada (no reservable)</option>
           <option value="WARNING">Aviso (sigue siendo reservable)</option>
@@ -119,7 +148,11 @@ export function TimeBlockForm({ rooms, enviando, onSubmit }: TimeBlockFormProps)
         />
       </Field>
 
-      <Field label="Motivo" ayuda="Lo verá quien consulte el calendario." className="sm:col-span-2">
+      <Field
+        label="Motivo"
+        ayuda="Lo verá quien consulte el calendario."
+        className="sm:col-span-2"
+      >
         <Textarea
           required
           placeholder="Mantenimiento preventivo de los equipos de cómputo."

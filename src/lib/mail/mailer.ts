@@ -34,6 +34,16 @@ function crearTransporte() {
 
 export interface EnviarCorreoInput {
   reservationId: string;
+  /**
+   * De qué laboratorio es este correo.
+   *
+   * Sin esto /admin/correos no se puede acotar, y el encargado de un
+   * laboratorio vería su pantalla de correos VACÍA: el filtro por sala falla
+   * cerrado a propósito, porque el cuerpo del correo lleva el nombre y los
+   * datos del solicitante. En la fase 4 esta misma sala decidirá además POR QUÉ
+   * BUZÓN sale el correo.
+   */
+  roomId: string;
   to: string;
   subject: string;
   html: string;
@@ -41,6 +51,7 @@ export interface EnviarCorreoInput {
 
 export async function enviarCorreo({
   reservationId,
+  roomId,
   to,
   subject,
   html,
@@ -48,7 +59,7 @@ export async function enviarCorreo({
   if (!smtpConfigurado()) {
     console.log(`[correo:LOGGED] Para: ${to}\nAsunto: ${subject}`);
     await prisma.emailLog.create({
-      data: { reservationId, to, subject, body: html, status: "LOGGED" },
+      data: { reservationId, roomId, to, subject, body: html, status: "LOGGED" },
     });
     return "LOGGED";
   }
@@ -61,14 +72,14 @@ export async function enviarCorreo({
       html,
     });
     await prisma.emailLog.create({
-      data: { reservationId, to, subject, body: html, status: "SENT" },
+      data: { reservationId, roomId, to, subject, body: html, status: "SENT" },
     });
     return "SENT";
   } catch (error) {
     const mensaje =
       error instanceof Error ? error.message : "Error desconocido al enviar el correo.";
     await prisma.emailLog.create({
-      data: { reservationId, to, subject, body: html, status: "FAILED", error: mensaje },
+      data: { reservationId, roomId, to, subject, body: html, status: "FAILED", error: mensaje },
     });
     return "FAILED";
   }
