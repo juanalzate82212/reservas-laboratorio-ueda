@@ -1,5 +1,6 @@
 "use client";
 
+import { LoaderCircle } from "lucide-react";
 import dynamic from "next/dynamic";
 
 import type { ActiveRoom } from "@/lib/rooms";
@@ -16,23 +17,37 @@ const RoomCalendar = dynamic(
   { ssr: false, loading: () => <CalendarSkeleton /> },
 );
 
+/*
+ * ⚠️ Sin `animate-pulse`, y no es cosmetico: esa utilidad anima la opacidad
+ * entre 1 y 0.5, y a media animacion el texto sobre #F5F5F5 cae por debajo del
+ * 4.5:1 que exige WCAG AA. axe-core lo reporta como `color-contrast` [serious]
+ * al muestrear el fotograma atenuado. Tampoco respetaba
+ * prefers-reduced-motion.
+ *
+ * Se sustituye por el mismo patron que ya usa el calendario del panel: un
+ * spinner (gira, no se atenua) con el texto a opacidad plena.
+ */
 function CalendarSkeleton() {
   return (
     <div
       role="status"
-      aria-label="Cargando calendario"
-      className="flex h-[420px] animate-pulse items-center justify-center rounded border border-borde bg-superficie text-caption text-texto-secundario"
+      className="flex h-[420px] items-center justify-center gap-2 rounded border border-borde bg-superficie"
     >
-      Cargando calendario…
+      <LoaderCircle
+        aria-hidden
+        className="h-5 w-5 animate-spin text-primary motion-reduce:animate-none"
+      />
+      <span className="text-caption font-medium text-texto-secundario">
+        Cargando el calendario…
+      </span>
     </div>
   );
 }
 
 /*
- * Solo hay una sala reservable (Sala Principal — se retiró Sala de
- * Reuniones), así que el calendario se muestra directo, a todo el ancho
- * disponible, sin el plegado ni el selector que tenía sentido cuando había
- * que elegir entre dos.
+ * Un calendario, el del laboratorio de la página que lo monta. Elegir
+ * laboratorio pasó a ser trabajo del portal (`/`), así que aquí no hay selector
+ * ni plegado: cuando se llega a /laboratorio/[slug] la elección ya está hecha.
  */
 export function RoomAvailability({ room }: { room: ActiveRoom }) {
   return <RoomCalendar room={room} />;

@@ -60,7 +60,7 @@ export default function QrPage() {
             size={280}
             level="M"
             marginSize={2}
-            title="Código QR para reservar el laboratorio"
+            title="Código QR para reservar un laboratorio"
             className="h-auto w-[280px] print:w-[14cm] print:max-w-full"
           />
 
@@ -68,8 +68,13 @@ export default function QrPage() {
             <p className="font-display text-h2 font-semibold text-texto">
               Escanea para reservar
             </p>
+            {/*
+              El QR lleva al portal, no a un laboratorio concreto: nombrar uno
+              aquí haría creer que este cartel solo sirve para ese. Ver
+              PLAN-MULTI-LAB.md.
+            */}
             <p className="max-w-xs text-body text-texto-secundario">
-              Laboratorio de Analítica de Datos e Inteligencia Artificial
+              Elige tu laboratorio y consulta su disponibilidad
             </p>
           </div>
         </Card>

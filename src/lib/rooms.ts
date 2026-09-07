@@ -1,4 +1,5 @@
 import type { Room } from "@prisma/client";
+import { cache } from "react";
 
 import { prisma } from "./db";
 
@@ -53,27 +54,20 @@ export async function getActiveRooms(): Promise<ActiveRoom[]> {
  * debe ser alcanzable escribiendo su slug a mano, así que quien llama responde
  * notFound() sin distinguir "no existe" de "todavía no está abierto".
  */
-export async function getRoomBySlug(slug: string): Promise<ActiveRoom | null> {
-  return prisma.room.findFirst({
-    where: { slug, isActive: true },
-    select: CAMPOS_PUBLICOS,
-  });
-}
+export const getRoomBySlug = cache(
+  async (slug: string): Promise<ActiveRoom | null> =>
+    prisma.room.findFirst({
+      where: { slug, isActive: true },
+      select: CAMPOS_PUBLICOS,
+    }),
+);
 
 /*
- * ⚠️ ESTO ES EL ACOPLAMIENTO A "UN SOLO LABORATORIO" y desaparece en la fase 2
- * (ver PLAN-MULTI-LAB.md). Devuelve el primero de los activos por orden de
- * slug, lo que era correcto cuando solo había uno reservable.
+ * Aquí vivía `getActiveRoom()`, que devolvía `rooms[0]` de los activos. Era el
+ * acoplamiento a "un solo laboratorio": mientras existió, activar una fila
+ * desde la base podía cambiar QUÉ laboratorio mostraba la portada, sin
+ * desplegar código y sin un solo error.
  *
- * Con dos laboratorios se vuelve una trampa: activar una fila desde la base
- * puede cambiar QUÉ laboratorio muestra la portada, sin desplegar código y sin
- * error alguno. Por eso el laboratorio de Redes entra inactivo hasta que el
- * portal exista y estas tres llamadas (app/page.tsx, app/reservar/page.tsx y
- * la copia en cliente de admin/calendario) se hayan retirado.
- *
- * NO usarla en código nuevo: para una página de laboratorio, getRoomBySlug().
+ * Se retiró al construir el portal. Para una página de laboratorio se usa
+ * getRoomBySlug(), que toma el laboratorio de la URL en vez de adivinarlo.
  */
-export async function getActiveRoom(): Promise<ActiveRoom | null> {
-  const rooms = await getActiveRooms();
-  return rooms[0] ?? null;
-}
