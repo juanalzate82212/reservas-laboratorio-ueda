@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
 
   const room = await prisma.room.findFirst({
     where: { id: roomId, isActive: true },
-    select: { id: true, capacity: true, name: true },
+    select: { id: true, capacity: true, name: true, mailKey: true },
   });
   if (!room) {
     return errorResponse(
@@ -186,6 +186,7 @@ export async function POST(request: NextRequest) {
       await enviarCorreoAlLaboratorio({
         reservationId: reservation.id,
         roomId: room.id,
+        mailKey: room.mailKey,
         ...newRequestAdminTemplate(
           {
             code: reservation.code,

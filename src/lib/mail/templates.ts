@@ -54,7 +54,23 @@ function tablaDatos(filas: Array<[string, string]>): string {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;">${celdas}</table>`;
 }
 
-function layout({ titulo, cuerpoHtml }: { titulo: string; cuerpoHtml: string }): string {
+/*
+ * ⚠️ `laboratorio` es un parámetro y no una constante desde que hay más de uno.
+ * Esta cabecera aparece en LOS SEIS correos, así que con el nombre incrustado
+ * un solicitante de Redes recibía un correo encabezado por Analítica.
+ *
+ * Con el modelo elegido (el laboratorio ES la sala) sale gratis: las plantillas
+ * ya recibían `roomName`, que ahora ES el nombre del laboratorio.
+ */
+function layout({
+  titulo,
+  cuerpoHtml,
+  laboratorio,
+}: {
+  titulo: string;
+  cuerpoHtml: string;
+  laboratorio: string;
+}): string {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   return `<!DOCTYPE html>
 <html lang="es">
@@ -65,7 +81,7 @@ function layout({ titulo, cuerpoHtml }: { titulo: string; cuerpoHtml: string }):
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:${COLOR.fondo};border-radius:8px;overflow:hidden;">
             <tr>
               <td style="background-color:${COLOR.primary};padding:24px 32px;">
-                <span style="color:#ffffff;font-size:20px;font-weight:700;font-family:Arial,Helvetica,sans-serif;">Laboratorio de Analítica de Datos e Inteligencia Artificial</span>
+                <span style="color:#ffffff;font-size:20px;font-weight:700;font-family:Arial,Helvetica,sans-serif;">${escapeHtml(laboratorio)}</span>
               </td>
             </tr>
             <tr>
@@ -128,7 +144,10 @@ function datosComunes(r: TemplateReservation): Array<[string, string]> {
  * pulse el botón.
  */
 function fechaParaGoogleCalendar(fecha: Date): string {
-  return fecha.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  return fecha
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}/, "");
 }
 
 /*
@@ -138,7 +157,7 @@ function fechaParaGoogleCalendar(fecha: Date): string {
  * enlace entero se escapa después para meterlo en el href.
  */
 function enlaceGoogleCalendar(r: TemplateReservation): string {
-  const texto = `${actividadLegible(r)} — Laboratorio de Analítica de Datos e IA`;
+  const texto = `${actividadLegible(r)} — ${r.roomName}`;
   const detalles = `Reserva ${r.code} · ${r.roomName}. Consulta su estado con el código en la página del laboratorio.`;
   const lugar = `Universidad Católica Luis Amigó · ${r.roomName}`;
 
@@ -188,10 +207,20 @@ export function confirmTemplate(
     <p style="margin:16px 0 0;color:${COLOR.textoSecundario};font-size:13px;">Guarda el código de tu reserva para consultarla más adelante.</p>
   `;
 
-  return { subject, html: layout({ titulo: "Reserva confirmada", cuerpoHtml }) };
+  return {
+    subject,
+    html: layout({
+      titulo: "Reserva confirmada",
+      cuerpoHtml,
+      laboratorio: r.roomName,
+    }),
+  };
 }
 
-export function rejectTemplate(r: TemplateReservation): { subject: string; html: string } {
+export function rejectTemplate(r: TemplateReservation): {
+  subject: string;
+  html: string;
+} {
   const subject = `Solicitud de reserva no aprobada — ${r.roomName}, ${formatRange(r.startsAt, r.endsAt)}`;
 
   const nota = r.adminNote
@@ -205,10 +234,20 @@ export function rejectTemplate(r: TemplateReservation): { subject: string; html:
     <p style="margin:16px 0 0;">Puedes revisar la disponibilidad y enviar una nueva solicitud para otro horario cuando quieras.</p>
   `;
 
-  return { subject, html: layout({ titulo: "Solicitud no aprobada", cuerpoHtml }) };
+  return {
+    subject,
+    html: layout({
+      titulo: "Solicitud no aprobada",
+      cuerpoHtml,
+      laboratorio: r.roomName,
+    }),
+  };
 }
 
-export function cancelTemplate(r: TemplateReservation): { subject: string; html: string } {
+export function cancelTemplate(r: TemplateReservation): {
+  subject: string;
+  html: string;
+} {
   const subject = `Reserva cancelada — ${r.roomName}, ${formatRange(r.startsAt, r.endsAt)}`;
 
   const nota = r.adminNote
@@ -222,7 +261,14 @@ export function cancelTemplate(r: TemplateReservation): { subject: string; html:
     <p style="margin:16px 0 0;">Puedes solicitar otro horario disponible cuando lo necesites.</p>
   `;
 
-  return { subject, html: layout({ titulo: "Reserva cancelada", cuerpoHtml }) };
+  return {
+    subject,
+    html: layout({
+      titulo: "Reserva cancelada",
+      cuerpoHtml,
+      laboratorio: r.roomName,
+    }),
+  };
 }
 
 /*
@@ -244,7 +290,14 @@ export function selfCancelTemplate(r: TemplateReservation): {
     <p style="margin:16px 0 0;">Si no fuiste tú, escríbenos cuanto antes: todavía estamos a tiempo de recuperar el horario.</p>
   `;
 
-  return { subject, html: layout({ titulo: "Reserva cancelada", cuerpoHtml }) };
+  return {
+    subject,
+    html: layout({
+      titulo: "Reserva cancelada",
+      cuerpoHtml,
+      laboratorio: r.roomName,
+    }),
+  };
 }
 
 /*
@@ -273,7 +326,14 @@ export function newRequestAdminTemplate(
     <p style="margin:16px 0 0;color:${COLOR.textoSecundario};font-size:13px;">Si nadie la revisa antes de que pase su horario, la solicitud se marca como vencida.</p>
   `;
 
-  return { subject, html: layout({ titulo: "Nueva solicitud de reserva", cuerpoHtml }) };
+  return {
+    subject,
+    html: layout({
+      titulo: "Nueva solicitud de reserva",
+      cuerpoHtml,
+      laboratorio: r.roomName,
+    }),
+  };
 }
 
 /** Aviso interno al laboratorio: una franja se liberó sin que el admin actuara. */
@@ -289,5 +349,12 @@ export function requesterCancelAdminTemplate(r: TemplateReservation): {
     <p style="margin:16px 0 0;color:${COLOR.textoSecundario};font-size:13px;">No hay nada que hacer en el panel: la franja ya se liberó sola.</p>
   `;
 
-  return { subject, html: layout({ titulo: "Cancelación del solicitante", cuerpoHtml }) };
+  return {
+    subject,
+    html: layout({
+      titulo: "Cancelación del solicitante",
+      cuerpoHtml,
+      laboratorio: r.roomName,
+    }),
+  };
 }

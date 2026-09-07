@@ -56,7 +56,7 @@ export async function POST(
       activityTypeOther: true,
       attendees: true,
       roomId: true,
-      room: { select: { name: true } },
+      room: { select: { name: true, mailKey: true } },
     },
   });
 
@@ -125,6 +125,7 @@ export async function POST(
     acuse = await enviarCorreo({
       reservationId: reservation.id,
       roomId: reservation.roomId,
+      mailKey: reservation.room.mailKey,
       to: reservation.requesterEmail,
       ...selfCancelTemplate(datosPlantilla),
     });
@@ -132,6 +133,7 @@ export async function POST(
     await enviarCorreoAlLaboratorio({
       reservationId: reservation.id,
       roomId: reservation.roomId,
+      mailKey: reservation.room.mailKey,
       ...requesterCancelAdminTemplate(datosPlantilla),
     });
   } catch (error) {

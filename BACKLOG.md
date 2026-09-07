@@ -16,6 +16,16 @@
 
 ---
 
+## Antes de que Redes reciba reservas de verdad
+
+**Confirmar el aforo y el correo de contacto del Laboratorio de Redes e Infraestructura.** Se sembró con aforo **25 copiado de Analítica** y `contactEmail` en `null`, ambos provisionales y ya visibles al público. El aforo no es decorativo: es el tope que valida `POST /api/reservations` contra `Room.capacity`. Sin `contactEmail`, el pie de sus páginas no ofrece a quién escribir.
+
+**Dar de alta su buzón de correo.** Sin las variables `SMTP_*_REDES` / `MAIL_FROM_REDES` / `MAIL_TO_ADMIN_REDES`, sus correos salen por el buzón global — hoy, el de Analítica. Funciona, pero no es lo que se buscó.
+
+**Crear a su encargado** desde `/admin/usuarios`, con rol `LAB_ADMIN`.
+
+---
+
 ## Detalles menores, sin compromiso
 
 - **Distinguir quién canceló.** Una cancelación del administrador y una del solicitante quedan idénticas en la base: `CANCELLED` con `decidedAt`. Si llega a importar, es un campo nuevo en `Reservation` y su migración, no un apaño de presentación.

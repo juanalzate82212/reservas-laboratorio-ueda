@@ -6,11 +6,19 @@ Guía para trabajar en este repositorio. Contiene **lo que no se puede deducir l
 
 ## Qué es esto
 
-Sistema de reserva del **Laboratorio de Analítica de Datos e Inteligencia Artificial** de la Universidad Católica Luis Amigó, **en producción**: https://reservas-laboratorio-ueda.vercel.app
+Sistema de reserva de los **laboratorios** de la Universidad Católica Luis Amigó, **en producción**: https://reservas-laboratorio-ueda.vercel.app
 
-El público llega por un código QR impreso → ve la disponibilidad en un calendario → solicita una franja. Un único administrador (una contraseña, sin sistema de usuarios) gestiona todo desde `/admin`, que tiene seis secciones: **Solicitudes, Calendario** (solo lectura), **Franjas, Estadísticas, Correos y QR**. Todo el texto visible va en español.
+El público llega por un código QR impreso → cae en el **portal** (`/`), que presenta los laboratorios → entra en el suyo, ve la disponibilidad y solicita una franja. Todo el texto visible va en español.
 
-**Hay una sola sala reservable, "Sala Principal"**, pero el modelo `Room` es genérico a propósito: hubo una segunda y se retiró por decisión de producto, no por limitación técnica. Por eso conviven `getActiveRoom()` y `getActiveRooms()`. **No "simplificar" eso**: reactivar una segunda sala debe seguir siendo un cambio de datos, no una migración.
+**Cada laboratorio ES una fila de `Room`.** No hay un modelo `Lab` aparte: fue una decisión explícita del usuario. Dar de alta uno nuevo es insertar una fila más sus variables de correo, sin migración. El precio, asumido: el día que UN laboratorio necesite DOS espacios reservables distintos, eso sí es una migración de modelo.
+
+Hoy hay dos: **Analítica de Datos e IA** (`analitica-datos-ia`, mailKey `ANALITICA`) y **Redes e Infraestructura** (`redes-infraestructura`, mailKey `REDES`).
+
+⚠️ **`getActiveRoom()` ya no existe.** Devolvía `rooms[0]` por orden de slug, y mientras existió, activar una fila desde la base podía cambiar QUÉ laboratorio veía el público, sin desplegar código y sin un solo error. Para una página de laboratorio se usa `getRoomBySlug()`, que lo toma de la URL en vez de adivinarlo. **No reintroducir nada que elija "el primero".**
+
+**Rutas públicas:** `/` (portal), `/laboratorio/[slug]`, `/laboratorio/[slug]/reservar`, `/reserva` y `/reserva/[codigo]`. `/reservar` es una redirección 307 desde `next.config.mjs` — y va ahí y no en una página con `redirect()` porque en un Server Component la redirección salta DESPUÉS de enviar la shell y salía un 200 con `<meta http-equiv="refresh">`.
+
+**El panel** (`/admin`) tiene siete secciones: **Solicitudes, Calendario** (solo lectura), **Franjas, Estadísticas, Correos, QR** y **Usuarios** (solo para el administrador general).
 
 ⚠️ **Dos nombres que se confunden, y ya costaron dos rondas de correcciones.** El **Laboratorio de Analítica de Datos e Inteligencia Artificial** es el espacio que se reserva y aparece en toda la app. La **Unidad de Estrategia del Dato y Analítica** es quien lo administra y construyó la herramienta, y aparece **una sola vez**, en el crédito de `Footer.tsx`. Esa línea dice algo distinto al resto del producto a propósito — no unificarla.
 
@@ -61,7 +69,17 @@ npx prisma migrate deploy    # aplicar migraciones ya creadas
 npx prisma generate          # regenerar cliente tras cambiar el schema
 npx prisma studio            # inspector de BD — el verificador principal
 npx prisma db seed           # ⚠️ DESTRUCTIVO: ver la sección de Datos
+
+npm run crear-admin          # crea/actualiza una cuenta de administrador
 ```
+
+**`npm run crear-admin` es un REQUISITO DE DESPLIEGUE en un entorno nuevo**, no una utilidad. La tabla `AdminUser` nace vacía —una migración es SQL y no puede hashear una contraseña— y la semilla no sirve ahí porque borra `Reservation` y `TimeBlock`. Sin ejecutarlo antes de desplegar, **el panel se queda sin nadie que pueda entrar**:
+
+```bash
+ADMIN_EMAIL=... ADMIN_PASSWORD=... ADMIN_NAME="..." ADMIN_ROLE=SUPER_ADMIN npm run crear-admin
+```
+
+En producción el administrador general es **p3.sistemas@amigo.edu.co**. El script es idempotente e imprime a qué proyecto de Supabase apunta antes de escribir.
 
 **La verificación principal es por criterios de aceptación**, no por tests: `prisma studio`, `curl` contra los Route Handlers, y `check:datetime` al cerrar cualquier trabajo que toque fechas.
 
@@ -96,7 +114,7 @@ Todas pedidas explícitamente por el usuario. Sin este contexto, varias parecen 
 
 ⚠️ **Los `value` de `src/config/reservationOptions.ts` deben coincidir exactamente con los enums de `prisma/schema.prisma`.** Ese archivo es la única fuente: lo consumen el `<select>` del wizard, el `z.enum` de la validación y las etiquetas de la revisión.
 
-**No se rota `ADMIN_PASSWORD`.** El usuario lo decidió con la información delante. **No volver a proponerlo.**
+**No se rota `ADMIN_PASSWORD`.** El usuario lo decidió con la información delante. **No volver a proponerlo.** (Desde la fase 3 la aplicación ya no la lee: solo la usan la semilla y `npm run crear-admin` como contraseña inicial de la primera cuenta.)
 
 ---
 
@@ -142,15 +160,45 @@ Se descartó Vercel Cron porque en plan Hobby solo permite **una ejecución al d
 
 **El HTML se escapa en origen Y se previsualiza en un `<iframe sandbox="">`.** Doble capa a propósito: `requesterName` y `activityTypeOther` los escribió alguien externo por el formulario público, y ese HTML se guarda en `EmailLog.body` y se vuelve a renderizar en `/admin/correos`, dentro de la sesión del admin.
 
-**`MAIL_TO_ADMIN` es variable aparte de `SMTP_USER`** aunque hoy valgan lo mismo: el día que los avisos internos deban ir a otra persona se cambia eso y no el remitente de todos los correos.
+**`MAIL_TO_ADMIN` es variable aparte de `SMTP_USER`**: el día que los avisos internos deban ir a otra persona se cambia eso y no el remitente de todos los correos.
+
+**El remitente se resuelve POR LABORATORIO** en `lib/mail/buzones.ts`: `SMTP_<CLAVE>_*`, `MAIL_FROM_<CLAVE>` y `MAIL_TO_ADMIN_<CLAVE>`, con reserva a la variable global sin sufijo si el laboratorio no tiene la suya. Una variable vacía cuenta como no configurada.
+
+⚠️ **La clave es `Room.mailKey`, NO el `slug`**, y van aparte a propósito: el slug es parte de la URL pública, o sea cosmético y renombrable, y si las credenciales colgaran de él, renombrarlo dejaría al laboratorio **sin SMTP en silencio** — el mailer caería en modo `LOGGED` y los correos dejarían de salir sin un solo error.
+
+⚠️ **`smtpConfigurado()` se evalúa por buzón**: un laboratorio sin credenciales cae en `LOGGED` sin arrastrar al otro.
+
+⚠️ **`reintentarCorreo()` re-resuelve el buzón desde el `roomId` DEL REGISTRO**, no del entorno. Antes leía `MAIL_FROM` en caliente: con dos laboratorios, eso significaría reenviar el correo de uno **desde la cuenta del otro**, sin dejar constancia. Un registro sin `roomId` no se puede atribuir a ningún buzón y no se reintenta.
+
+**`EmailLog` guarda `roomId` y `fromAddress`**: sin el primero, `/admin/correos` no se puede acotar y un `LAB_ADMIN` vería la pantalla vacía (el filtro falla cerrado porque el cuerpo lleva datos del solicitante); sin el segundo, el remitente de un correo enviado era irrecuperable.
+
+**El nombre del laboratorio en las plantillas es un parámetro**, no una constante: la cabecera de `layout()` aparece en los SEIS correos, y con el nombre incrustado un solicitante de Redes recibía un correo encabezado por Analítica. Sale barato porque `TemplateReservation.roomName` **es** el nombre del laboratorio.
 
 ⚠️ **El enlace de Google Calendar usa el instante UTC real.** **No** pasa por `toBogotaWallClockIso()`: ese truco es exclusivo del límite con FullCalendar, y aquí metería 5 h de desfase en el calendario de quien pulse el botón.
 
-### Autenticación del admin
+### Autenticación y aislamiento por laboratorio
 
-JWT firmado con `jose` en cookie `admin_session` (httpOnly, 8 h). Sin NextAuth.
+JWT firmado con `jose` en cookie `admin_session` (httpOnly, 8 h). Sin NextAuth. Cuentas en `AdminUser`, contraseñas hasheadas con **scrypt de `node:crypto`** (`lib/password.ts`) — cero dependencias frente a `bcrypt` (binario nativo) o `bcryptjs`.
 
-**El middleware no es la única defensa:** solo protege *páginas*. Cada handler de `/api/admin/**` debe llamar a `getAdminSession()` por su cuenta.
+Dos roles: **`SUPER_ADMIN`** (transversal, `roomId` null, único que gestiona usuarios y franjas globales) y **`LAB_ADMIN`** (acotado a su laboratorio).
+
+⚠️ **`AdminSession` es una unión discriminada**, no un objeto con `roomId` opcional. Así el compilador garantiza que un `LAB_ADMIN` siempre trae sala; sin eso, `alcanceDeSala()` tendría que decidir qué hacer con uno sin sala, y la respuesta cómoda —alcance vacío— le abriría TODOS los laboratorios. Ese caso se corta antes: `getAdminSession()` no le abre sesión.
+
+⚠️ **`getAdminSession()` verifica la firma Y RELEE la fila del usuario** en cada petición. Esa consulta extra es deliberada: confiando solo en el token, desactivar a alguien o cambiarlo de laboratorio tardaría **hasta 8 h** en surtir efecto. Va secuencial, nunca en `Promise.all`.
+
+⚠️ **`alcanceDeSala()` va DESPUÉS del filtro del cliente en el `where`, y el orden ES la seguridad.** Si `?roomId=` fuera lo último, un `LAB_ADMIN` leería las solicitudes de otro laboratorio con datos personales incluidos. Hay un test en `lib/auth.test.ts` que fija ese orden justo porque es una vulnerabilidad que depende de dos líneas.
+
+**Fuera de alcance se responde 404, no 403**: un 403 confirmaría que ese id existe. Mismo criterio que la autocancelación pública.
+
+**Franjas — asimetría deliberada:** un `LAB_ADMIN` **ve** las franjas globales (`roomId` null) porque le cierran su propio calendario, pero **no puede crearlas ni borrarlas**, porque afectan a laboratorios que no administra. Solo el `SUPER_ADMIN`. Por eso el `GET` de la lista NO usa `alcanceDeSala()` y el `DELETE` sí.
+
+**Estadísticas: siempre de UN laboratorio.** No es presentación: `ocupacion.indice` divide entre las horas hábiles de un solo calendario, así que agregando dos podría pasar de 1.
+
+**El middleware no es la única defensa:** solo protege *páginas*, y en Edge solo puede leer la firma del token (rol incluido), que es una foto que puede tener hasta 8 h. Cada handler de `/api/admin/**` llama a `getAdminSession()` por su cuenta. Ocultar la sección "Usuarios" del nav es cortesía; el 403 del handler es la defensa.
+
+**`SesionAdminProvider`** reparte la sesión a los Client Components desde el layout (que ya la resolvió), en vez de un `GET /api/admin/session` por pantalla. Es para decidir **qué pintar**, nunca para autorizar.
+
+**No hay borrado de administradores**, solo desactivación: borrarlos perdería el rastro de quién decidió sobre las solicitudes ya resueltas. Y **nadie puede desactivarse ni degradarse a sí mismo** — eso es lo que impide dejar la aplicación sin ningún administrador general.
 
 ⚠️ **Dos runtimes, un solo `lib/auth.ts`.** `middleware.ts` corre en **Edge** y solo puede importar `signAdminToken`/`verifyAdminToken`/`ADMIN_SESSION_COOKIE`; nunca `getAdminSession()`, que depende de `next/headers` (Node). Para que convivan, `getAdminSession()` importa `next/headers` de forma **dinámica** dentro de su cuerpo, así no queda atrapado en el grafo estático del bundle de Edge.
 
@@ -160,7 +208,7 @@ JWT firmado con `jose` en cookie `admin_session` (httpOnly, 8 h). Sin NextAuth.
 
 ## FullCalendar: tres trampas
 
-`RoomCalendar` se usa en dos sitios con el mismo código: el público (`/`) y el panel (`/admin/calendario`, con `soloLectura`). Se resolvió con un prop en vez de duplicando el componente **porque estas tres trampas viajan con él**: una copia aparte las duplicaría y se quedaría atrás en cuanto se arregle una.
+`RoomCalendar` se usa en dos sitios con el mismo código: el público (`/laboratorio/[slug]`) y el panel (`/admin/calendario`, con `soloLectura`, que trae selector cuando hay más de un laboratorio y usa `key={sala.id}` para remontarlo al cambiar — sin eso, `ultimoRangoRef` sobreviviría al cambio y el calendario se quedaría con los datos del anterior). Se resolvió con un prop en vez de duplicando el componente **porque estas tres trampas viajan con él**: una copia aparte las duplicaría y se quedaría atrás en cuanto se arregle una.
 
 **1. El truco de zona horaria.** Se configura con `timeZone="UTC"` y se le pasan cadenas ISO **sin sufijo de zona** que ya representan hora de Bogotá (`toBogotaWallClockIso()`). Así el calendario se ve igual sin importar la zona del navegador. Contrapartida: los `Date` que FullCalendar construye traen los campos de Bogotá metidos en los *getters* UTC, y `src/lib/fullcalendar.ts` deshace el truco. **No usar esas funciones fuera del límite con FullCalendar** — son un adaptador de un solo sentido. Por lo mismo se sobrescribe el prop `now`.
 
@@ -168,7 +216,9 @@ JWT firmado con `jose` en cookie `admin_session` (httpOnly, 8 h). Sin NextAuth.
 
 **3. El bucle infinito de `datesSet`.** Cada `setState` hace que `<FullCalendar>` reciba props nuevas; el wrapper llama `resetOptions()` en cada `componentDidUpdate` con un objeto recién creado, la memoización interna compara por referencia, falla siempre, y vuelve a disparar `datesSet` **para el mismo rango visible** → otro fetch → otro `setState`. El arreglo son dos capas que se complementan: `ultimoRangoRef` ignora un `datesSet` de rango idéntico, y un `AbortController` por componente cubre la navegación real solapada. **El rango se marca al empezar la petición y se desmarca si falla o se aborta** — sin lo segundo, el doble montaje de efectos de React en desarrollo deja el rango bloqueado sin datos.
 
-> **`/` y `/reservar` deben seguir con `force-dynamic`.** No son candidatos a ISR: el CI construye con credenciales de base de datos falsas.
+> **`/`, `/laboratorio/[slug]`, `/laboratorio/[slug]/reservar` y `/reserva/[codigo]` deben seguir con `force-dynamic`.** No son candidatos a ISR: el CI construye con credenciales de base de datos falsas.
+>
+> ⚠️ **Limitación conocida:** un slug de laboratorio inexistente renderiza la página 404 correcta pero responde **HTTP 200**. Con el streaming de Next 14 el estado ya está comprometido cuando `notFound()` se lanza; llamarlo también en `generateMetadata` no lo cambia (probado). Una ruta que no casa con ningún segmento sí da 404 de verdad. Se acepta: quien navega ve la pantalla correcta.
 
 ---
 

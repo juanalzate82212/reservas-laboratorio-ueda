@@ -1,8 +1,10 @@
-# Reservas — Laboratorio de Analítica de Datos e Inteligencia Artificial
+# Reservas de Laboratorios — Universidad Católica Luis Amigó
 
-Sistema de reserva del laboratorio de la **Universidad Católica Luis Amigó**.
+Sistema de reserva de los laboratorios de la **Universidad Católica Luis Amigó**.
 
-Cualquier persona de la comunidad universitaria escanea un código QR, consulta la disponibilidad en un calendario y solicita una franja horaria. Un administrador revisa las solicitudes, las aprueba o rechaza, y gestiona bloqueos de horario. El solicitante recibe un correo automático con la decisión.
+Cualquier persona de la comunidad universitaria escanea un código QR, elige laboratorio en el portal, consulta su disponibilidad en un calendario y solicita una franja horaria. El encargado de ese laboratorio revisa las solicitudes, las aprueba o rechaza, y gestiona bloqueos de horario. El solicitante recibe un correo automático con la decisión, enviado desde la cuenta de ese laboratorio.
+
+**Laboratorios activos:** Analítica de Datos e Inteligencia Artificial, y Redes e Infraestructura. Cada uno tiene su calendario, su encargado y su remitente de correo; una reserva en uno no afecta al otro.
 
 **En producción:** https://reservas-laboratorio-ueda.vercel.app
 
@@ -12,17 +14,26 @@ Cualquier persona de la comunidad universitaria escanea un código QR, consulta 
 
 **Para el público** (sin cuenta ni contraseña):
 
-- Ver la disponibilidad de la sala en un calendario semanal, con los estados diferenciados por color **y** por icono/borde (por accesibilidad para daltonismo): reservado, en revisión, sin equipos de cómputo, no disponible, festivo.
+- Elegir laboratorio en el portal (`/`) y ver su disponibilidad en un calendario semanal, con los estados diferenciados por color **y** por icono/borde (por accesibilidad para daltonismo): reservado, en revisión, sin equipos de cómputo, no disponible, festivo.
 - Solicitar una reserva eligiendo día, hora de inicio y duración; tocar una franja libre del calendario prellena el formulario.
 - Consultar el estado de una solicitud con el código que se entrega al enviarla (ej. `UEDA-7F3K2`).
 - Cancelar la propia reserva hasta el momento en que empieza, con ese mismo código más el número de documento. No hace falta cuenta: son dos datos que solo junta quien reservó.
 
-**Para el administrador** (una contraseña, sin sistema de usuarios):
+**Para los administradores** (correo y contraseña, con dos roles):
 
 - Bandeja de solicitudes con filtros por estado: confirmar, rechazar o cancelar.
 - Gestión de franjas: bloquear horarios (no reservables) o marcarlos como advertencia (reservables, pero sin préstamo de equipos).
 - Registro de correos enviados, con vista previa y opción de reintentar los fallidos.
+- Estadísticas de uso, sin ningún dato personal.
 - Página con el código QR en formato imprimible.
+- **Usuarios**: alta y edición de administradores (solo el administrador general).
+
+**Los dos roles:**
+
+| Rol | Alcance |
+|-----|---------|
+| **Administrador general** (`SUPER_ADMIN`) | Todos los laboratorios. Único que gestiona administradores y que puede crear franjas que afecten a todos |
+| **Encargado de laboratorio** (`LAB_ADMIN`) | Solo el suyo. Ve las franjas globales porque le cierran su calendario, pero no puede crearlas ni borrarlas |
 
 **Reglas de negocio principales:**
 
@@ -107,16 +118,21 @@ Todas están documentadas en [`.env.example`](.env.example). Resumen:
 |----------|----------|
 | `DATABASE_URL` | Conexión de runtime — pooler de Supabase, **puerto 6543**, con `?pgbouncer=true&connection_limit=1` |
 | `DIRECT_URL` | Conexión directa, **puerto 5432** — solo para migraciones (PgBouncer no soporta DDL) |
-| `ADMIN_PASSWORD` | Contraseña única del panel de administración |
+| `ADMIN_PASSWORD` | Contraseña **inicial** del primer administrador. La aplicación ya no la lee: solo la usan la semilla y `npm run crear-admin` |
 | `AUTH_SECRET` | Clave para firmar el JWT de sesión. Generar con `openssl rand -base64 32` |
 | `NEXT_PUBLIC_APP_URL` | URL pública de la app. **Es lo que codifica el QR** y la base de la URL absoluta de la imagen de Open Graph; un valor incorrecto rompe la función principal y deja el enlace compartido sin vista previa |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASSWORD` | Credenciales de envío de correo |
 | `MAIL_FROM` | Remitente, en formato `Nombre <correo>`. Debe coincidir con `SMTP_USER` o ser un alias suyo |
-| `MAIL_TO_ADMIN` | Buzón interno donde caen los **avisos** al laboratorio: solicitud nueva por revisar, y cancelación hecha por el solicitante. Hoy es la misma cuenta que envía. Si se deja vacía, esos avisos no se mandan y solo queda constancia en consola |
+| `MAIL_TO_ADMIN` | Buzón interno donde caen los **avisos** al laboratorio: solicitud nueva por revisar, y cancelación hecha por el solicitante. Si se deja vacía, esos avisos no se mandan y solo queda constancia en consola |
+| `SMTP_*_<CLAVE>`, `MAIL_FROM_<CLAVE>`, `MAIL_TO_ADMIN_<CLAVE>` | **Buzón propio de un laboratorio.** `<CLAVE>` es su `Room.mailKey` (`ANALITICA`, `REDES`). Si un laboratorio no tiene la suya, se usa la variable global sin sufijo |
 
 **Las dos URLs de base de datos no son intercambiables** y ambas deben estar declaradas. Omitir `DIRECT_URL` produce errores de *"prepared statement already exists"* que típicamente solo aparecen después de desplegar.
 
-**Sin `SMTP_PASSWORD`, la aplicación sigue funcionando:** el mailer escribe los correos en consola y los registra con estado `LOGGED` en vez de fallar, de modo que todo el flujo es desarrollable y demostrable sin credenciales.
+**Sin `SMTP_PASSWORD`, la aplicación sigue funcionando:** el mailer escribe los correos en consola y los registra con estado `LOGGED` en vez de fallar, de modo que todo el flujo es desarrollable y demostrable sin credenciales. Se evalúa **por buzón**: un laboratorio sin credenciales cae en `LOGGED` sin arrastrar a los demás.
+
+> ⚠️ El sufijo de las variables por laboratorio es `Room.mailKey`, **no el `slug`**. Van aparte a propósito: el slug es parte de la URL pública y algún día alguien lo renombrará; si las credenciales colgaran de él, ese cambio dejaría al laboratorio **sin SMTP en silencio**.
+
+**Dar de alta un laboratorio nuevo** = insertar su fila en `Room` (con su `mailKey`) y añadir sus variables de correo. No hace falta ninguna migración.
 
 ### Cómo obtener la contraseña de correo
 
@@ -221,6 +237,13 @@ Para desplegar desde cero:
 3. Cargar todas las variables de entorno en los entornos Production y Preview.
 4. `NEXT_PUBLIC_APP_URL` debe ser el dominio real — es lo que codifica el QR.
 5. Aplicar las migraciones: `DATABASE_URL="$DIRECT_URL" npx prisma migrate deploy`.
+6. **Crear el primer administrador.** La tabla `AdminUser` nace vacía: una migración es SQL y no puede hashear una contraseña, y la semilla no sirve en producción porque borra `Reservation` y `TimeBlock`. **Sin este paso el panel se queda sin nadie que pueda entrar.**
+
+   ```bash
+   ADMIN_EMAIL=p3.sistemas@amigo.edu.co ADMIN_PASSWORD="..."    ADMIN_NAME="Administrador general" ADMIN_ROLE=SUPER_ADMIN    npm run crear-admin
+   ```
+
+   En producción el administrador general es **p3.sistemas@amigo.edu.co**. El script es idempotente e imprime a qué proyecto de Supabase apunta antes de escribir. Los demás administradores se crean ya desde `/admin/usuarios`.
 
 > **Vercel no tiene desplegable de versión de Node**: respeta `engines.node` de `package.json`. El repo declara `22.x` desde el 2026-08-11, así que la retirada de Node 20 del 2026-10-01 ya no afecta.
 
