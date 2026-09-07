@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { errorResponse, validationErrorResponse } from "@/lib/api/http";
-import { getAdminSession } from "@/lib/auth";
+import { alcanceDeSala, getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { enviarCorreo } from "@/lib/mail/mailer";
 import { cancelTemplate, confirmTemplate, rejectTemplate } from "@/lib/mail/templates";
@@ -46,7 +46,8 @@ export async function PATCH(
   request: Request,
   { params }: { params: { id: string } },
 ) {
-  if (!(await getAdminSession())) {
+  const sesion = await getAdminSession();
+  if (!sesion) {
     return errorResponse(401, "UNAUTHORIZED", "Inicia sesión para gestionar solicitudes.");
   }
 
@@ -60,8 +61,17 @@ export async function PATCH(
 
   const { action } = parsed.data;
 
-  const reservation = await prisma.reservation.findUnique({
-    where: { id: params.id },
+  /*
+   * findFirst con el alcance, no findUnique por id: una solicitud de otro
+   * laboratorio tiene que ser indistinguible de una que no existe.
+   *
+   * Responde 404 y no 403 a propósito. Un 403 confirmaría que ese id existe, y
+   * con eso se puede recorrer el espacio de identificadores y contar las
+   * solicitudes ajenas. Mismo criterio que la autocancelación pública, que no
+   * distingue "ese código no existe" de "ese documento no coincide".
+   */
+  const reservation = await prisma.reservation.findFirst({
+    where: { id: params.id, ...alcanceDeSala(sesion) },
     select: { id: true, status: true },
   });
   if (!reservation) {
@@ -118,6 +128,7 @@ export async function PATCH(
 
   const emailStatus = await enviarCorreo({
     reservationId: updated.id,
+    roomId: updated.roomId,
     to: updated.requesterEmail,
     subject: plantilla.subject,
     html: plantilla.html,
