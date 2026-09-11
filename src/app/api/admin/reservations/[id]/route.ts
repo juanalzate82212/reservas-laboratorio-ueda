@@ -5,7 +5,11 @@ import { errorResponse, validationErrorResponse } from "@/lib/api/http";
 import { alcanceDeSala, getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { enviarCorreo } from "@/lib/mail/mailer";
-import { cancelTemplate, confirmTemplate, rejectTemplate } from "@/lib/mail/templates";
+import {
+  cancelTemplate,
+  confirmTemplate,
+  rejectTemplate,
+} from "@/lib/mail/templates";
 
 // Nodemailer no corre en Edge Runtime (§7 del plan).
 export const runtime = "nodejs";
@@ -21,13 +25,19 @@ export const runtime = "nodejs";
  * del usuario. `adminNote` sigue existiendo en el modelo (nullable) por si
  * una fase futura decide capturarlo, pero esta ruta no lo exige ni lo pide.
  */
-const ACTION_TARGET: Record<"CONFIRM" | "REJECT" | "CANCEL", "CONFIRMED" | "REJECTED" | "CANCELLED"> = {
+const ACTION_TARGET: Record<
+  "CONFIRM" | "REJECT" | "CANCEL",
+  "CONFIRMED" | "REJECTED" | "CANCELLED"
+> = {
   CONFIRM: "CONFIRMED",
   REJECT: "REJECTED",
   CANCEL: "CANCELLED",
 };
 
-const ALLOWED_FROM: Record<"CONFIRM" | "REJECT" | "CANCEL", "PENDING" | "CONFIRMED"> = {
+const ALLOWED_FROM: Record<
+  "CONFIRM" | "REJECT" | "CANCEL",
+  "PENDING" | "CONFIRMED"
+> = {
   CONFIRM: "PENDING",
   REJECT: "PENDING",
   CANCEL: "CONFIRMED",
@@ -48,12 +58,20 @@ export async function PATCH(
 ) {
   const sesion = await getAdminSession();
   if (!sesion) {
-    return errorResponse(401, "UNAUTHORIZED", "Inicia sesión para gestionar solicitudes.");
+    return errorResponse(
+      401,
+      "UNAUTHORIZED",
+      "Inicia sesión para gestionar solicitudes.",
+    );
   }
 
   const body = await request.json().catch(() => null);
   if (body === null) {
-    return errorResponse(400, "VALIDATION_ERROR", "El cuerpo de la solicitud no es JSON válido.");
+    return errorResponse(
+      400,
+      "VALIDATION_ERROR",
+      "El cuerpo de la solicitud no es JSON válido.",
+    );
   }
 
   const parsed = patchSchema.safeParse(body);
@@ -75,7 +93,11 @@ export async function PATCH(
     select: { id: true, status: true },
   });
   if (!reservation) {
-    return errorResponse(404, "RESERVATION_NOT_FOUND", "No encontramos esa solicitud.");
+    return errorResponse(
+      404,
+      "RESERVATION_NOT_FOUND",
+      "No encontramos esa solicitud.",
+    );
   }
 
   if (reservation.status !== ALLOWED_FROM[action]) {
@@ -89,7 +111,9 @@ export async function PATCH(
   const updated = await prisma.reservation.update({
     where: { id: params.id },
     data: { status: ACTION_TARGET[action], decidedAt: new Date() },
-    include: { room: { select: { id: true, name: true, slug: true } } },
+    include: {
+      room: { select: { id: true, name: true, slug: true, mailKey: true } },
+    },
   });
 
   // El correo nunca bloquea la transición: la reserva ya quedó escrita
@@ -126,13 +150,32 @@ export async function PATCH(
     plantilla = cancelTemplate(datosPlantilla);
   }
 
-  const emailStatus = await enviarCorreo({
-    reservationId: updated.id,
-    roomId: updated.roomId,
-    to: updated.requesterEmail,
-    subject: plantilla.subject,
-    html: plantilla.html,
-  });
+  /*
+   * ⚠️ try/catch, además del que ya tiene el mailer. enviarCorreo() atrapa los
+   * fallos de ENVÍO, pero el EmailLog.create de dentro de su propio `catch`
+   * puede fallar por su cuenta —y esa excepción sí sale—, convirtiendo un 200
+   * con la reserva YA TRANSICIONADA en un 500. El administrador vería un error,
+   * volvería a intentarlo y se encontraría con un 409 de transición inválida,
+   * sin entender que la primera vez sí funcionó.
+   *
+   * Era el único de los cuatro handlers de correo sin esta guarda.
+   */
+  let emailStatus: Awaited<ReturnType<typeof enviarCorreo>> | null = null;
+  try {
+    emailStatus = await enviarCorreo({
+      reservationId: updated.id,
+      roomId: updated.roomId,
+      mailKey: updated.room.mailKey,
+      to: updated.requesterEmail,
+      subject: plantilla.subject,
+      html: plantilla.html,
+    });
+  } catch (error) {
+    console.error(
+      "[correo] Falló el correo de una decisión del administrador:",
+      error,
+    );
+  }
 
   return NextResponse.json({ ...updated, emailStatus });
 }
