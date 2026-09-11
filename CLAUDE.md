@@ -6,7 +6,9 @@ Guía para trabajar en este repositorio. Contiene **lo que no se puede deducir l
 
 ## Qué es esto
 
-Sistema de reserva de los **laboratorios** de la Universidad Católica Luis Amigó, **en producción**: https://reservas-laboratorio-ueda.vercel.app
+Sistema de reserva de los **laboratorios** de la Universidad Católica Luis Amigó: https://reservas-laboratorio-ueda.vercel.app
+
+> ⚠️ **Al 2026-09-11, todo lo multi-laboratorio vive en `develop`. `main` —producción— todavía sirve la versión de UN SOLO laboratorio.** Lo que sigue describe `develop`. Antes de fusionar a `main` hay tres pasos obligatorios, en orden: aplicar las migraciones, `npm run crear-admin` (si no, el panel se queda sin acceso) y cargar las variables de correo de cada laboratorio. **Borrar este aviso cuando esté desplegado.**
 
 El público llega por un código QR impreso → cae en el **portal** (`/`), que presenta los laboratorios → entra en el suyo, ve la disponibilidad y solicita una franja. Todo el texto visible va en español.
 
@@ -41,7 +43,7 @@ Importa porque **el guard de `prisma/seed.ts` no protege**: comprueba `NODE_ENV 
 
 **La app está en uso: no dar por buena ninguna cifra de filas de producción que leas aquí.** Míralo en vez de deducirlo. En producción **no resembrar sin pedirlo**.
 
-**Las cinco tablas de `public` tienen RLS y ninguna tiene políticas**, que es el estado buscado: cierra el canal REST de Supabase sin afectar a la app, porque Prisma se conecta como `postgres` y ese rol ignora RLS. El linter reportará `rls_enabled_no_policy` como INFO en las cinco — **no es un pendiente**, es la consecuencia esperada.
+**Las seis tablas de `public` tienen RLS y ninguna tiene políticas** (las cinco del modelo más `_prisma_migrations`), que es el estado buscado: cierra el canal REST de Supabase sin afectar a la app, porque Prisma se conecta como `postgres` y ese rol ignora RLS. El linter reportará `rls_enabled_no_policy` como INFO en todas — **no es un pendiente**, es la consecuencia esperada.
 
 ---
 
@@ -50,6 +52,7 @@ Importa porque **el guard de `prisma/seed.ts` no protege**: comprueba `NODE_ENV 
 - **[BACKLOG.md](BACKLOG.md)** — lo pendiente y lo que está fuera de alcance. **No implementar nada de esa lista sin que el usuario lo pida.**
 - **[identidad-visual-ucla-ui-ux.md](identidad-visual-ucla-ui-ux.md)** — tokens, tipografía, logo y voz de redacción. **De cumplimiento obligatorio.**
 - **[PLAN-MVP.md](PLAN-MVP.md)** — la especificación numerada que citan los comentarios del código (`§5 del plan`…). Es referencia de contrato, no estado actual: **donde difiera del código, manda el código.**
+- **[PLAN-MULTI-LAB.md](PLAN-MULTI-LAB.md)** — el plan del segundo laboratorio, ya COMPLETADO. Mismo estatus: documento histórico, no estado actual. Útil para entender **por qué** el multi-laboratorio quedó así; describe el código de antes de cada fase, así que no buscar ahí cómo están las cosas hoy.
 - **[README.md](README.md)** — instalación, variables de entorno y despliegue.
 
 ---
@@ -83,7 +86,9 @@ En producción el administrador general es **p3.sistemas@amigo.edu.co**. El scri
 
 **La verificación principal es por criterios de aceptación**, no por tests: `prisma studio`, `curl` contra los Route Handlers, y `check:datetime` al cerrar cualquier trabajo que toque fechas.
 
-**Vitest cubre solo funciones puras** — `lib/availability.test.ts` y `lib/stats.test.ts`, sin Prisma ni petición, ejercitadas con objetos literales. Ese es el criterio para decidir si algo nuevo merece un test aquí; el resto se verifica con el método de arriba.
+**Vitest cubre solo funciones puras**, sin Prisma ni petición, ejercitadas con objetos literales: `lib/availability.test.ts`, `lib/stats.test.ts`, `lib/password.test.ts`, `lib/auth.test.ts` y `lib/mail/buzones.test.ts`. Ese es el criterio para decidir si algo nuevo merece un test aquí; el resto se verifica con el método de arriba.
+
+⚠️ El de `lib/auth.test.ts` no es un test cualquiera: fija que `alcanceDeSala()` va **después** del filtro del cliente en el `where`. Invertir esas dos líneas expondría datos personales de otro laboratorio.
 
 Para bugs de interfaz y auditorías de accesibilidad, **Playwright y axe-core instalados temporalmente** (`npm install --no-save playwright @axe-core/playwright`) han sido efectivos; `package.json` y `package-lock.json` deben quedar intactos.
 
@@ -134,7 +139,7 @@ Todas pedidas explícitamente por el usuario. Sin este contexto, varias parecen 
 
 **Mutaciones = Route Handlers, no Server Actions.** Un solo patrón, para poder probar con `curl`. Formato de error uniforme: `{ "error": { "code": "...", "message": "..." } }`.
 
-**Dos patrones de datos a propósito.** La landing consulta Prisma directo (Server Component, no necesita refrescarse). El panel es Client Component y llama a la API desde el navegador, porque necesita revalidar tras cada mutación, mantener filtros y mostrar toasts.
+**Dos patrones de datos a propósito.** Las páginas públicas (portal y laboratorio) consultan Prisma directo (Server Components, no necesitan refrescarse). El panel es Client Component y llama a la API desde el navegador, porque necesita revalidar tras cada mutación, mantener filtros y mostrar toasts.
 
 ### `EXPIRED` se aplica al leer, no con un cron
 

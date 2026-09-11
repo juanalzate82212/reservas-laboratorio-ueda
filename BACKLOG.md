@@ -4,7 +4,9 @@
 
 `CLAUDE.md` guarda las *decisiones y sus porqués*; este archivo, las *tareas abiertas*. **No duplicar**: si algo ya está explicado allá, aquí no se repite.
 
-**La aplicación está en producción** con el MVP completo, el panel de administración (solicitudes, calendario de solo lectura, franjas, estadísticas, correos y QR) y los arreglos pedidos tras el despliegue.
+**La aplicación está en producción** con el MVP completo y el panel de administración.
+
+⚠️ **Lo multi-laboratorio está terminado en `develop`, pero `main` todavía sirve la versión de un solo laboratorio.** El portal, las rutas por laboratorio, los administradores con rol y el correo por buzón no han llegado a producción. Ver los pasos de despliegue en [README.md](README.md#despliegue).
 
 ---
 
@@ -26,6 +28,22 @@
 
 ---
 
+## Deuda técnica anotada
+
+**No detectamos rebotes.** `EmailLog` con estado `SENT` significa *"el servidor SMTP aceptó el mensaje"*, **no** *"llegó"*. Si el correo de un solicitante rebota o cae en spam, hoy nadie se entera. Es la carencia real del montaje actual, independiente de la biblioteca que se use.
+
+**Evaluar un transporte de correo más moderno — sin urgencia.** Nodemailer no es el problema: está mantenida y es el estándar de Node. Lo anticuado es la **credencial**: una contraseña de aplicación de Google, estática y que Google desincentiva, sobre un buzón humano usado como servicio de envío.
+
+Lo que ganaría el diseño: hoy cada laboratorio necesita **sus propias credenciales** porque Gmail obliga a que el `From` sea la cuenta autenticada. Con un dominio verificado (Resend, Postmark, SES) o con la **API de Gmail y delegación en todo el dominio**, una sola credencial enviaría como cualquier dirección `@amigo.edu.co`: `buzones.ts` dejaría de gestionar secretos y añadir un laboratorio sería una fila en `Room`. De paso desaparecería el `runtime = "nodejs"` de los handlers de correo.
+
+Está preparado para migrar barato: todo el envío pasa por `enviarCorreo()` y `resolverBuzon()`, así que cambiar de transporte toca **un archivo**.
+
+⚠️ **GCP no tiene servicio propio de correo transaccional** y bloquea el puerto 25 de salida; su documentación remite a terceros. La vía Google es la API de Gmail con cuenta de servicio, que exige que un superadministrador de Workspace conceda la delegación.
+
+**Disparadores para retomarlo:** que Google endurezca las contraseñas de aplicación; que empiece a importar saber si un correo llegó; que aparezca un tercer o cuarto laboratorio; o que el equipo obtenga su proyecto de GCP.
+
+---
+
 ## Detalles menores, sin compromiso
 
 - **Distinguir quién canceló.** Una cancelación del administrador y una del solicitante quedan idénticas en la base: `CANCELLED` con `decidedAt`. Si llega a importar, es un campo nuevo en `Reservation` y su migración, no un apaño de presentación.
@@ -37,7 +55,7 @@
 **No implementar nada de esto sin que el usuario lo pida explícitamente.** Si aparece la tentación a mitad de otra tarea, anotarla aquí y seguir.
 
 - Autenticación de usuarios finales (SSO institucional).
-- Múltiples administradores con roles y auditoría.
+- **Auditoría** de acciones del panel: quién decidió qué y cuándo. (Los administradores múltiples con rol **sí** se construyeron; lo que no existe es el registro de auditoría. `Reservation.decidedAt` guarda *cuándo* se decidió, pero no *quién*.)
 - Reservas recurrentes o series.
 - Gestión de inventario de equipos de cómputo.
 - **Exportar** las estadísticas (CSV, Excel, PDF). El dashboard de agregados sí se construyó; sacarlas del panel, no.

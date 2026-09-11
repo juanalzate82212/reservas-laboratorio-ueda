@@ -45,10 +45,10 @@ Cualquier persona de la comunidad universitaria escanea un código QR, elige lab
 | Duración de una reserva | De 30 minutos a 4 horas, en bloques de 30 min |
 | Anticipación | Mínimo 1 hora, máximo 60 días |
 | Correo del solicitante | Debe terminar en `@amigo.edu.co` |
-| Asistentes | Obligatorio, y no puede pasar del aforo de la sala (hoy 25) |
+| Asistentes | Obligatorio, y no puede pasar del aforo del laboratorio (hoy 25 en los dos) |
 | Aprobación | Siempre manual; las solicitudes pendientes ya ocupan la franja |
 
-Las reglas viven en `src/config/booking.ts` y `src/config/holidays.ts`, no repartidas por el código. El aforo es la excepción: sale de `Room.capacity`, porque es un dato de la sala y no una regla global.
+Las reglas viven en `src/config/booking.ts` y `src/config/holidays.ts`, no repartidas por el código. El aforo es la excepción: sale de `Room.capacity`, porque es un dato de cada laboratorio y no una regla global.
 
 **Estados de una reserva:** `PENDING` (en revisión) · `CONFIRMED` · `REJECTED` · `CANCELLED` · `EXPIRED`. Los cuatro primeros los decide el administrador o el solicitante; **`EXPIRED` (vencida) se aplica al leer**, a las solicitudes que nadie revisó y cuya franja ya terminó. No hay tarea programada: `lib/expiration.ts` corre antes de las lecturas que importan.
 
@@ -140,6 +140,8 @@ El correo institucional corre sobre **Google Workspace**, así que aplican las r
 
 ⚠️ **Google bloquea el acceso SMTP con la contraseña normal de la cuenta desde 2022.** Hace falta una *contraseña de aplicación*: 16 caracteres, específica para una aplicación, revocable por separado y que no da acceso al resto de la cuenta.
 
+**Hay que repetir esto por cada laboratorio**, con su propia cuenta: Gmail solo deja enviar con un `From` que sea la cuenta autenticada, y de ahí que cada uno necesite sus credenciales.
+
 Con la cuenta del laboratorio iniciada:
 
 1. En [myaccount.google.com/security](https://myaccount.google.com/security), activar la **verificación en 2 pasos**. Es requisito: sin ella la opción de contraseñas de aplicación **ni siquiera aparece**.
@@ -171,9 +173,11 @@ npx prisma migrate deploy # aplicar migraciones existentes
 npx prisma generate      # regenerar el cliente tras cambiar el schema
 npx prisma studio        # inspector visual de la base de datos
 npx prisma db seed       # ⚠️ destructivo: recrea los datos de ejemplo
+
+npm run crear-admin      # crea/actualiza una cuenta de administrador del panel
 ```
 
-Hay **Vitest**, pero la suite es todavía muy pequeña: un solo fichero, `src/lib/availability.test.ts`. El CI la ejecuta en cada PR.
+**Vitest** cubre las funciones puras: disponibilidad, estadísticas, hasheo de contraseñas, alcance por laboratorio y resolución de buzón. El CI la ejecuta en cada PR.
 
 La verificación principal sigue siendo por **criterios de aceptación**: Prisma Studio, `curl` contra los Route Handlers, y `scripts/check-datetime.ts` para la capa horaria.
 
@@ -183,42 +187,51 @@ La verificación principal sigue siendo por **criterios de aceptación**: Prisma
 
 ```
 prisma/
-  schema.prisma          Modelo de datos (Room, Reservation, TimeBlock, EmailLog)
+  schema.prisma          Room, AdminUser, Reservation, TimeBlock, EmailLog
   migrations/            Historial de migraciones
   seed.ts                Datos de ejemplo (destructivo)
 scripts/
-  check-datetime.ts      Verificación de los casos límite de fecha/hora
+  check-datetime.ts      Verificacion de los casos limite de fecha/hora
+  crear-admin.ts         Crea/actualiza una cuenta de administrador
   generar-imagenes-marca.mjs  Rehace los iconos y la imagen de Open Graph
 src/
   app/
-    page.tsx             Landing pública con el calendario
-    error.tsx …          Pantallas de error, 404 y carga en voz de marca
-    icon.png …           Iconos y tarjeta de Open Graph (Next los enlaza solo)
-    reservar/            Wizard de solicitud (3 pasos)
-    reserva/             Búsqueda por código (funciona sin JavaScript)
-    reserva/[codigo]/    Estado de una reserva, con opción de cancelarla
+    page.tsx             Portal: los laboratorios activos
+    laboratorio/[slug]/  Disponibilidad de un laboratorio
+    laboratorio/[slug]/reservar/  Wizard de solicitud (3 pasos)
+    reserva/             Busqueda por codigo (funciona sin JavaScript)
+    reserva/[codigo]/    Estado de una reserva, con opcion de cancelarla
+    error.tsx ...        Pantallas de error, 404 y carga en voz de marca
+    icon.png ...         Iconos y tarjeta de Open Graph (Next los enlaza solo)
     admin/
       login/             Pantalla de acceso (fuera del shell autenticado)
-      (protected)/       Panel: bandeja, franjas, correos, QR
-    api/                 Route Handlers (públicos y de admin)
+      (protected)/       Panel: solicitudes, calendario, franjas,
+                         estadisticas, correos, QR y usuarios
+    api/                 Route Handlers (publicos y de admin)
   components/
-    ui/                  Primitivos: Button, Input, Field, Card, Dialog…
+    ui/                  Primitivos: Button, Input, Field, Card, Dialog...
     brand/               Logo, Header, Footer, ArcoDecorativo
     calendar/            RoomCalendar (FullCalendar) y leyenda
     reservation/         Pasos del wizard
-    admin/               Componentes del panel
+    admin/               Componentes del panel y SesionAdminProvider
   config/
-    booking.ts           Horarios, duraciones, límites
+    booking.ts           Horarios, duraciones, limites
     holidays.ts          Festivos colombianos
-    reservationOptions.ts Programas académicos y tipos de actividad
+    reservationOptions.ts Programas academicos y tipos de actividad
   lib/
-    datetime.ts          Toda la aritmética de fechas (UTC ↔ Bogotá)
+    datetime.ts          Toda la aritmetica de fechas (UTC <-> Bogota)
     availability.ts      Solapamiento y estado de cada franja
     expiration.ts        Marca como vencidas las solicitudes sin revisar
+    rooms.ts             Laboratorios activos y acceso por slug
+    stats.ts             Agregados del dashboard (funcion pura)
+    auth.ts              Sesion del panel, roles y alcance por laboratorio
+    password.ts          Hasheo con scrypt (NO importar desde auth.ts)
     validation/          Esquemas de Zod compartidos cliente/servidor
-    mail/                Plantillas y envío de correo
-    auth.ts              JWT de sesión del administrador
-  middleware.ts          Protege las páginas de /admin/**
+    mail/
+      buzones.ts         Que cuenta envia el correo de cada laboratorio
+      mailer.ts          Envio y registro en EmailLog
+      templates.ts       Las seis plantillas de correo
+  middleware.ts          Protege las paginas de /admin/**
 ```
 
 ---
@@ -273,10 +286,13 @@ Sigue importando porque **`npx prisma db seed` borra todas las reservas y franja
 
 ## Seguridad
 
-- **Row-Level Security habilitado** en las cuatro tablas. Es imprescindible: Supabase expone automáticamente todas las tablas del schema `public` por su API REST, protegidas únicamente por RLS. **Cualquier tabla nueva necesita su propio `ALTER TABLE … ENABLE ROW LEVEL SECURITY;`** en la migración que la crea — Prisma no lo hace solo.
+- **Row-Level Security habilitado** en todas las tablas de `public`, sin ninguna política — eso cierra el canal REST por completo. Es imprescindible: Supabase expone automáticamente todas las tablas del schema `public` por su API REST, protegidas únicamente por RLS. **Cualquier tabla nueva necesita su propio `ALTER TABLE … ENABLE ROW LEVEL SECURITY;`** en la migración que la crea — Prisma no lo hace solo.
 - **Ningún dato personal en el endpoint público.** `GET /api/availability` devuelve solo `startsAt`, `endsAt` y `status`.
 - **El HTML de los correos se escapa en origen** y la vista previa del panel se renderiza dentro de un `<iframe sandbox="">`, porque ese contenido incluye texto escrito por terceros desde el formulario público.
 - **La sesión de administrador** es un JWT firmado en una cookie `httpOnly` de 8 horas. El middleware protege las páginas, pero además cada handler de `/api/admin/**` verifica la sesión por su cuenta.
+- **Contraseñas hasheadas con `scrypt`** de `node:crypto`, con sal por usuario y comparación en tiempo constante. El hash nunca sale de la API.
+- **Aislamiento por laboratorio en la capa de aplicación**, no en RLS: Prisma se conecta como `postgres` y ese rol la ignora. Cada consulta del panel lleva el alcance del administrador en su `where`, y lo que queda fuera responde **404 y no 403** — un 403 confirmaría que ese registro existe.
+- **Desactivar una cuenta corta el acceso en el acto**, sin esperar a que caduque su token: la sesión relee la fila del usuario en cada petición.
 - El archivo `.env` nunca se versiona; sí `.env.example`.
 
 ---
