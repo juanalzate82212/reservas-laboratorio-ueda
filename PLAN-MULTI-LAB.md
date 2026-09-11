@@ -1,6 +1,6 @@
 # Plan — Segundo laboratorio (multi-laboratorio)
 
-> **Estado:** COMPLETADO. Fases 1–4 fusionadas en `develop` (PR #54, #55, #56, #57 y el de esta fase).
+> **Estado:** COMPLETADO. Fases 1–4 fusionadas en `develop` (PR #54, #55, #56, #57 y #58).
 > Falta **desplegar a `main`** — ver los requisitos de despliegue en [README.md](README.md#despliegue) y [CLAUDE.md](CLAUDE.md).
 > Documento de contrato, como [PLAN-MVP.md](PLAN-MVP.md): **donde difiera del código, manda el código.**
 > Las decisiones y sus porqués, una vez implementados, se consolidan en [CLAUDE.md](CLAUDE.md).
