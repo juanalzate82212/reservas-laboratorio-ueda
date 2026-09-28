@@ -4,9 +4,15 @@ import { z } from "zod";
 import { errorResponse, validationErrorResponse } from "@/lib/api/http";
 import { alcanceDeSala, getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { enviarCorreo } from "@/lib/mail/mailer";
 import {
+  enviarCorreo,
+  enviarCorreoAlLaboratorio,
+  type DescripcionInvitacion,
+} from "@/lib/mail/mailer";
+import {
+  cancelAdminTemplate,
   cancelTemplate,
+  confirmAdminTemplate,
   confirmTemplate,
   rejectTemplate,
 } from "@/lib/mail/templates";
@@ -132,6 +138,35 @@ export async function PATCH(
     adminNote: updated.adminNote,
   };
 
+  /*
+   * Qué invitación de calendario acompaña a la decisión.
+   *
+   * Solo CONFIRM y CANCEL tienen una. REJECT sale de PENDING, y una solicitud
+   * pendiente nunca llegó a tener evento: mandar un CANCEL de algo que no se
+   * creó no retira nada y ensucia el buzón del solicitante.
+   *
+   * El CANCEL solo puede venir de CONFIRMED —lo impone ALLOWED_FROM—, así que
+   * aquí sí es seguro asumir que hubo invitación antes.
+   */
+  const invitacion: DescripcionInvitacion | undefined =
+    action === "REJECT"
+      ? undefined
+      : {
+          metodo: action === "CONFIRM" ? "REQUEST" : "CANCEL",
+          reserva: {
+            code: updated.code,
+            roomName: updated.room.name,
+            startsAt: updated.startsAt,
+            endsAt: updated.endsAt,
+            activityType: updated.activityType,
+            activityTypeOther: updated.activityTypeOther,
+          },
+          solicitante: {
+            nombre: updated.requesterName,
+            correo: updated.requesterEmail,
+          },
+        };
+
   let plantilla: { subject: string; html: string };
   if (action === "CONFIRM") {
     const avisoSolapado = await prisma.timeBlock.findFirst({
@@ -169,7 +204,30 @@ export async function PATCH(
       to: updated.requesterEmail,
       subject: plantilla.subject,
       html: plantilla.html,
+      invitacion,
     });
+
+    /*
+     * Y la copia del laboratorio, con la MISMA invitación. Es lo único que
+     * mete el evento en su calendario: aparecer como ATTENDEE en el correo
+     * del solicitante no le entrega nada.
+     *
+     * Secuencial, después del primero: cada envío escribe su EmailLog y con
+     * connection_limit=1 en paralelo competirían por la única conexión.
+     *
+     * Al rechazar no se manda: no hay evento que poner ni que quitar.
+     */
+    if (invitacion) {
+      await enviarCorreoAlLaboratorio({
+        reservationId: updated.id,
+        roomId: updated.roomId,
+        mailKey: updated.room.mailKey,
+        ...(action === "CONFIRM"
+          ? confirmAdminTemplate(datosPlantilla)
+          : cancelAdminTemplate(datosPlantilla)),
+        invitacion,
+      });
+    }
   } catch (error) {
     console.error(
       "[correo] Falló el correo de una decisión del administrador:",

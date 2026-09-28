@@ -2,7 +2,7 @@
 
 Sistema de reserva de los laboratorios de la **Universidad Católica Luis Amigó**.
 
-Cualquier persona de la comunidad universitaria escanea un código QR, elige laboratorio en el portal, consulta su disponibilidad en un calendario y solicita una franja horaria. El encargado de ese laboratorio revisa las solicitudes, las aprueba o rechaza, y gestiona bloqueos de horario. El solicitante recibe un correo automático con la decisión, enviado desde la cuenta de ese laboratorio.
+Cualquier persona de la comunidad universitaria escanea un código QR, elige laboratorio en el portal, consulta su disponibilidad en un calendario y solicita una franja horaria. El encargado de ese laboratorio revisa las solicitudes, las aprueba o rechaza, y gestiona bloqueos de horario. El solicitante recibe un correo automático con la decisión, enviado desde la cuenta de ese laboratorio; si se aprueba, ese correo lleva una invitación de calendario que también llega al buzón del laboratorio.
 
 **Laboratorios activos:** Analítica de Datos e Inteligencia Artificial, y Redes e Infraestructura. Cada uno tiene su calendario, su encargado y su remitente de correo; una reserva en uno no afecta al otro.
 
@@ -24,6 +24,7 @@ Cualquier persona de la comunidad universitaria escanea un código QR, elige lab
 - Bandeja de solicitudes con filtros por estado: confirmar, rechazar o cancelar.
 - Gestión de franjas: bloquear horarios (no reservables) o marcarlos como advertencia (reservables, pero sin préstamo de equipos).
 - Registro de correos enviados, con vista previa y opción de reintentar los fallidos.
+- Invitación de calendario al confirmar una reserva, y su retirada al cancelarla. Llega al solicitante y al buzón del laboratorio.
 - Estadísticas de uso, sin ningún dato personal.
 - Página con el código QR en formato imprimible.
 - **Usuarios**: alta y edición de administradores (solo el administrador general).
@@ -229,8 +230,9 @@ src/
     validation/          Esquemas de Zod compartidos cliente/servidor
     mail/
       buzones.ts         Que cuenta envia el correo de cada laboratorio
+      ics.ts             Invitacion de calendario (funcion pura)
       mailer.ts          Envio y registro en EmailLog
-      templates.ts       Las seis plantillas de correo
+      templates.ts       Las ocho plantillas de correo
   middleware.ts          Protege las paginas de /admin/**
 ```
 

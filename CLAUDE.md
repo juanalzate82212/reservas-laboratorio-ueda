@@ -86,7 +86,7 @@ En producción el administrador general es **p3.sistemas@amigo.edu.co**. El scri
 
 **La verificación principal es por criterios de aceptación**, no por tests: `prisma studio`, `curl` contra los Route Handlers, y `check:datetime` al cerrar cualquier trabajo que toque fechas.
 
-**Vitest cubre solo funciones puras**, sin Prisma ni petición, ejercitadas con objetos literales: `lib/availability.test.ts`, `lib/stats.test.ts`, `lib/password.test.ts`, `lib/auth.test.ts` y `lib/mail/buzones.test.ts`. Ese es el criterio para decidir si algo nuevo merece un test aquí; el resto se verifica con el método de arriba.
+**Vitest cubre solo funciones puras**, sin Prisma ni petición, ejercitadas con objetos literales: `lib/availability.test.ts`, `lib/stats.test.ts`, `lib/password.test.ts`, `lib/auth.test.ts`, `lib/mail/buzones.test.ts` y `lib/mail/ics.test.ts`. Ese es el criterio para decidir si algo nuevo merece un test aquí; el resto se verifica con el método de arriba.
 
 ⚠️ El de `lib/auth.test.ts` no es un test cualquiera: fija que `alcanceDeSala()` va **después** del filtro del cliente en el `where`. Invertir esas dos líneas expondría datos personales de otro laboratorio.
 
@@ -177,9 +177,27 @@ Se descartó Vercel Cron porque en plan Hobby solo permite **una ejecución al d
 
 **`EmailLog` guarda `roomId` y `fromAddress`**: sin el primero, `/admin/correos` no se puede acotar y un `LAB_ADMIN` vería la pantalla vacía (el filtro falla cerrado porque el cuerpo lleva datos del solicitante); sin el segundo, el remitente de un correo enviado era irrecuperable.
 
-**El nombre del laboratorio en las plantillas es un parámetro**, no una constante: la cabecera de `layout()` aparece en los SEIS correos, y con el nombre incrustado un solicitante de Redes recibía un correo encabezado por Analítica. Sale barato porque `TemplateReservation.roomName` **es** el nombre del laboratorio.
+**El nombre del laboratorio en las plantillas es un parámetro**, no una constante: la cabecera de `layout()` aparece en los OCHO correos, y con el nombre incrustado un solicitante de Redes recibía un correo encabezado por Analítica. Sale barato porque `TemplateReservation.roomName` **es** el nombre del laboratorio.
 
-⚠️ **El enlace de Google Calendar usa el instante UTC real.** **No** pasa por `toBogotaWallClockIso()`: ese truco es exclusivo del límite con FullCalendar, y aquí metería 5 h de desfase en el calendario de quien pulse el botón.
+#### La invitación de calendario
+
+Al **confirmar**, el correo lleva adjunta una invitación iCalendar (`METHOD:REQUEST`) que construye `lib/mail/ics.ts`; al **cancelar** una reserva que estaba confirmada, un `METHOD:CANCEL` que la retira.
+
+**No se usa la API de Google Calendar, y no por pereza.** Una cuenta de servicio responde `403 forbiddenForServiceAccounts` en cuanto el evento lleva `attendees`; la única salida es la delegación de autoridad para todo el dominio, que concede un superadministrador de Workspace de `amigo.edu.co`. **Se pidió y no la conceden.** Si algún día la conceden, esto se puede sustituir — pero mientras tanto no volver a proponerlo.
+
+Lo que esto NO hace, y conviene no prometerlo: el evento no se crea solo en el calendario del laboratorio, sino que cada destinatario acepta una invitación, y **la aplicación nunca se entera de si la aceptaron**. No hay estado que consultar; lo que sabemos es que la invitación salió.
+
+⚠️ **Al confirmar salen DOS correos con la MISMA invitación**, uno al solicitante y otro al buzón del laboratorio (`confirmAdminTemplate`). No es redundancia: una invitación solo entra en la agenda de quien **recibe** el correo, así que listar al laboratorio como `ATTENDEE` en la copia del solicitante no le entrega nada. Sin el segundo correo, el calendario del laboratorio se queda vacío.
+
+⚠️ **El `UID` (`lib/mail/ics.ts`) no puede cambiar nunca.** Es lo único que ata la cancelación a la invitación que la precedió; si cambia, el `CANCEL` se ignora y la reserva cancelada se queda pegada en los calendarios para siempre, sin un solo error. Por eso el dominio del UID es una constante literal y **no** `NEXT_PUBLIC_APP_URL`, que cambia entre entornos. Hay un test que lo fija.
+
+⚠️ **`REJECT` no lleva invitación**, y la autocancelación de una reserva **`PENDING`** tampoco: una solicitud pendiente nunca llegó a tener evento. Solo `CONFIRMED` y `CANCELLED` la tienen.
+
+⚠️ **El reintento re-deriva la invitación del estado ACTUAL de la reserva**, en vez de guardar el `.ics` original. Reenviar el que se mandó volvería a crear en las agendas un evento quizá ya cancelado. Consecuencia aceptada: como el cuerpo del correo sí se reenvía literal, un reintento puede llevar un HTML que diga "confirmada" con una invitación de cancelación. El cuerpo literal ya era así antes del `.ics`.
+
+⚠️ **Las fechas del `.ics` son el instante UTC real.** **No** pasan por `toBogotaWallClockIso()`: ese truco es exclusivo del límite con FullCalendar, y aquí metería 5 h de desfase en el calendario de quien acepte.
+
+**Antes había un botón "Añadir a Google Calendar"** en el correo de confirmación, un enlace `action=TEMPLATE`. Se retiró al llegar la invitación: dejaba el evento en manos de que el solicitante lo pulsara, el laboratorio nunca se enteraba, y el evento que creaba no tenía UID, así que la cancelación no podía retirarlo.
 
 ### Autenticación y aislamiento por laboratorio
 
