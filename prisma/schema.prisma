@@ -30,6 +30,15 @@ enum TimeBlockKind {
   WARNING
 }
 
+// Hasta dónde llega un administrador. SUPER_ADMIN es transversal: gestiona los
+// usuarios y es el único que puede crear un bloqueo global (TimeBlock con
+// roomId null, que afecta a TODOS los laboratorios). LAB_ADMIN solo ve y
+// decide sobre el suyo. Ver PLAN-MULTI-LAB.md, fase 3.
+enum AdminRole {
+  SUPER_ADMIN
+  LAB_ADMIN
+}
+
 // Los `value` de src/config/reservationOptions.ts deben coincidir
 // exactamente con estos nombres.
 enum AcademicProgram {
@@ -50,18 +59,64 @@ enum ActivityType {
   OTRO
 }
 
+// Una fila por laboratorio reservable. Decisión de producto: el laboratorio ES
+// la sala — no hay un modelo `Lab` aparte. Dar de alta un laboratorio nuevo es
+// insertar una fila más sus variables de entorno de correo.
+//
+// ⚠️ El precio de esa decisión: el día que UN laboratorio necesite DOS espacios
+// reservables distintos, eso sí es una migración de modelo, no un dato.
 model Room {
-  id           String        @id @default(cuid())
-  slug         String        @unique // "sala-principal" | "sala-reuniones"
+  id           String  @id @default(cuid())
+  slug         String  @unique // parte de la URL pública: /laboratorio/[slug]
   name         String
+  shortName    String? // nombre corto para cabeceras y tarjetas del portal
   description  String?
   capacity     Int
-  hasComputers Boolean       @default(true)
-  colorToken   String        @default("azul") // "azul" | "naranja"
-  isActive     Boolean       @default(true)
+  hasComputers Boolean @default(true)
+  colorToken   String  @default("azul") // "azul" | "naranja"
+  isActive     Boolean @default(true)
+
+  // --- Identidad de correo (fase 4) ---
+  //
+  // ⚠️ `mailKey` NO es el slug, y va aparte a propósito: con él se resuelven
+  // las variables SMTP_<KEY>_*, mientras que el slug es cosmético y algún día
+  // alguien lo renombrará. Si las credenciales colgaran del slug, ese cambio
+  // dejaría al laboratorio sin SMTP configurado EN SILENCIO — el mailer caería
+  // en modo LOGGED y los correos dejarían de salir sin un solo error.
+  mailKey      String  @unique
+  mailFromName String? // nombre visible del remitente
+  contactEmail String? // el mailto: del pie de página
+
   reservations Reservation[]
   timeBlocks   TimeBlock[]
+  admins       AdminUser[]
+  emailLogs    EmailLog[]
   createdAt    DateTime      @default(now())
+}
+
+// Administradores del panel. Sustituye a la contraseña única de ADMIN_PASSWORD.
+// La contraseña se guarda hasheada con scrypt de node:crypto (src/lib/password.ts):
+// sal por usuario y comparación en tiempo constante, sin dependencias nuevas.
+model AdminUser {
+  id           String    @id @default(cuid())
+  email        String    @unique // con esto se inicia sesión
+  name         String
+  passwordHash String
+  role         AdminRole @default(LAB_ADMIN)
+
+  // null solo para SUPER_ADMIN, que es transversal. Un LAB_ADMIN sin sala no
+  // vería nada: lo impide el esquema Zod de lib/validation/adminUser.ts.
+  roomId String?
+  room   Room?   @relation(fields: [roomId], references: [id])
+
+  isActive    Boolean   @default(true)
+  lastLoginAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Postgres NO indexa las columnas de clave foránea por su cuenta.
+  @@index([roomId])
 }
 
 model Reservation {
@@ -120,4 +175,17 @@ model EmailLog {
   status        String // "SENT" | "FAILED" | "LOGGED"
   error         String?
   sentAt        DateTime @default(now())
+
+  // De qué laboratorio salió el correo. Sin esta columna /admin/correos no
+  // puede acotarse por laboratorio: `reservationId` no tiene relación ni FK,
+  // así que la sala solo se podría deducir con un join manual.
+  roomId String?
+  room   Room?   @relation(fields: [roomId], references: [id])
+
+  // Con qué buzón se envió. Antes era irrecuperable: reintentarCorreo() relee
+  // el remitente del entorno, así que un reintento podía salir por una cuenta
+  // distinta a la original sin dejar constancia en ninguna parte.
+  fromAddress String?
+
+  @@index([roomId])
 }

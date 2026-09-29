@@ -1,118 +1,72 @@
 # Backlog
 
-**Lista única de lo que queda pendiente** y de lo que se decidió dejar fuera. Cosas que aparecen durante el desarrollo pero no bloquean la tarea en curso se anotan aquí en vez de resolverse fuera de turno.
+**Lo que queda pendiente y lo que no se debe construir.** Cosas que aparecen a mitad de una tarea pero no la bloquean se anotan aquí en vez de resolverse fuera de turno.
 
-`CLAUDE.md` guarda las *decisiones y sus porqués*; este archivo guarda las *tareas abiertas*. No duplicar el estado de un pendiente allá.
+`CLAUDE.md` guarda las *decisiones y sus porqués*; este archivo, las *tareas abiertas*. **No duplicar**: si algo ya está explicado allá, aquí no se repite.
 
-**Estado general: las diez fases del MVP están completas**, y con ellas los nueve ajustes pedidos tras el despliegue. La aplicación está en producción y el usuario confirmó el recorrido de punta a punta.
+**La aplicación está en producción** con el MVP completo y el panel de administración.
 
-Lo que queda debajo es **un arreglo pedido por el usuario**, un vencimiento (los festivos de 2027) y dos detalles menores.
-
----
-
-## Fase 10, cerrada
-
-Queda un solo resto, y es parcial:
-
-| # | Tarea | Estado |
-|---|-------|--------|
-| 3 | Repasar estados de carga y vacíos | **Parcial.** El calendario, `EmptyState`, las pantallas de estado y el wizard ya los tienen; falta un repaso del panel. No bloquea nada. |
-
-**Lo que quedó fuera de la revisión de accesibilidad, a propósito:** la rejilla del calendario sigue sin ser operable por teclado (FullCalendar no hace focusables las celdas). No incumple, porque el wizard es el camino equivalente y sí es navegable — pero si el wizard cambia, hay que volver a mirarlo.
+⚠️ **Lo multi-laboratorio está terminado en `develop`, pero `main` todavía sirve la versión de un solo laboratorio.** El portal, las rutas por laboratorio, los administradores con rol, el correo por buzón y la invitación de calendario no han llegado a producción. Los pasos, en orden y con las comprobaciones de después, en [README.md](README.md#este-despliegue-llevar-develop-a-main).
 
 ---
 
-## Arreglos pedidos por el usuario (2026-08-22)
+## Con fecha límite
 
-Cola de trabajo activa. Se resuelven **de a poco**, cada uno en su rama y su PR.
+**Festivos de 2027 — antes de enero de 2027.** `HOLIDAYS_CO` en `src/config/holidays.ts` solo cubre 2026, y `holidays.ts` emite un `console.warn` cuando falta el año en curso.
 
-### 1. ~~Quitar "Estudiante" de la lista de cargos~~ ✅ Hecho el 2026-08-22
+⚠️ **No basta con calcular la Pascua y aplicar la Ley Emiliani.** Hay que comprobar si el Congreso creó algún festivo nuevo: ya pasó con la Ley 2578 de 2026, que añadió el de la Virgen de Chiquinquirá y dejó el año en 19 festivos en vez de 18. Un festivo que falte no es cosmético — `getOpeningRangesFor()` lo consume, así que el laboratorio aceptaría reservas un día cerrado.
 
-Fuera de `REQUESTER_ROLES`. El usuario confirmó que **ninguna reserva de producción lo usaba**, así que no quedan filas huérfanas. Las dos reservas de ejemplo de `prisma/seed.ts` que lo usaban pasaron a `INVESTIGADOR` y `DOCENTE`, para que la semilla no genere valores que el formulario ya no ofrece.
+---
 
-### 2. ~~La tabla de solicitudes está desalineada~~ ✅ Hecho el 2026-08-22
+## Antes de que Redes reciba reservas de verdad
 
-La causa era que la cabecera tenía cinco `<th>` y cada fila un solo `<td colSpan={5}>` con un CSS grid dentro: dos algoritmos de reparto independientes. Ahora hay celdas reales, una por columna, y el navegador dimensiona cabecera y cuerpo a la vez.
+**Confirmar el aforo y el correo de contacto del Laboratorio de Redes e Infraestructura.** Se sembró con aforo **25 copiado de Analítica** y `contactEmail` en `null`, ambos provisionales y ya visibles al público. El aforo no es decorativo: es el tope que valida `POST /api/reservations` contra `Room.capacity`. Sin `contactEmail`, el pie de sus páginas no ofrece a quién escribir.
 
-Medido en navegador con la API interceptada: **0 px de desfase** en las 15 intersecciones (3 filas × 5 columnas), tanto en las cajas de celda como en la posición real del texto.
+**Poner su buzón real en `MAIL_TO_ADMIN_REDES`.** Es a donde le llegan los avisos, quién va como **asistente** en la invitación de calendario y el `Reply-To` de los correos a sus solicitantes. Sin él cae al buzón global y sus reservas terminan en el calendario equivocado.
 
-De paso se recuperaron las semánticas de columna (`<th scope="col">` y una celda por dato, que antes no existían) y el chevron pasó a ser un `<button>` con `aria-expanded` y nombre propio.
+⚠️ **Ya no hace falta pedirle a Redes una contraseña de aplicación.** Todo el correo sale de una sola cuenta institucional; lo único propio de cada laboratorio son su nombre visible y su buzón. Ese pendiente se cerró solo.
 
-### 3. El QR impreso desaprovecha la hoja
+**Crear a su encargado** desde `/admin/usuarios`, con rol `LAB_ADMIN`.
 
-`/admin/qr` genera el `QRCodeSVG` a `size={280}`, que en papel carta queda pequeño. Hay que subirlo en el medio `print` sin descolocar el resto de la composición ni tocar la vista en pantalla. El `@page { size: letter }` ya está en `globals.css`.
+---
 
-Al ampliarlo, **volver a comprobar el nivel de corrección de errores**: se bajó de `H` a `M` cuando se quitó el logo incrustado, y a otro tamaño conviene reconfirmar que se lee bien impreso. Probar con una impresión real, no solo con la previsualización.
+## Deuda técnica anotada
 
-### 4. ~~El dominio del pie debe ser `funlam.edu.co`~~ ✅ Hecho el 2026-08-22
+**No detectamos rebotes.** `EmailLog` con estado `SENT` significa *"el servidor SMTP aceptó el mensaje"*, **no** *"llegó"*. Si el correo de un solicitante rebota o cae en spam, hoy nadie se entera. Es la carencia real del montaje actual, independiente de la biblioteca que se use.
 
-Cambiado en `Footer.tsx` (enlace y texto) y en `identidad-visual-ucla-ui-ux.md`, por decisión del usuario, para que los dos no se contradigan.
+**Evaluar un transporte de correo más moderno — sin urgencia.** Nodemailer no es el problema: está mantenida y es el estándar de Node. Lo anticuado es la **credencial**: una contraseña de aplicación de Google, estática y que Google desincentiva, sobre un buzón humano usado como servicio de envío.
 
-⚠️ **El correo de contacto del manual sigue siendo `ucatolicaluisamigo@amigo.edu.co`**, sin tocar: es una dirección, no el enlace al sitio, y cambiarla sería inventar un dato. Si también debe cambiar, hay que preguntarlo.
+Lo que ganaría el diseño: con un dominio verificado (Resend, Postmark, SES) cada laboratorio podría **volver a enviar desde su propia dirección** sin necesitar credenciales propias, porque el remitente dejaría de estar atado a la cuenta autenticada. Hoy eso no se puede y por eso todo sale de una sola cuenta. De paso desaparecería el `runtime = "nodejs"` de los handlers de correo.
+
+⚠️ **Ojo si algún día se cambia el transporte: el remitente no se puede mover a la ligera.** Las cancelaciones se emparejan con la invitación original por `UID` **y** organizador, así que cambiar la cuenta remitente deja sin poder retirar los eventos ya enviados.
+
+Está preparado para migrar barato: todo el envío pasa por `enviarCorreo()` y `resolverBuzon()`, así que cambiar de transporte toca **un archivo**.
+
+⚠️ **GCP no tiene servicio propio de correo transaccional** y bloquea el puerto 25 de salida; su documentación remite a terceros. La vía Google es la API de Gmail con cuenta de servicio, que exige que un superadministrador de Workspace conceda la delegación.
+
+⚠️ **La delegación en todo el dominio se pidió y la NEGARON** (2026-09). Es lo que descartó crear los eventos con la API oficial de Google Calendar y obligó a la invitación por correo. **No volver a proponerla** salvo que el usuario diga que cambió la respuesta.
+
+**Disparadores para retomarlo:** que Google endurezca las contraseñas de aplicación; que empiece a importar saber si un correo llegó; que aparezca un tercer o cuarto laboratorio; o que el equipo obtenga su proyecto de GCP.
 
 ---
 
 ## Detalles menores, sin compromiso
 
-### Distinguir quién canceló
-
-Hoy una cancelación del administrador y una del solicitante quedan idénticas en la base: `CANCELLED` con `decidedAt`. En el panel no se puede saber cuál fue. Si llega a importar, es un campo nuevo en `Reservation` (y su migración), no un apaño de presentación.
-
-### Los errores de validación no se borran al corregirlos
-
-Detectado al probar el desplegable de cargo, pero **afecta a todo el formulario y es anterior a ese trabajo**: si alguien pulsa "Siguiente" sin completar algo, ve el error en rojo; al corregirlo, el mensaje **sigue ahí** hasta que vuelve a pulsar "Siguiente". No bloquea nada —el paso avanza igual—, pero da la sensación de que la corrección no se registró.
-
-La causa es la configuración de `useForm`: con `mode: "onTouched"` y errores puestos por `trigger()` (no por un `handleSubmit`), `isSubmitted` sigue en `false` y el `reValidateMode: "onChange"` por defecto no llega a activarse. Se arreglaría revalidando el campo en su `onChange` cuando ya tiene error.
+- **Distinguir quién canceló.** Una cancelación del administrador y una del solicitante quedan idénticas en la base: `CANCELLED` con `decidedAt`. Si llega a importar, es un campo nuevo en `Reservation` y su migración, no un apaño de presentación.
 
 ---
 
-## Mantenimiento con fecha límite
+## Fuera de alcance
 
-| Asunto | Plazo | Detalle |
-|--------|-------|---------|
-| ~~**Node.js 20.x quedará obsoleto en Vercel**~~ | ~~2026-10-01~~ | ✅ **Hecho el 2026-08-11**, con margen de mes y medio. `engines.node`, `.nvmrc` y `@types/node` a 22.x; el CI ya leía `.nvmrc`, así que no hubo que tocar `ci.yml`. |
-| **Festivos de 2027** | Antes de enero 2027 | `HOLIDAYS_CO` solo cubre 2026. Al añadir el año nuevo **no basta con calcular Pascua y aplicar la Ley Emiliani**: hay que comprobar si se creó algún festivo por ley (ya pasó en 2026 con la Ley 2578). `holidays.ts` emite `console.warn` si falta el año en curso. |
-
----
-
-## Seguridad, antes de un uso más amplio
-
-- ~~**Rotar `ADMIN_PASSWORD`.**~~ **Descartado por decisión del usuario (2026-08-11).** Estaba anotado porque la contraseña actual se eligió durante el desarrollo y circuló en sesiones de trabajo. No se rota. **No volver a proponerlo**; si algún día cambia el criterio, lo pedirá él.
-- **Una sola contraseña de administrador, sin usuarios ni auditoría** (riesgo R5 del plan). Aceptado para el MVP; si el sistema pasa a uso institucional formal, se necesita SSO.
-- **Sin autenticación del solicitante** (riesgo R6): cualquiera con un correo `@amigo.edu.co` válido puede reservar a nombre de otro. Mitigado por la aprobación manual del administrador.
-
----
-
-## Limpieza del repositorio
-
-~~**Los ficheros de las skills están duplicados en el historial.**~~ ✅ **Hecho.** `.claude/skills/` y `.agents/skills/` están en `.gitignore`; lo versionado es `skills-lock.json`. El árbol de ficheros es caché reinstalable.
-
-*(Las 14 ramas remotas ya fusionadas se borraron el 2026-08-11; solo quedan `main` y `develop`.)*
-
----
-
-## Fuera de alcance del MVP (§1.2 del plan)
-
-No implementar sin pedirlo explícitamente.
+**No implementar nada de esto sin que el usuario lo pida explícitamente.** Si aparece la tentación a mitad de otra tarea, anotarla aquí y seguir.
 
 - Autenticación de usuarios finales (SSO institucional).
-- Múltiples administradores con roles y auditoría.
+- **Auditoría** de acciones del panel: quién decidió qué y cuándo. (Los administradores múltiples con rol **sí** se construyeron; lo que no existe es el registro de auditoría. `Reservation.decidedAt` guarda *cuándo* se decidió, pero no *quién*.)
 - Reservas recurrentes o series.
-- Gestión de inventario de equipos de cómputo (solo se marca la advertencia).
-- Reportes, métricas y exportación.
-- Recordatorios previos y adjunto `.ics` para Outlook. **Parcialmente reabierto:** el enlace "Añadir a Google Calendar" del correo de confirmación sí se construyó. Siguen fuera los recordatorios previos y el `.ics`.
-- **Correo de acuse de recibo al solicitante** al enviar la solicitud. Decidido: solo se envía correo en la decisión, y la pantalla de éxito con el código cumple esa función. Ojo con el matiz: el aviso al **laboratorio** cuando entra una solicitud nueva es otra cosa y sí se construyó (`MAIL_TO_ADMIN`).
-- **Edición** de una reserva ya creada por parte del solicitante. La **cancelación** por parte del solicitante es distinta y sí se construyó: `POST /api/reservations/[code]/cancel`, con código + documento como llave.
+- Gestión de inventario de equipos de cómputo.
+- **Exportar** las estadísticas (CSV, Excel, PDF). El dashboard de agregados sí se construyó; sacarlas del panel, no.
+- Recordatorios previos a la reserva. El **adjunto `.ics` sí se construyó**: el correo de confirmación lleva una invitación de calendario y el de cancelación la retira (ver CLAUDE.md). El botón "Añadir a Google Calendar" se retiró al llegar.
+- **Correo de acuse de recibo al solicitante** al enviar la solicitud: se decidió que solo se envía correo en la decisión, y la pantalla de éxito con el código cumple esa función. Ojo con el matiz — el aviso al **laboratorio** cuando entra una solicitud nueva es otra cosa y sí se construyó (`MAIL_TO_ADMIN`).
+- **Edición** de una reserva ya creada por el solicitante. La **cancelación** por el solicitante es distinta y sí existe (`POST /api/reservations/[code]/cancel`).
 
 ---
-
-## Ideas registradas, sin compromiso
-
-- ⛔ **Fusión con DataCueva — explorada y CANCELADA el 2026-08-22.** La idea era absorber la app de préstamo de equipos ([DataCueva](https://github.com/JuanSNuno/DataCueva)) dentro de este panel, con una sola base y usuarios con roles en lugar de la contraseña compartida. Hubo plan aprobado por fases (`FUSION-DATACUEVA.md`) y se completó su fase 0; el usuario canceló antes de traer una sola línea de DataCueva. **No reabrir sin que lo pida.**
-
-  **Nada de aquel trabajo se revirtió, y no hace falta**: la fase 0 eran tres tareas que este repositorio necesitaba igual —la base de datos de desarrollo, Node 22 y Vitest— y ninguna tocó código de la aplicación. El plan sí se borró, porque señalaba un trabajo que no va a ocurrir.
-
-  El análisis completo (inventario real de DataCueva, por qué no se subía a Next 16, el porte de Drizzle a Prisma) vive en el historial: `git log --all --oneline -- FUSION-DATACUEVA.md`. Si algún día se retoma, es material aprovechable — pero estaba **equivocado en tres puntos** que solo se descubrieron al leer el repositorio de verdad, así que hay que reverificarlo antes de fiarse.
-
-- **Reactivar una segunda sala.** Se retiró "Sala de Reuniones" por decisión de producto, pero el modelo `Room` se dejó genérico a propósito. Volver a tener dos salas requeriría reponer el selector en el wizard y decidir cómo se muestran dos calendarios en la landing; no requiere migración de base de datos.
-- **Dataset de demostración.** El punto 8 de la Fase 10 pedía dejar la semana en curso poblada con reservas de ejemplo. Quedó anulado: el usuario limpió los datos de prueba a propósito para dejar la aplicación lista para uso real. Si alguna vez hace falta para una demostración, `prisma/seed.ts` sigue funcionando y desde el 2026-08-11 apunta a la base de **desarrollo** — pero **sigue siendo destructivo**: borra `Reservation` y `TimeBlock` completos. Confirmar a qué proyecto apunta el `.env` antes de correrlo (ver `CLAUDE.md`).

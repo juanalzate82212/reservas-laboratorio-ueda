@@ -27,40 +27,65 @@ const ETIQUETA_TIPO = { BLOCKED: "Bloqueada", WARNING: "Aviso" } as const;
  */
 function formatBlockRange(start: Date, end: Date): string {
   const mismoDia = toBogotaDayKey(start) === toBogotaDayKey(end);
-  return mismoDia ? formatRange(start, end) : `${formatDateTime(start)} – ${formatDateTime(end)}`;
+  return mismoDia
+    ? formatRange(start, end)
+    : `${formatDateTime(start)} – ${formatDateTime(end)}`;
 }
 
 export interface TimeBlockCardProps {
   timeBlock: TimeBlock;
   onEliminar: (id: string) => void;
+  /** Si quien mira puede eliminar ESTA franja. Ver DELETE /api/admin/time-blocks/[id]. */
+  puedeEliminar?: boolean;
 }
 
-export function TimeBlockCard({ timeBlock, onEliminar }: TimeBlockCardProps) {
+export function TimeBlockCard({
+  timeBlock,
+  onEliminar,
+  puedeEliminar = true,
+}: TimeBlockCardProps) {
   return (
     <Card>
       <CardBody className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-display text-body-l font-semibold text-texto">
-              {timeBlock.room?.name ?? "Todas las salas"}
+              {timeBlock.room?.name ?? "Todos los laboratorios"}
             </span>
-            <Badge tono={TONO_TIPO[timeBlock.kind]}>{ETIQUETA_TIPO[timeBlock.kind]}</Badge>
+            <Badge tono={TONO_TIPO[timeBlock.kind]}>
+              {ETIQUETA_TIPO[timeBlock.kind]}
+            </Badge>
           </div>
           <span className="text-caption text-texto-secundario">
-            {formatBlockRange(new Date(timeBlock.startsAt), new Date(timeBlock.endsAt))}
+            {formatBlockRange(
+              new Date(timeBlock.startsAt),
+              new Date(timeBlock.endsAt),
+            )}
           </span>
           <p className="text-body text-texto">{timeBlock.reason}</p>
         </div>
 
-        <Button
-          type="button"
-          variante="danger"
-          tamano="sm"
-          onClick={() => onEliminar(timeBlock.id)}
-          className="self-start"
-        >
-          Eliminar
-        </Button>
+        {/*
+          Una franja global la VE el encargado de un laboratorio, porque le
+          cierra su propio calendario, pero no la puede eliminar: afecta a
+          laboratorios que no administra. En vez del botón se explica quién la
+          gestiona, que es más útil que un botón que devuelve 404.
+        */}
+        {puedeEliminar ? (
+          <Button
+            type="button"
+            variante="danger"
+            tamano="sm"
+            onClick={() => onEliminar(timeBlock.id)}
+            className="self-start"
+          >
+            Eliminar
+          </Button>
+        ) : (
+          <span className="self-start text-caption text-texto-secundario">
+            La gestiona el administrador general
+          </span>
+        )}
       </CardBody>
     </Card>
   );

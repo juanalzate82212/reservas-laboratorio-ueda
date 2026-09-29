@@ -1,53 +1,58 @@
 # CLAUDE.md
 
-Guía para Claude Code (claude.ai/code) al trabajar en este repositorio. **Es la fuente de verdad del estado actual y de las decisiones tomadas.** Guarda las *decisiones y sus porqués*; las *tareas abiertas* están en [BACKLOG.md](BACKLOG.md) y no se duplican aquí.
+Guía para trabajar en este repositorio. Contiene **lo que no se puede deducir leyendo el código**: las decisiones y sus porqués, y las trampas que rompen algo si se tocan sin saberlas. Lo que sí se ve en el código no se repite aquí. Las tareas abiertas están en [BACKLOG.md](BACKLOG.md).
 
 ---
 
 ## Qué es esto
 
-Sistema de reserva del **Laboratorio de Analítica de Datos e Inteligencia Artificial** de la Universidad Católica Luis Amigó. El público llega por un código QR → ve la disponibilidad en un calendario → solicita una franja. Un único administrador (una contraseña, sin sistema de usuarios) aprueba, rechaza o cancela solicitudes y gestiona bloqueos de horario. Todo el texto visible va en español.
+Sistema de reserva de los **laboratorios** de la Universidad Católica Luis Amigó: https://reservas-laboratorio-ueda.vercel.app
 
-**Hay una sola sala reservable, "Sala Principal"**, pero el modelo `Room` es genérico a propósito: hubo una segunda sala y se retiró por decisión de producto, no por limitación técnica. Por eso conviven `getActiveRoom()` y `getActiveRooms()`, y el selector de sala de `TimeBlockForm` sigue existiendo aunque hoy solo ofrezca dos opciones. **No "simplificar" eso**: reactivar una segunda sala debe seguir siendo un cambio de datos, no una migración.
+> ⚠️ **Al 2026-09-29, `main` —producción— todavía sirve la versión de UN SOLO laboratorio.** Lo que sigue describe `develop`, donde esperan el portal, las rutas por laboratorio, los administradores con rol y aislamiento, el correo por buzón y la invitación de calendario. Sale todo de golpe en la primera fusión a `main`, y antes hay **tres pasos obligatorios en este orden**: aplicar las migraciones con `DIRECT_URL`, `npm run crear-admin` (si no, el panel se queda sin nadie que pueda entrar) y cargar las variables de correo en Vercel. La lista completa, con las comprobaciones de después, está en [README.md](README.md#este-despliegue-llevar-develop-a-main). **Borrar este aviso y esa sección cuando esté desplegado.**
 
-⚠️ **Dos nombres que se confunden**, y ya costaron dos rondas de correcciones: el **Laboratorio de Analítica de Datos e Inteligencia Artificial** es el espacio que se reserva y aparece en toda la app; la **Unidad de Estrategia del Dato y Analítica** es quien lo administra y construyó la herramienta, y aparece **una sola vez**, en el crédito de `Footer.tsx`. Esa línea dice algo distinto al resto del producto a propósito — no unificarla.
+El público llega por un código QR impreso → cae en el **portal** (`/`), que presenta los laboratorios → entra en el suyo, ve la disponibilidad y solicita una franja. Todo el texto visible va en español.
 
-**Estado: las diez fases del MVP están completas y la aplicación está [en producción](https://reservas-laboratorio-ueda.vercel.app)**, con el criterio de aceptación final confirmado por el usuario.
+**Cada laboratorio ES una fila de `Room`.** No hay un modelo `Lab` aparte: fue una decisión explícita del usuario. Dar de alta uno nuevo es insertar una fila más sus variables de correo, sin migración. El precio, asumido: el día que UN laboratorio necesite DOS espacios reservables distintos, eso sí es una migración de modelo.
+
+Hoy hay dos: **Analítica de Datos e IA** (`analitica-datos-ia`, mailKey `ANALITICA`) y **Redes e Infraestructura** (`redes-infraestructura`, mailKey `REDES`).
+
+⚠️ **`getActiveRoom()` ya no existe.** Devolvía `rooms[0]` por orden de slug, y mientras existió, activar una fila desde la base podía cambiar QUÉ laboratorio veía el público, sin desplegar código y sin un solo error. Para una página de laboratorio se usa `getRoomBySlug()`, que lo toma de la URL en vez de adivinarlo. **No reintroducir nada que elija "el primero".**
+
+**Rutas públicas:** `/` (portal), `/laboratorio/[slug]`, `/laboratorio/[slug]/reservar`, `/reserva` y `/reserva/[codigo]`. `/reservar` es una redirección 307 desde `next.config.mjs` — y va ahí y no en una página con `redirect()` porque en un Server Component la redirección salta DESPUÉS de enviar la shell y salía un 200 con `<meta http-equiv="refresh">`.
+
+**El panel** (`/admin`) tiene siete secciones: **Solicitudes, Calendario** (solo lectura), **Franjas, Estadísticas, Correos, QR** y **Usuarios** (solo para el administrador general).
+
+⚠️ **Dos nombres que se confunden, y ya costaron dos rondas de correcciones.** El **Laboratorio de Analítica de Datos e Inteligencia Artificial** es el espacio que se reserva y aparece en toda la app. La **Unidad de Estrategia del Dato y Analítica** es quien lo administra y construyó la herramienta, y aparece **una sola vez**, en el crédito de `Footer.tsx`. Esa línea dice algo distinto al resto del producto a propósito — no unificarla.
 
 ---
 
-## Datos: dos proyectos de Supabase
-
-**Hay una base de desarrollo separada desde el 2026-08-11.** Antes no la había —local y producción compartían proyecto— y ese era el mayor riesgo del repositorio.
+## ⚠️ Datos: dos proyectos de Supabase
 
 | Entorno | Proyecto | Quién lo usa |
 |---------|----------|--------------|
 | **Desarrollo** | `vkixgpvztkvbuwamhqdv` | el `.env` local y el MCP de `.mcp.json` |
 | **Producción** | `ceqqzubsxxuroawcnpvg` | solo las variables de entorno de Vercel |
 
-⚠️ **Antes de ejecutar cualquier cosa que escriba en la base, confirmar a cuál apunta el `.env`.** La forma rápida, sin exponer la contraseña:
+**Antes de ejecutar cualquier cosa que escriba en la base, confirmar a cuál apunta el `.env`:**
 
 ```bash
 grep -oE 'postgres\.[a-z0-9]{20}' .env | head -1
 ```
 
-Sigue siendo importante porque **el guard de `prisma/seed.ts` no protege**: comprueba `NODE_ENV === "production"`, que en una terminal local vale `"development"` o nada, aunque `DATABASE_URL` apunte a producción. Y `npx prisma db seed` **borra `Reservation` y `TimeBlock` completos** antes de recrear los datos de demo. La separación de proyectos quita el riesgo por defecto, no la posibilidad de pegarse un tiro pegando la cadena equivocada.
+Importa porque **el guard de `prisma/seed.ts` no protege**: comprueba `NODE_ENV === "production"`, que en una terminal local nunca vale eso aunque la cadena apunte a la base real. Y `npx prisma db seed` **borra `Reservation` y `TimeBlock` completos**.
 
-**En desarrollo la semilla es bienvenida**: deja 1 sala, 6 reservas y 2 bloqueos, que es justo lo que hace falta para trabajar. En producción **no resembrar sin pedirlo** — el usuario vació `Reservation` y `EmailLog` a propósito para dejar la app lista para uso real.
+**La app está en uso: no dar por buena ninguna cifra de filas de producción que leas aquí.** Míralo en vez de deducirlo. En producción **no resembrar sin pedirlo**.
 
-⚠️ **No dar por buena ninguna cifra de filas de producción que leas aquí: la app está en uso.** Míralo en vez de deducirlo.
-
-**`_prisma_migrations` también tiene RLS**, desde el 2026-08-11. Antes no: se había excluido por considerarla "tabla interna, sin datos sensibles". Eso era cierto a medias — no guarda datos personales, pero con la llave `anon` **se podía escribir**, y corromper el historial de migraciones rompe los despliegues. Fue seguro activarlo porque Prisma se conecta como `postgres`, que ignora RLS.
-
-Con eso, **las cinco tablas de `public` tienen RLS y ninguna tiene políticas**, que es exactamente el estado buscado: el canal REST de Supabase queda cerrado del todo y la app no se entera. El linter de Supabase seguirá reportando `rls_enabled_no_policy` como **INFO** en las cinco; **no es un pendiente**, es la consecuencia esperada. Solo dejaría de serlo si algún día se usa `@supabase/supabase-js` desde el cliente.
+**Las seis tablas de `public` tienen RLS y ninguna tiene políticas** (las cinco del modelo más `_prisma_migrations`), que es el estado buscado: cierra el canal REST de Supabase sin afectar a la app, porque Prisma se conecta como `postgres` y ese rol ignora RLS. El linter reportará `rls_enabled_no_policy` como INFO en todas — **no es un pendiente**, es la consecuencia esperada.
 
 ---
 
 ## Documentos
 
-- **[BACKLOG.md](BACKLOG.md)** — lo que falta y lo que se dejó fuera de alcance. No implementar nada listado como fuera de alcance; si aparece la tentación, anotarla ahí y seguir.
+- **[BACKLOG.md](BACKLOG.md)** — lo pendiente y lo que está fuera de alcance. **No implementar nada de esa lista sin que el usuario lo pida.**
 - **[identidad-visual-ucla-ui-ux.md](identidad-visual-ucla-ui-ux.md)** — tokens, tipografía, logo y voz de redacción. **De cumplimiento obligatorio.**
-- **[PLAN-MVP.md](PLAN-MVP.md)** — la especificación numerada que citan los comentarios del código (`§5 del plan`, `§8 del plan`…). Es referencia de contrato, no estado actual: **donde difiera del código, manda el código.**
+- **[PLAN-MVP.md](PLAN-MVP.md)** — la especificación numerada que citan los comentarios del código (`§5 del plan`…). Es referencia de contrato, no estado actual: **donde difiera del código, manda el código.**
+- **[PLAN-MULTI-LAB.md](PLAN-MULTI-LAB.md)** — el plan del segundo laboratorio, ya COMPLETADO. Mismo estatus: documento histórico, no estado actual. Útil para entender **por qué** el multi-laboratorio quedó así; describe el código de antes de cada fase, así que no buscar ahí cómo están las cosas hoy.
 - **[README.md](README.md)** — instalación, variables de entorno y despliegue.
 
 ---
@@ -55,366 +60,313 @@ Con eso, **las cinco tablas de `public` tienen RLS y ninguna tiene políticas**,
 ## Comandos
 
 ```bash
-npm run dev                  # desarrollo
+npm run dev
 npm run build                # debe pasar limpio antes de cerrar cualquier trabajo
 npm run lint
 npm run typecheck
-npm test                     # Vitest, una pasada (sí está en CI)
-npm run test:watch           # Vitest en modo vigilancia
-npm run check:datetime       # casos límite de fecha/hora (no está en CI)
+npm test                     # Vitest (está en CI)
+npm run check:datetime       # casos límite de fecha/hora (NO está en CI)
 
 npx prisma migrate dev       # crear y aplicar migración en desarrollo
 npx prisma migrate deploy    # aplicar migraciones ya creadas
 npx prisma generate          # regenerar cliente tras cambiar el schema
 npx prisma studio            # inspector de BD — el verificador principal
 npx prisma db seed           # ⚠️ DESTRUCTIVO: ver la sección de Datos
+
+npm run crear-admin          # crea/actualiza una cuenta de administrador
 ```
 
-**Hay Vitest desde el 2026-08-11, pero cubre muy poco todavía.** Hoy la suite es **un solo fichero**, `src/lib/availability.test.ts`: 19 casos sobre el solapamiento de franjas y el estado visual de cada hueco. Entró como preparación de un proyecto que luego se canceló (ver `BACKLOG.md`), y se conserva porque el arnés es útil por su cuenta — sobre todo para los arreglos que quedan pendientes.
+**`npm run crear-admin` es un REQUISITO DE DESPLIEGUE en un entorno nuevo**, no una utilidad. La tabla `AdminUser` nace vacía —una migración es SQL y no puede hashear una contraseña— y la semilla no sirve ahí porque borra `Reservation` y `TimeBlock`. Sin ejecutarlo antes de desplegar, **el panel se queda sin nadie que pueda entrar**:
 
-**Eso no sustituye la verificación por criterios de aceptación**, que sigue siendo el método principal: `prisma studio`, `curl` contra los Route Handlers y `scripts/check-datetime.ts` para la capa horaria. Un test verde no dice nada sobre las nueve décimas partes de esta aplicación.
+```bash
+ADMIN_EMAIL=... ADMIN_PASSWORD=... ADMIN_NAME="..." ADMIN_ROLE=SUPER_ADMIN npm run crear-admin
+```
 
-⚠️ **No poner `passWithNoTests` en `vitest.config.mts`.** Es el atajo evidente con la suite casi vacía y convierte "no encontré ningún test" en verde: un `include` o un `exclude` mal escritos apagarían la suite entera sin que nadie se entere. Por eso entró con un test de verdad y no con cero.
+En producción el administrador general es **p3.sistemas@amigo.edu.co**. El script es idempotente e imprime a qué proyecto de Supabase apunta antes de escribir.
 
-⚠️ **`vitest.config.mts` es `.mts`, no `.ts`.** El proyecto es CommonJS (sin `"type": "module"`, del que dependen `next.config`, `postcss` y `tailwind`), así que Vite cargaba el config como CJS y avisaba de que `import.meta.url` es sintaxis ESM — algo que dejará de tolerar cuando `configLoader: "native"` sea el valor por defecto. Por eso el `include` de `tsconfig.json` lleva también el patrón de los `.mts`: sin él, `npm run typecheck` dejaría de mirar ese fichero.
+**La verificación principal es por criterios de aceptación**, no por tests: `prisma studio`, `curl` contra los Route Handlers, y `check:datetime` al cerrar cualquier trabajo que toque fechas.
 
-⚠️ **El alias `@/*` está declarado dos veces**: en `paths` de `tsconfig.json` y a mano en `resolve.alias` de `vitest.config.mts` (se evitó `vite-tsconfig-paths` por una dependencia menos). Añadir un alias nuevo obliga a tocar los dos, igual que pasa con los tokens de `globals.css` y `tailwind.config.ts`.
+**Vitest cubre solo funciones puras**, sin Prisma ni petición, ejercitadas con objetos literales: `lib/availability.test.ts`, `lib/stats.test.ts`, `lib/password.test.ts`, `lib/auth.test.ts`, `lib/mail/buzones.test.ts` y `lib/mail/ics.test.ts`. Ese es el criterio para decidir si algo nuevo merece un test aquí; el resto se verifica con el método de arriba.
+
+⚠️ El de `lib/auth.test.ts` no es un test cualquiera: fija que `alcanceDeSala()` va **después** del filtro del cliente en el `where`. Invertir esas dos líneas expondría datos personales de otro laboratorio.
 
 Para bugs de interfaz y auditorías de accesibilidad, **Playwright y axe-core instalados temporalmente** (`npm install --no-save playwright @axe-core/playwright`) han sido efectivos; `package.json` y `package-lock.json` deben quedar intactos.
 
-**`npm run check:datetime` no está en el CI** porque no necesita base de datos, pero es la red de seguridad de la capa horaria: correrlo al cerrar cualquier trabajo que toque fechas.
-
 ---
 
-## Git y GitHub
+## Git y despliegue
 
-- `main` = producción, cada push despliega a Vercel. `develop` = rama por defecto e integración, donde apuntan los PR. Cada unidad de trabajo en su rama: `feat/*`, `fix/*`, `chore/*`, `docs/*`.
-- Los rulesets bloquean push directo, force-push y borrado en `main` y `develop`.
-- [ci.yml](.github/workflows/ci.yml) corre lint + typecheck + build en PR y en push a `develop`; es el status check obligatorio. **No corre en `main`**, a propósito.
-- `gh pr checks <n>` a veces reporta "pending" con el job ya terminado; `gh run view --job=<id>` es más fiable.
+`main` = producción, y cada push despliega en Vercel. `develop` = rama por defecto e integración, adonde apuntan los PR. Cada unidad de trabajo en su rama (`feat/*`, `fix/*`, `chore/*`, `docs/*`). Los rulesets bloquean push directo y force-push en las dos ramas protegidas.
 
-**Nunca fusionar un PR sin confirmación explícita del usuario.** Instrucción permanente suya, repetida en varias sesiones.
+[ci.yml](.github/workflows/ci.yml) corre lint + typecheck + test + build en cada PR; es el status check obligatorio. **No corre en `main`**, a propósito.
 
-⚠️ **Un merge a `main` puede no desplegar, y nada avisa.** Pasó una vez: el PR se fusionó, Vercel no creó el despliegue y la app quedó atrasada ~12 h. Fue puntual —el merge siguiente desplegó sin tocar nada— pero el fallo es silencioso, porque el CI no corre en `main` y Vercel no marca error. **Tras fusionar a `main`, comprobar producción con una petición real** a una ruta cuyo contenido haya cambiado.
+- ⚠️ **El CI falla de vez en cuando por Google Fonts, no por el código.** `next/font` descarga Montserrat e Inter durante `next build`, así que un tropiezo de red en el runner tumba el build con `TypeError: Cannot read properties of null (reading '1')` dentro de `@next/font/dist/google/loader.js`. No es un error tuyo: **relanzar el job** (`gh run rerun <id> --failed`) y comprobar. Si falla dos veces seguidas con el mismo commit, entonces sí mirar el código.
+- **Nunca fusionar un PR sin confirmación explícita del usuario.**
+- ⚠️ **Un merge a `main` puede no desplegar, y nada avisa.** Ya pasó: el PR se fusionó, Vercel no creó el despliegue y la app quedó atrasada ~12 h en silencio, porque el CI no corre en `main` y Vercel no marca error. **Tras fusionar a `main`, comprobar producción con una petición real** a una ruta cuyo contenido haya cambiado.
+- **Nunca desplegar desde local** para "arreglar" un despliegue que falta.
+- Los despliegues de vista previa están detrás del muro de autenticación de Vercel: `curl` a esa URL devuelve la página de login, no la app.
 
 ---
 
 ## Decisiones de producto
 
-Todas pedidas explícitamente por el usuario.
+Todas pedidas explícitamente por el usuario. Sin este contexto, varias parecen errores.
 
-**Rechazar y cancelar no piden motivo.** El plan exigía `adminNote` obligatorio; el usuario pidió lo contrario antes de construir la bandeja: ambas acciones solo piden confirmación. El campo sigue en el modelo (nullable) y `ReservationDetail` lo muestra si tiene valor. **Consecuencia:** el correo de rechazo no puede citar una razón, porque no se recoge en ningún punto del flujo.
+**Rechazar y cancelar no piden motivo.** El campo `adminNote` sigue en el modelo (nullable) y se muestra si tiene valor, pero nada lo escribe. **Consecuencia:** el correo de rechazo no puede citar una razón.
 
-**Campos del formulario.** Son obligatorios `academicProgram` y `activityType` (listas cerradas; `OTRO` pide detalle en `activityTypeOther`), `attendees` —validado contra `Room.capacity`, no contra una constante— y `responsibilityAccepted`. El campo libre `purpose` se eliminó: lo reemplaza `activityType`, más útil para decidir sin leer texto libre.
+**Campos del formulario.** Obligatorios `academicProgram` y `activityType` (listas cerradas; `OTRO` pide detalle en `activityTypeOther`), `attendees` —validado contra `Room.capacity`, no contra una constante— y `responsibilityAccepted`. No hay campo de texto libre para el propósito: lo reemplaza `activityType`, más útil para decidir.
 
-⚠️ **El cargo es la excepción.** `REQUESTER_ROLES` existe como las otras listas, pero `Reservation.requesterRole` sigue siendo **`String`, no un enum de Prisma**. Es deliberado: el campo nació como texto libre y hay filas con valores que no traducen a la lista. Migrar obligaría a inventarles un mapeo o a perderlos, y no compraría nada — la única escritura pasa por Zod, que valida contra esa lista, y el canal REST de Supabase está cerrado por RLS. `labelForRequesterRole()` devuelve el valor crudo si no lo reconoce, así las reservas antiguas siguen legibles. Su "Otro", a diferencia del de `activityType`, **no** pide detalle.
+⚠️ **`Reservation.requesterRole` es `String`, no un enum de Prisma**, a diferencia de los otros dos. Es deliberado: nació como texto libre y hay filas con valores que no traducen a la lista. La única escritura pasa por Zod, que sí valida contra `REQUESTER_ROLES`, y `labelForRequesterRole()` devuelve el valor crudo si no lo reconoce, así las reservas antiguas siguen legibles. Su "Otro", a diferencia del de `activityType`, **no** pide detalle.
 
-⚠️ **Los `value` de `src/config/reservationOptions.ts` deben coincidir exactamente con los enums `AcademicProgram`/`ActivityType` de `prisma/schema.prisma`.** Están comentados cruzadamente. Ese archivo es la única fuente: lo consumen el `<select>` de `StepRequester.tsx`, el `z.enum` de `lib/validation/reservation.ts` y las etiquetas de `StepReview.tsx`.
+⚠️ **Los `value` de `src/config/reservationOptions.ts` deben coincidir exactamente con los enums de `prisma/schema.prisma`.** Ese archivo es la única fuente: lo consumen el `<select>` del wizard, el `z.enum` de la validación y las etiquetas de la revisión.
 
-**No se rota `ADMIN_PASSWORD`.** Estuvo anotado como pendiente de seguridad; el usuario decidió no hacerlo, con la información delante. **No volver a proponerlo.**
+**No se rota `ADMIN_PASSWORD`.** El usuario lo decidió con la información delante. **No volver a proponerlo.** (Desde la fase 3 la aplicación ya no la lee: solo la usan la semilla y `npm run crear-admin` como contraseña inicial de la primera cuenta.)
 
 ---
 
-## Arquitectura: lo que hay que entender de varios archivos a la vez
+## Arquitectura
 
 **Configuración como fuente única de reglas.** `src/config/booking.ts` y `src/config/holidays.ts` concentran horarios, granularidad, duraciones, límites y festivos. Ninguna regla de negocio se hardcodea en componentes ni handlers.
 
-**El horario de atención absorbe los festivos.** `getOpeningRangesFor(date)` en `lib/datetime.ts` devuelve `[]` para sábados, domingos y festivos. Todo lo demás —generación de slots, validación del servidor, pintado del calendario— consume esa función, así que cerrar un día no requiere lógica extra en ninguna capa. Los cierres excepcionales no van aquí: los crea el admin como `TimeBlock` de tipo `BLOCKED`.
+**El horario de atención absorbe los festivos.** `getOpeningRangesFor(date)` devuelve `[]` para sábados, domingos y festivos. Todo lo demás —generación de slots, validación del servidor, pintado del calendario, cálculo de ocupación— consume esa función, así que cerrar un día no requiere lógica extra en ninguna capa. Los cierres excepcionales son otra cosa: los crea el admin como `TimeBlock` de tipo `BLOCKED`.
 
 **Dos jornadas por día con receso 12:00–13:00.** Una reserva nunca puede cruzarlo: `fitsInSingleRange()` rechaza 11:00–14:00 aunque ambos extremos estén en horario.
 
-**Zod compartido cliente/servidor.** Los esquemas de `lib/validation/` son la única definición de las reglas de campo; el cliente los usa vía `@hookform/resolvers` y el servidor los revalida siempre. El servidor no confía en el cliente ni cuando el formulario ya validó.
+**Zod compartido cliente/servidor.** Los esquemas de `lib/validation/` son la única definición de las reglas de campo. El servidor **siempre** revalida, aunque el formulario ya haya validado.
 
-**Qué vive en Zod y qué en el Route Handler.** `lib/validation/reservation.ts` cubre lo que es función pura de los campos (formato, dominio del correo, duración, alineación a la grilla, receso, anticipación), reutilizando `lib/datetime.ts` en vez de reimplementar aritmética. Lo que necesita la base de datos —sala activa, solapamiento, bloqueos, aforo, límite de pendientes por correo— vive en `POST /api/reservations`, **dentro de la misma `prisma.$transaction` que crea el registro**: la comprobación de choque y la creación no pueden ir separadas.
+**Qué vive en Zod y qué en el handler.** Zod cubre lo que es función pura de los campos (formato, dominio del correo, duración, alineación a la grilla, receso, anticipación). Lo que necesita la base de datos —sala activa, solapamiento, bloqueos, aforo, límite de pendientes— vive en `POST /api/reservations`, **dentro de la misma `prisma.$transaction` que crea el registro**: comprobar el choque y crear no pueden ir separados.
 
-**Disponibilidad.** `lib/availability.ts` implementa el solapamiento con exactamente `A.startsAt < B.endsAt && B.startsAt < A.endsAt` (09:00–10:00 y 10:00–11:00 **no** solapan). Las reservas `PENDING` **ocupan la franja** igual que las `CONFIRMED`.
-
-⚠️ `lib/availability.ts` declara su **propio** union `ReservationStatus` en vez de importar el de Prisma (para servir igual en cliente y servidor, y poder probarse con literales). No puede desincronizarse en silencio —los handlers pasan resultados de Prisma a `findConflicts()`, así que un estado nuevo que falte allí rompe la compilación— pero al añadir uno hay que tocar los dos sitios.
+**Disponibilidad.** El solapamiento es exactamente `A.startsAt < B.endsAt && B.startsAt < A.endsAt` — 09:00–10:00 y 10:00–11:00 **no** solapan. Las reservas `PENDING` **ocupan la franja** igual que las `CONFIRMED`.
 
 **Mutaciones = Route Handlers, no Server Actions.** Un solo patrón, para poder probar con `curl`. Formato de error uniforme: `{ "error": { "code": "...", "message": "..." } }`.
 
-**Dos patrones de datos distintos, a propósito.** `app/page.tsx` consulta Prisma directo: es Server Component y no necesita refrescarse tras una mutación. `app/admin/(protected)/page.tsx` es Client Component y llama a `GET /api/admin/reservations` desde el navegador, porque necesita revalidar tras cada `PATCH`, mantener filtros y mostrar toasts.
+**Dos patrones de datos a propósito.** Las páginas públicas (portal y laboratorio) consultan Prisma directo (Server Components, no necesitan refrescarse). El panel es Client Component y llama a la API desde el navegador, porque necesita revalidar tras cada mutación, mantener filtros y mostrar toasts.
 
-**Comunicación entre hermanos sin store global.** El contador de pendientes vive en `AdminNav` (dentro del layout) pero quien dispara los cambios es la bandeja — hermanos en el árbol. En vez de Context o un store para un solo valor derivado, se usa un evento de `window` (`ADMIN_RESERVATIONS_CHANGED_EVENT`): la bandeja lo dispara tras cada `PATCH` exitoso y `AdminNav` vuelve a pedir el conteo.
+### `EXPIRED` se aplica al leer, no con un cron
 
-**El formulario de `/reserva` funciona sin JavaScript**, y no por purismo: entre que la página pinta y que React hidrata hay una ventana en la que el `onSubmit` no está enlazado, y pulsar el botón hacía un envío nativo que recargaba la misma página **sin ir a ninguna parte** (detectado con Playwright, no por lectura). El `<form>` es un `GET` real hacia `/reserva`, que resuelve `?codigo=` en el servidor y redirige; el handler de cliente ahorra el viaje.
+Una solicitud que nadie revisó y cuya franja ya terminó pasa a `EXPIRED`. Es el único estado que **no** decide el administrador, así que no hay acción de usuario donde colgarlo: `lib/expiration.ts` hace un `updateMany` idempotente que se llama **antes** de las lecturas que importan.
 
-### `EXPIRED` se aplica al leer, no con una tarea programada
+Se descartó Vercel Cron porque en plan Hobby solo permite **una ejecución al día**. `decidedAt` se deja en `null` a propósito: `EXPIRED` con `decidedAt` nulo significa exactamente "se venció sin que nadie la mirara", y el dashboard lo cuenta así.
 
-Una solicitud que nadie revisó y cuya franja ya terminó pasa a `EXPIRED`. Es el único estado que **no** decide el administrador, así que no hay ninguna acción de usuario donde colgarlo: `lib/expiration.ts` hace un `updateMany` idempotente que se llama **antes** de las tres lecturas que importan — `GET /api/admin/reservations` (de donde cuelga el contador del nav), `getPublicReservationByCode()` y el conteo de pendientes de `POST /api/reservations`.
-
-Se descartó Vercel Cron porque **en plan Hobby solo permite una ejecución al día**: una solicitud vencida por la mañana seguiría mostrándose "En revisión" hasta la madrugada. `decidedAt` se deja en `null` a propósito — `EXPIRED` con `decidedAt` nulo significa exactamente "se venció sin que nadie la mirara".
-
-**Es terminal:** `ALLOWED_FROM` en el `PATCH` solo admite origen `PENDING` o `CONFIRMED`, así que las tres acciones sobre una vencida devuelven `409` sin código extra. Y **arregla un bug real**: el tope de `maxPendingPerEmail` filtra por `PENDING`, así que antes tres solicitudes vencidas sin revisar bloqueaban ese correo de forma permanente.
+**Es terminal**, y eso arregla un bug real: el tope de `maxPendingPerEmail` filtra por `PENDING`, así que antes tres solicitudes vencidas sin revisar bloqueaban ese correo para siempre.
 
 ### Cancelación por el propio solicitante
 
 `POST /api/reservations/[code]/cancel` no lleva sesión: la llave son **código + número de documento**, dos datos que solo junta quien reservó.
 
 - **El error es el mismo para "ese código no existe" y "ese documento no coincide".** Si fueran distintos, el endpoint diría si un código existe y volvería recorrible el espacio de códigos.
-- **El acuse por correo al solicitante es parte de la seguridad**, no cortesía: el documento no es un secreto, así que si alguien cancelara sin permiso, el dueño se entera al momento. Usa `selfCancelTemplate` y **no** `cancelTemplate` — la redacción de esa ("lamentamos informarte") es la de una cancelación que se sufre, no una que se decide.
-- **Compare-and-set**: el estado va en el `WHERE` del `updateMany`, no solo en la comprobación previa. Si el admin decide entre una cosa y la otra, no se pisa su decisión.
-- Se puede cancelar hasta que la reserva **empieza**, estando `PENDING` o `CONFIRMED`. `EXPIRED` no, por terminal. La franja se libera sola: `CANCELLED` no está en `ESTADOS_QUE_OCUPAN`.
-- No se distingue en la BD quién canceló; ambos dejan `CANCELLED` con `decidedAt`.
+- **El acuse por correo es parte de la seguridad**, no cortesía: el documento no es un secreto, así que si alguien cancelara sin permiso, el dueño se entera al momento. Usa `selfCancelTemplate` y **no** `cancelTemplate`, cuya redacción es la de una cancelación que se sufre, no una que se decide.
+- **Compare-and-set:** el estado va en el `WHERE` del `updateMany`, no solo en la comprobación previa, para no pisar una decisión simultánea del admin.
 
 ### Correos
 
 **El correo nunca bloquea la transición de estado.** Orden: actualizar BD → intentar enviar → registrar en `EmailLog` (`SENT`/`FAILED`/`LOGGED`). Si el envío falla, la respuesta sigue siendo `200` con `{ emailStatus: "FAILED" }`.
 
-⚠️ **Las llamadas a correo van envueltas en `try/catch` en los handlers, además del que ya tiene el mailer.** `enviarCorreo()` atrapa los fallos de *envío* y los registra como `FAILED`, pero el `EmailLog.create` de su propio `catch` puede fallar y esa excepción sí escaparía — convirtiendo un `201`/`200` en `500` con la reserva ya escrita. En `POST /api/reservations` eso sería peor que ruido: el solicitante creería que no se envió y al reintentar chocaría con su propia franja.
+⚠️ **Las llamadas a correo van envueltas en `try/catch` en los handlers**, además del que ya tiene el mailer: el `EmailLog.create` del propio `catch` del mailer puede fallar, y esa excepción convertiría un `201` en `500` con la reserva ya escrita.
 
-**El HTML se escapa en origen Y se previsualiza en un `<iframe sandbox="">` — doble capa.** `requesterName`, `activityTypeOther` y `adminNote` los escribió alguien externo por el formulario público, y ese HTML no solo se manda: se guarda en `EmailLog.body` y se vuelve a renderizar en `/admin/correos`, dentro de la sesión del admin. `templates.ts` escapa todo valor interpolado; `EmailLogRow.tsx` además usa un `<iframe sandbox="">` sin ningún token en vez de `dangerouslySetInnerHTML`.
+**El HTML se escapa en origen Y se previsualiza en un `<iframe sandbox="">`.** Doble capa a propósito: `requesterName` y `activityTypeOther` los escribió alguien externo por el formulario público, y ese HTML se guarda en `EmailLog.body` y se vuelve a renderizar en `/admin/correos`, dentro de la sesión del admin.
 
-**`lib/mail/mailer.ts` comprueba `SMTP_HOST` Y `SMTP_PASSWORD`**, no solo el host, para decidir el fallback a consola + `LOGGED`. En la práctica el usuario ya tenía host/puerto/usuario configurados antes de tramitar la contraseña de aplicación, así que revisar solo el host habría intentado una conexión real sin credenciales y fallado con `FAILED` en vez de degradar limpiamente.
+**`MAIL_TO_ADMIN` es variable aparte de `SMTP_USER`**: el día que los avisos internos deban ir a otra persona se cambia eso y no el remitente de todos los correos.
 
-**`MAIL_TO_ADMIN` para los avisos internos** (solicitud nueva, y cancelación hecha por el solicitante). Hoy vale lo mismo que `SMTP_USER` —el laboratorio se avisa a sí mismo— pero sigue siendo variable aparte a propósito: el día que los avisos deban ir a otra persona se cambia eso y no el remitente de todos los correos. `enviarCorreoAlLaboratorio()` devuelve `null` y avisa por consola si no está configurada, en vez de inventar un destinatario.
+**El remitente se resuelve POR LABORATORIO** en `lib/mail/buzones.ts`: `SMTP_<CLAVE>_*`, `MAIL_FROM_<CLAVE>` y `MAIL_TO_ADMIN_<CLAVE>`, con reserva a la variable global sin sufijo si el laboratorio no tiene la suya. Una variable vacía cuenta como no configurada.
 
-⚠️ **El enlace de Google Calendar usa el instante UTC real** (`fechaParaGoogleCalendar()`). **No** pasa por `toBogotaWallClockIso()`: ese truco es exclusivo del límite con FullCalendar y aquí metería 5 h de desfase en el calendario de quien pulse el botón. El separador `/` de `dates` va sin codificar, como en la documentación de Google.
+⚠️ **Ese mecanismo sigue existiendo, pero HOY NO SE USA para el SMTP: todos los laboratorios envían desde una única cuenta institucional** (`p3.sistemas@amigo.edu.co`), configurada en las variables globales, y ninguno declara `SMTP_*_<CLAVE>`. **No "arreglarlo" devolviéndole a cada laboratorio su propia cuenta**: la invitación de calendario depende de que el remitente no sea ninguno de los destinatarios (ver más abajo). Lo que sí es por laboratorio son `MAIL_FROM_<CLAVE>` —solo para el **nombre visible**, la dirección es la misma— y `MAIL_TO_ADMIN_<CLAVE>`.
 
-**Verificado contra Gmail real**, no simulado: los tres estados de `EmailLog` (`SENT`; `LOGGED` con contraseña vacía; `FAILED` con contraseña incorrecta — Gmail devolvió `535-5.7.8`, capturado en `EmailLog.error`, y la reserva quedó igual `CONFIRMED`), más el reintento sobre un registro `LOGGED`, que pasó a `SENT`.
+**`Reply-To` apunta al buzón del laboratorio.** Es la contrapartida del remitente único: sin él, un estudiante que pulse Responder le escribiría al administrador de sistemas en vez de al laboratorio. No se pone cuando el destinatario ya es ese buzón.
 
-### Autenticación del admin
+⚠️ **La clave es `Room.mailKey`, NO el `slug`**, y van aparte a propósito: el slug es parte de la URL pública, o sea cosmético y renombrable, y si las credenciales colgaran de él, renombrarlo dejaría al laboratorio **sin SMTP en silencio** — el mailer caería en modo `LOGGED` y los correos dejarían de salir sin un solo error.
 
-JWT firmado con `jose` en cookie `admin_session` (httpOnly, 8 h). Sin NextAuth.
+⚠️ **`smtpConfigurado()` se evalúa por buzón**: un laboratorio sin credenciales cae en `LOGGED` sin arrastrar al otro.
 
-**El middleware no es la única defensa:** `middleware.ts` solo protege *páginas*. Cada handler de `/api/admin/**` debe llamar a `getAdminSession()` por su cuenta.
+⚠️ **`reintentarCorreo()` re-resuelve el buzón desde el `roomId` DEL REGISTRO**, no del entorno. Antes leía `MAIL_FROM` en caliente: con dos laboratorios, eso significaría reenviar el correo de uno **desde la cuenta del otro**, sin dejar constancia. Un registro sin `roomId` no se puede atribuir a ningún buzón y no se reintenta.
 
-⚠️ **Dos runtimes, un solo `lib/auth.ts`.** `middleware.ts` corre en **Edge** y solo puede importar `signAdminToken`/`verifyAdminToken`/`ADMIN_SESSION_COOKIE`; nunca `getAdminSession()`, que depende de `next/headers` (Node). Para que ambos convivan sin que el bundler de Edge arrastre un import de Node, `getAdminSession()` importa `next/headers` de forma **dinámica** dentro de su propio cuerpo, así no puede quedar atrapado en el grafo estático del bundle del middleware.
+**`EmailLog` guarda `roomId` y `fromAddress`**: sin el primero, `/admin/correos` no se puede acotar y un `LAB_ADMIN` vería la pantalla vacía (el filtro falla cerrado porque el cuerpo lleva datos del solicitante); sin el segundo, el remitente de un correo enviado era irrecuperable.
 
-**Route group `(protected)`.** Agrupa las páginas con el shell autenticado; `app/admin/login/page.tsx` queda **fuera**. Los paréntesis no aparecen en la URL. Esto arregló un bug real: `/admin/login` heredaba el layout autenticado y mostraba el nav y el botón de cerrar sesión **antes de que hubiera sesión**, con un `<main>` anidado dentro de otro. Next.js aplica un layout a *todas* las rutas anidadas, sin excepción automática para páginas públicas.
+**El nombre del laboratorio en las plantillas es un parámetro**, no una constante: la cabecera de `layout()` aparece en los OCHO correos, y con el nombre incrustado un solicitante de Redes recibía un correo encabezado por Analítica. Sale barato porque `TemplateReservation.roomName` **es** el nombre del laboratorio.
 
-### Franjas de admin (`TimeBlock`)
+#### La invitación de calendario
 
-**El formulario pide fecha de inicio y fecha de fin por separado, no un solo día.** A diferencia del wizard público (una reserva siempre cabe en un día), una franja de admin puede abarcar varios. Por eso `TimeBlockForm.tsx` no reutiliza las reglas de grilla — solo valida que `endsAt` sea posterior a `startsAt`. Consecuencia: `TimeBlockCard.tsx` no puede usar `formatRange()` (asume un solo día) y cae a `formatBlockRange()` local cuando el rango cruza medianoche.
+Al **confirmar**, el correo lleva adjunta una invitación iCalendar (`METHOD:REQUEST`) que construye `lib/mail/ics.ts`; al **cancelar** una reserva que estaba confirmada, un `METHOD:CANCEL` que la retira. Siempre `REQUEST`, nunca otra cosa.
 
-**El chequeo de conflicto distingue franja por sala de franja global:** si `roomId` tiene valor, la búsqueda se filtra a esa sala; si es `null`, no se filtra — una franja global choca con una reserva de *cualquier* sala. Solo `BLOCKED` dispara el chequeo: `WARNING` es reservable por definición.
+**No se usa la API de Google Calendar, y no por pereza.** Una cuenta de servicio responde `403 forbiddenForServiceAccounts` en cuanto el evento lleva `attendees`; la única salida es la delegación de autoridad para todo el dominio, que concede un superadministrador de Workspace de `amigo.edu.co`. **Se pidió y no la conceden.** Si algún día la conceden, esto se puede sustituir — pero mientras tanto no volver a proponerlo.
 
-### Pantallas de estado (error, 404, carga)
+##### ⚠️ La regla que explica todo este diseño
 
-`app/not-found.tsx`, `error.tsx`, `loading.tsx` y `global-error.tsx`, en voz de marca. Reutilizan `EmptyState` y el shell público en vez de inventar composiciones nuevas.
+**Quien figura como `ORGANIZER` nunca recibe el evento.** Un cliente de calendario no le entrega a nadie algo de lo que ya es dueño: iMIP da por hecho que el organizador lo tiene en su agenda porque lo creó él. Aquí no existe en ninguna parte, así que su copia no aterriza en ningún sitio.
 
-- **`EmptyState` tiene `nivelTitulo`** (`"h1" | "h3"`, por defecto `"h3"`). El 404 y el error **son** la página, así que su título es el `h1`. El tamaño visual no cambia — lo pide la semántica, no el diseño.
-- **Ningún botón de estas pantallas es `variante="accent"`.** `EmptyState` ya trae su arco naranja, el único elemento naranja que admite la vista.
-- ⚠️ **`global-error.tsx` usa estilos en línea con hex escritos a mano**, rompiendo a propósito la regla de "ningún hex suelto". Es la pantalla del fallo del layout raíz, y ese layout es justo quien aplica las variables de `next/font` e importa `globals.css`: depender de esa cadena para dibujar su propio fallo es frágil. Por lo mismo no importa ningún componente del proyecto.
-- **`app/admin/(protected)/loading.tsx` es una guarda, no un arreglo.** Hoy no llega a dispararse (las páginas del panel son Client Components y nada suspende en el servidor), pero si una pasara a Server Component, el boundary de la raíz mostraría la cabecera y el pie **públicos** dentro del panel.
-- ⚠️ **`error.tsx` y `global-error.tsx` no se pueden verificar con `npm run dev`**: el overlay de desarrollo los tapa. Hay que usar `npm run build && npm run start`. Para provocar el error basta una `DATABASE_URL` inalcanzable; para el fallo total, un `throw` en el layout **detrás de una variable de entorno** (uno incondicional rompe el propio build al prerenderizar).
-- `/reserva/[codigo]` **no** usa `notFound()` a propósito: responde `200` con su propio `EmptyState`, que además avisa de la confusión entre S/5 y Z/2 al leer un código. Un 404 genérico no puede dar ese consejo.
+Esto **costó tres intentos y dos hipótesis equivocadas**, comprobadas con envíos reales:
+
+1. Las dos copias con el mismo `REQUEST`, organizador = buzón del laboratorio → **al laboratorio no le llegaba nada**, solo el `.ics` como fichero adjunto.
+2. La copia del laboratorio como `METHOD:PUBLISH` → **tampoco**. No hay método que salve la coincidencia.
+3. **Separar el remitente de los destinatarios** → es lo que hay hoy.
+
+Por eso **todos los correos salen de `p3.sistemas@amigo.edu.co`**, que no es el buzón de ningún laboratorio ni de ningún solicitante. Los asistentes son el **solicitante** y el **buzón del laboratorio** (`MAIL_TO_ADMIN_<CLAVE>`), los dos invitados de verdad, los dos con botones de respuesta.
+
+⚠️ **Por eso el remitente NO puede volver a ser la cuenta del laboratorio.** Y por eso `armarIcs()` **avisa por consola** si `MAIL_TO_ADMIN_<CLAVE>` coincide con el remitente: ese laboratorio se quedará sin evento, y la primera vez el fallo no dio ni un error.
+
+⚠️ **Ojo con las cuentas de administrador.** Si alguien crea un `AdminUser` con la dirección del remitente, no rompe nada *hoy* —el admin no es asistente, solo lo son el solicitante y el buzón del laboratorio—, pero es la clase de coincidencia que reintroduce el problema si algún día se añade al admin a la lista.
+
+##### El resto de las trampas
+
+Lo que esto NO hace, y conviene no prometerlo: el evento no se crea solo en el calendario, sino que cada destinatario acepta una invitación, y **la aplicación nunca se entera de si la aceptaron**. No hay estado que consultar; lo que sabemos es que la invitación salió.
+
+⚠️ **Al confirmar salen DOS correos con la MISMA invitación**, uno al solicitante y otro al buzón del laboratorio (`confirmAdminTemplate`). No es redundancia: una invitación solo entra en la agenda de quien **recibe** el correo, así que listar al laboratorio como `ATTENDEE` en la copia del solicitante no le entrega nada. Sin el segundo correo, el calendario del laboratorio se queda vacío.
+
+⚠️ **El `UID` (`lib/mail/ics.ts`) no puede cambiar nunca.** Es lo único que ata la cancelación a la invitación que la precedió; si cambia, el `CANCEL` se ignora y la reserva cancelada se queda pegada en los calendarios para siempre, sin un solo error. Por eso el dominio del UID es una constante literal y **no** `NEXT_PUBLIC_APP_URL`, que cambia entre entornos. Hay un test que lo fija.
+
+⚠️ **`REJECT` no lleva invitación**, y la autocancelación de una reserva **`PENDING`** tampoco: una solicitud pendiente nunca llegó a tener evento. Solo `CONFIRMED` y `CANCELLED` la tienen.
+
+⚠️ **El reintento re-deriva la invitación del estado ACTUAL de la reserva**, en vez de guardar el `.ics` original. Reenviar el que se mandó volvería a crear en las agendas un evento quizá ya cancelado. Consecuencia aceptada: como el cuerpo del correo sí se reenvía literal, un reintento puede llevar un HTML que diga "confirmada" con una invitación de cancelación. El cuerpo literal ya era así antes del `.ics`.
+
+⚠️ **Las fechas del `.ics` son el instante UTC real.** **No** pasan por `toBogotaWallClockIso()`: ese truco es exclusivo del límite con FullCalendar, y aquí metería 5 h de desfase en el calendario de quien acepte.
+
+**Antes había un botón "Añadir a Google Calendar"** en el correo de confirmación, un enlace `action=TEMPLATE`. Se retiró al llegar la invitación: dejaba el evento en manos de que el solicitante lo pulsara, el laboratorio nunca se enteraba, y el evento que creaba no tenía UID, así que la cancelación no podía retirarlo.
+
+### Autenticación y aislamiento por laboratorio
+
+JWT firmado con `jose` en cookie `admin_session` (httpOnly, 8 h). Sin NextAuth. Cuentas en `AdminUser`, contraseñas hasheadas con **scrypt de `node:crypto`** (`lib/password.ts`) — cero dependencias frente a `bcrypt` (binario nativo) o `bcryptjs`.
+
+Dos roles: **`SUPER_ADMIN`** (transversal, `roomId` null, único que gestiona usuarios y franjas globales) y **`LAB_ADMIN`** (acotado a su laboratorio).
+
+⚠️ **`AdminSession` es una unión discriminada**, no un objeto con `roomId` opcional. Así el compilador garantiza que un `LAB_ADMIN` siempre trae sala; sin eso, `alcanceDeSala()` tendría que decidir qué hacer con uno sin sala, y la respuesta cómoda —alcance vacío— le abriría TODOS los laboratorios. Ese caso se corta antes: `getAdminSession()` no le abre sesión.
+
+⚠️ **`getAdminSession()` verifica la firma Y RELEE la fila del usuario** en cada petición. Esa consulta extra es deliberada: confiando solo en el token, desactivar a alguien o cambiarlo de laboratorio tardaría **hasta 8 h** en surtir efecto. Va secuencial, nunca en `Promise.all`.
+
+⚠️ **`alcanceDeSala()` va DESPUÉS del filtro del cliente en el `where`, y el orden ES la seguridad.** Si `?roomId=` fuera lo último, un `LAB_ADMIN` leería las solicitudes de otro laboratorio con datos personales incluidos. Hay un test en `lib/auth.test.ts` que fija ese orden justo porque es una vulnerabilidad que depende de dos líneas.
+
+**Fuera de alcance se responde 404, no 403**: un 403 confirmaría que ese id existe. Mismo criterio que la autocancelación pública.
+
+**Franjas — asimetría deliberada:** un `LAB_ADMIN` **ve** las franjas globales (`roomId` null) porque le cierran su propio calendario, pero **no puede crearlas ni borrarlas**, porque afectan a laboratorios que no administra. Solo el `SUPER_ADMIN`. Por eso el `GET` de la lista NO usa `alcanceDeSala()` y el `DELETE` sí.
+
+**Estadísticas: siempre de UN laboratorio.** No es presentación: `ocupacion.indice` divide entre las horas hábiles de un solo calendario, así que agregando dos podría pasar de 1.
+
+**El middleware no es la única defensa:** solo protege *páginas*, y en Edge solo puede leer la firma del token (rol incluido), que es una foto que puede tener hasta 8 h. Cada handler de `/api/admin/**` llama a `getAdminSession()` por su cuenta. Ocultar la sección "Usuarios" del nav es cortesía; el 403 del handler es la defensa.
+
+**`SesionAdminProvider`** reparte la sesión a los Client Components desde el layout (que ya la resolvió), en vez de un `GET /api/admin/session` por pantalla. Es para decidir **qué pintar**, nunca para autorizar.
+
+**No hay borrado de administradores**, solo desactivación: borrarlos perdería el rastro de quién decidió sobre las solicitudes ya resueltas. Y **nadie puede desactivarse ni degradarse a sí mismo** — eso es lo que impide dejar la aplicación sin ningún administrador general.
+
+⚠️ **Dos runtimes, un solo `lib/auth.ts`.** `middleware.ts` corre en **Edge** y solo puede importar `signAdminToken`/`verifyAdminToken`/`ADMIN_SESSION_COOKIE`; nunca `getAdminSession()`, que depende de `next/headers` (Node). Para que convivan, `getAdminSession()` importa `next/headers` de forma **dinámica** dentro de su cuerpo, así no queda atrapado en el grafo estático del bundle de Edge.
+
+**Route group `(protected)`.** Agrupa las páginas con el shell autenticado; `/admin/login` queda **fuera**. Sin eso, el login heredaba el nav y el botón de cerrar sesión antes de que hubiera sesión.
 
 ---
 
-## FullCalendar: tres trampas que costaron análisis
+## FullCalendar: tres trampas
 
-### 1. El truco de zona horaria
+`RoomCalendar` se usa en dos sitios con el mismo código: el público (`/laboratorio/[slug]`) y el panel (`/admin/calendario`, con `soloLectura`, que trae selector cuando hay más de un laboratorio y usa `key={sala.id}` para remontarlo al cambiar — sin eso, `ultimoRangoRef` sobreviviría al cambio y el calendario se quedaría con los datos del anterior). Se resolvió con un prop en vez de duplicando el componente **porque estas tres trampas viajan con él**: una copia aparte las duplicaría y se quedaría atrás en cuanto se arregle una.
 
-`RoomCalendar` configura FullCalendar con `timeZone="UTC"` y le pasa cadenas ISO **sin sufijo de zona** que ya representan hora de Bogotá (`toBogotaWallClockIso()`). Así el calendario se ve igual sin importar la zona del navegador — la alternativa delegaría la corrección en el dispositivo del visitante.
+**1. El truco de zona horaria.** Se configura con `timeZone="UTC"` y se le pasan cadenas ISO **sin sufijo de zona** que ya representan hora de Bogotá (`toBogotaWallClockIso()`). Así el calendario se ve igual sin importar la zona del navegador. Contrapartida: los `Date` que FullCalendar construye traen los campos de Bogotá metidos en los *getters* UTC, y `src/lib/fullcalendar.ts` deshace el truco. **No usar esas funciones fuera del límite con FullCalendar** — son un adaptador de un solo sentido. Por lo mismo se sobrescribe el prop `now`.
 
-Contrapartida: los `Date` que FullCalendar construye internamente traen los campos de Bogotá metidos en los *getters* UTC. `src/lib/fullcalendar.ts` deshace el truco para recuperar el instante real. **No usar esas funciones fuera del límite con FullCalendar** — son un adaptador de un solo sentido, no utilidades de fecha.
+**2. Los AVISO van de fondo, no en primer plano.** Un evento de fondo no intercepta el clic, así que `dateClick` sigue disparando con la media hora exacta que se tocó; en primer plano, `eventClick` solo entregaría el rango completo del bloque. Un evento de fondo **no tiene** el wrapper `.fc-event-main`, así que el tinte va en `background-color` con alpha y **nunca** en `opacity`, que atenuaría también el icono y el texto. Y `renderEventContent` necesita su guard: los eventos de festivo no llevan `extendedProps.tipo`, y sin él React truena en cualquier semana con festivo.
 
-Por lo mismo, el prop `now` se sobrescribe: sin eso, el indicador de hora actual usaría la hora real del sistema, desalineada 5 h de la grilla.
+**3. El bucle infinito de `datesSet`.** Cada `setState` hace que `<FullCalendar>` reciba props nuevas; el wrapper llama `resetOptions()` en cada `componentDidUpdate` con un objeto recién creado, la memoización interna compara por referencia, falla siempre, y vuelve a disparar `datesSet` **para el mismo rango visible** → otro fetch → otro `setState`. El arreglo son dos capas que se complementan: `ultimoRangoRef` ignora un `datesSet` de rango idéntico, y un `AbortController` por componente cubre la navegación real solapada. **El rango se marca al empezar la petición y se desmarca si falla o se aborta** — sin lo segundo, el doble montaje de efectos de React en desarrollo deja el rango bloqueado sin datos.
 
-> **`RoomCalendar` se usa en dos sitios con el mismo código.** El público (`/`) y el panel (`/admin/calendario`), que lo monta con `soloLectura`: mismo calendario, sin `dateClick` ni `eventClick`, y con la clase `fc-solo-lectura` que devuelve el cursor a `default` (las celdas llevan `cursor: pointer` en `globals.css` porque pulsarlas abre el wizard). Se resolvió con un prop en vez de duplicando el componente **porque las tres trampas de abajo viajan con él**: una copia aparte las duplicaría y se quedaría atrás en cuanto se arregle una. El prop es `false` por defecto, así que el calendario público no cambió.
+> **`/`, `/laboratorio/[slug]`, `/laboratorio/[slug]/reservar` y `/reserva/[codigo]` deben seguir con `force-dynamic`.** No son candidatos a ISR: el CI construye con credenciales de base de datos falsas.
 >
-> El calendario del panel **no muestra de quién es cada reserva**, y es deliberado: se alimenta de `GET /api/availability`, que nunca devuelve datos personales. Para eso está la bandeja de Solicitudes.
-
-### 2. AVISO va de fondo, no en primer plano
-
-El calendario es clicable y abre `/reservar?startsAt=` al tocar una franja libre. Por eso los `TimeBlock` de tipo `WARNING` —que **sí** son reservables— se renderizan como evento de **fondo**: un evento de fondo no intercepta el clic, así que `dateClick` sigue disparando con la media hora exacta que se tocó. Si fuera de primer plano, `eventClick` solo entregaría el rango completo del bloque, que puede durar horas.
-
-⚠️ Un evento de fondo **no tiene** el wrapper `.fc-event-main` de los de primer plano: el contenido se inserta directo en `.fc-bg-event`. El tinte va en `background-color` con alpha, **nunca** en `opacity` — `opacity` en ese nodo atenuaría también el icono y el texto, que viven ahí mismo. Verificado leyendo `@fullcalendar/core/internal-common.js`, no asumido por la documentación.
-
-⚠️ `renderEventContent` necesita un guard (`if (!tipo) return null`). Los eventos de festivo no llevan `extendedProps.tipo`; el código original hacía un *cast* en vez de comprobar, así que `<Icono />` con un tipo de componente `undefined` **tronaba React** en cualquier semana con festivo. TypeScript no lo vio porque el `as` se lo ocultaba.
-
-### 3. El bucle infinito de `datesSet`
-
-Reproducido en un navegador real con Playwright, tras dos diagnósticos previos equivocados.
-
-**Causa raíz:** cada `setState` hace que `<FullCalendar>` reciba props nuevas. El wrapper de `@fullcalendar/react` llama `calendar.resetOptions(this.props)` en **cada** `componentDidUpdate`, pasando un objeto recién creado por React en cada render. La memoización interna de `@fullcalendar/core` compara **por referencia** contra ese objeto, así que falla siempre, reconstruye el `dateProfile` y dispara `datesSet` de nuevo **para el mismo rango visible**. Eso relanza el fetch → nuevo `setState` → nuevo `resetOptions()`… Sin el fix, `/api/availability` disparaba pares de peticiones cada ~150 ms indefinidamente.
-
-**Arreglo, en dos capas que se complementan:**
-
-- `ultimoRangoRef` guarda el último rango pedido. `handleDatesSet` ignora un `datesSet` cuyo rango sea idéntico, antes de crear siquiera el `AbortController`. Esto corta el ciclo en su origen.
-- El `AbortController` por componente sigue haciendo falta para navegación real solapada: cada pedido nuevo aborta el anterior, y el `finally` solo apaga el spinner si sigue siendo el más reciente.
-
-⚠️ **El rango se marca al empezar la petición, pero se desmarca si esa petición falla o se aborta.** Las dos mitades arreglan síntomas distintos: *marcar al empezar* evita que un `datesSet` espurio dispare un segundo fetch mientras el primero sigue en vuelo; *desmarcar si falla* evita que un rango quede bloqueado para siempre sin datos (en desarrollo React monta cada componente dos veces y el `useEffect` de limpieza aborta el primer intento — ese era el síntoma "la primera carga no trae las franjas hasta que cambio de semana y vuelvo").
-
-> **`/` y `/reservar` deben seguir con `force-dynamic`.** No son candidatos a ISR aunque `Room` cambie poco, porque `ci.yml` construye con credenciales de base de datos falsas e ISR exige generar la página en build time — rompería el CI por la trampa de pre-renderizado de más abajo.
+> ⚠️ **Limitación conocida:** un slug de laboratorio inexistente renderiza la página 404 correcta pero responde **HTTP 200**. Con el streaming de Next 14 el estado ya está comprometido cuando `notFound()` se lanza; llamarlo también en `generateMetadata` no lo cambia (probado). Una ruta que no casa con ningún segmento sí da 404 de verdad. Se acepta: quien navega ve la pantalla correcta.
 
 ---
 
-## Trampas que ya costaron análisis
+## Trampas que rompen cosas
 
-### 1. Dos URLs de base de datos, y el pooler es intermitente
+**1. Dos URLs de base de datos.** `DATABASE_URL` = pooler puerto **6543** con `?pgbouncer=true&connection_limit=N` (runtime). `DIRECT_URL` = puerto **5432**, solo para migraciones (PgBouncer en modo transacción no soporta DDL). Omitir la segunda produce *"prepared statement already exists"*, y típicamente **solo después de desplegar**.
 
-`DATABASE_URL` = pooler puerto **6543** con `?pgbouncer=true&connection_limit=N` (runtime). `DIRECT_URL` = puerto **5432**, solo para migraciones (PgBouncer en modo transacción no soporta DDL). Ambas declaradas en el bloque `datasource`. Omitirlo produce *"prepared statement already exists"* o agotamiento de conexiones, y típicamente **solo después de desplegar**.
+⚠️ **`connection_limit=1` prohíbe `Promise.all` de varias consultas Prisma fuera de una `$transaction`.** Cada llamada intenta adquirir su propia conexión; con el límite en 1 compiten en vez de esperar turno y agotan el `pool_timeout`. **Fuera de una transacción, las consultas van secuenciales, sin excepción** — ya causó un `P2024` real. En Vercel `connection_limit=1` es lo correcto; en el `.env` local puede subirse a 5.
 
-⚠️ **El puerto 6543 falla de forma intermitente desde las herramientas de este agente** — acepta TCP pero a veces no completa el handshake de Postgres; **desde la terminal del usuario funciona siempre**. Distinguir los dos errores importa: *"Can't reach database server"* es el fallo de handshake del agente; `P2024` solo puede ocurrir con la conexión ya establecida, y significa saturación del pool.
-
-Cuando falla, correr con la URL directa como override **solo de terminal, nunca escrito al `.env`**:
+⚠️ **El puerto 6543 falla de forma intermitente desde las herramientas de este agente**, aunque desde la terminal del usuario funciona siempre. Cuando pase, correr con la URL directa como override **solo de terminal, nunca escrito al `.env`**:
 
 ```bash
 DIRECT_URL=$(grep '^DIRECT_URL=' .env | cut -d'"' -f2) && DATABASE_URL="$DIRECT_URL" npm run dev
 ```
 
-⚠️ **`connection_limit=1` prohíbe `Promise.all` de varias consultas Prisma fuera de una `$transaction`.** Cada llamada intenta adquirir su propia conexión; con el límite en 1, lanzarlas a la vez las hace competir en vez de esperar turno y agota el `pool_timeout`. Dentro de `prisma.$transaction` sí es seguro, porque `tx` reutiliza la conexión ya reservada. **Fuera de una transacción, las consultas van secuenciales, sin excepción** — ya pasó: "paralelizar para ganar velocidad" en `GET /api/availability` causó un `P2024`.
+Distinguir los tres fallos importa: *"Can't reach database server"* es el handshake del agente; `P2024` es saturación del pool y exige conexión ya establecida; y `FATAL: (ENOTFOUND) tenant/user postgres.<ref> not found` significa **proyecto pausado** —Supabase free pausa tras 7 días sin actividad—, no borrado: se despausa desde el panel y vuelve tal cual.
 
-En Vercel `connection_limit=1` es lo correcto. En el `.env` **local únicamente** puede subirse a 5.
+**2. El servidor corre en UTC, no en hora de Colombia.** Todo se almacena en UTC y se presenta en `America/Bogota`. **Nunca `new Date("2026-08-01 08:00")` sin zona explícita.** Un desfase de 5 h funciona bien en local antes de fallar en producción.
 
-### 2. Un advisory lock huérfano bloquea toda migración futura
+**3. Pre-renderizado silencioso en build time.** Un Route Handler `GET` o un Server Component que no lea `request`, `searchParams`, `cookies()` ni `headers()` **se pre-renderiza durante `next build`**. Si consulta la base de datos, el build queda acoplado a que esté disponible — y en CI, a las credenciales falsas. Pasó dos veces. Necesitan `export const dynamic = "force-dynamic"` explícito. **Revisar cada página o handler nuevo que toque la base.**
 
-`prisma migrate dev` falló 6 veces seguidas alternando `P1002` y `P1001`. **La causa no era la red:** un `migrate dev --create-only` anterior había abortado en un entorno no interactivo, dejando una sesión **`idle`** con `SELECT pg_advisory_lock(...)` todavía tomado. Postgres no libera un advisory lock hasta que la sesión que lo pidió se cierra.
+**4. Row-Level Security, obligatorio en toda tabla nueva.** Supabase expone automáticamente todas las tablas de `public` por su API REST, protegidas únicamente por RLS — sin relación con si el código usa esa API. Sin RLS, cualquiera con la llave `anon` (pública por diseño) podía leer o borrar `Reservation` entera. **Toda migración que cree una tabla necesita su propio `ALTER TABLE … ENABLE ROW LEVEL SECURITY;`**: Prisma no lo hace ni lo deriva del schema.
 
-**Si `migrate dev` falla con `P1002` de forma persistente, sospechar de esto antes que de la red:** buscar en `pg_stat_activity` (por `DIRECT_URL`) una fila `idle` cuya `query` sea ese lock, y liberarla con `pg_terminate_backend()`. **Confirmar con el usuario antes de ejecutarlo** — es una acción sobre la base compartida.
+**5. Nodemailer no corre en Edge.** Los handlers que envían correo necesitan `export const runtime = "nodejs"`.
 
-### 3. El servidor corre en UTC, no en hora de Colombia
+**6. `"postinstall": "prisma generate"`** en `package.json`: Vercel cachea `node_modules` y sin esto el build falla con errores de tipos confusos tras cambiar el schema.
 
-Todo se almacena en UTC y se presenta en `America/Bogota`. **Nunca `new Date("2026-08-01 08:00")` sin zona explícita.** Un desfase de 5 h aparece en la anticipación mínima y en el horario de atención, y funciona bien en local antes de fallar en producción.
-
-### 4. Pre-renderizado silencioso en build time
-
-**Un Route Handler `GET` o un Server Component que no lea `request`, `searchParams`, `cookies()` ni `headers()` se pre-renderiza durante `next build`.** Si consulta la base de datos, el build queda acoplado a que la BD esté disponible — y en CI, a las credenciales falsas de `ci.yml`. Pasó dos veces. Necesitan `export const dynamic = "force-dynamic";` explícito. Los que leen `request.nextUrl` salen dinámicos solos, pero **revisar cada página o handler nuevo que toque la base de datos**.
-
-### 5. Row-Level Security: obligatorio en toda tabla nueva
-
-Supabase expone automáticamente **todas** las tablas de `public` vía su API REST, protegidas únicamente por RLS — sin relación con si el código usa esa API (esta no la usa: solo Prisma). Sin RLS, cualquiera con la URL del proyecto y la llave `anon` (pública por diseño) podía leer o borrar `Reservation` entera: nombre, documento, correo. Supabase lo detectó y envió una alerta.
-
-Corregido con `ALTER TABLE … ENABLE ROW LEVEL SECURITY;` sobre las cuatro tablas. **Es seguro porque se verificó primero:** Prisma se conecta como el rol `postgres`, que tiene `rolbypassrls = true` e **ignora RLS por completo**. Habilitar RLS sin políticas bloquea el canal REST sin afectar a la app.
-
-⚠️ **Toda tabla nueva necesita su propio `ALTER TABLE … ENABLE ROW LEVEL SECURITY;` en su migración.** Prisma no lo hace por defecto ni lo deriva de `schema.prisma`. Si algún día se introduce `@supabase/supabase-js` del lado del cliente, ahí sí harán falta políticas reales.
-
-### 6. Otras
-
-- **Nodemailer no corre en Edge Runtime.** Los handlers que envían correo necesitan `export const runtime = "nodejs"`.
-- **`"postinstall": "prisma generate"`** en `package.json`: Vercel cachea `node_modules` y sin esto el build falla con errores de tipos confusos tras cambiar el schema.
-- **Supabase free pausa el proyecto tras 7 días sin actividad.** Verificar que esté despierto antes de cualquier demostración.
-
-  ⚠️ **Un proyecto pausado no da un error de red: el pooler responde `FATAL: (ENOTFOUND) tenant/user postgres.<ref> not found`.** Ese mensaje parece decir que el proyecto fue *borrado*, y no es así — se despausa desde el panel de Supabase y vuelve tal cual. Pasó el 2026-08-22 con la base de desarrollo. **No confundirlo** con el fallo intermitente del puerto 6543 (*"Can't reach database server"*, que es de handshake) ni con `P2024` (saturación del pool, que exige conexión ya establecida).
-- **`NEXT_PUBLIC_APP_URL` es lo que codifica el QR** y la base de `metadataBase`. Un valor incorrecto rompe la función principal y deja el enlace compartido sin vista previa.
-- **La lista de festivos puede cambiar por ley a mitad de año.** La **Ley 2578 de 2026** creó el festivo de la Virgen de Chiquinquirá; son **19**, no 18. Al añadir un año no basta con calcular Pascua y aplicar la Ley Emiliani: hay que comprobar si se creó alguno nuevo. `holidays.ts` emite `console.warn` si falta el año en curso.
-- **`z.coerce.number()` sobre un campo opcional vacío.** Un `<input type="number">` sin valor llega como `""`, y `Number("")` da **`0`, no `NaN`** — sin un `z.preprocess` que convierta `""` a `undefined`, dejar el campo en blanco falla la validación de "mayor que cero" en vez de aceptarse vacío.
+**7. `NEXT_PUBLIC_APP_URL` es lo que codifica el QR** y la base de `metadataBase`. Un valor incorrecto rompe la función principal del producto.
 
 ---
 
-## Capa de UI: convenciones establecidas
+## UI, marca y accesibilidad
 
-- **Props en español** (`variante`, `tamano`, `tono`, `cargando`, `ayuda`, `opcional`), igual que el resto del producto.
-- **`cn()` de [src/lib/utils.ts](src/lib/utils.ts)** para componer clases. Usa `extendTailwindMerge` declarando nuestra escala tipográfica: sin esa extensión, tailwind-merge clasificaría `text-h1` como color de texto y descartaría una de dos clases en silencio. **Si añades un tamaño a `fontSize` en `tailwind.config.ts`, añádelo también ahí.**
-- **[Field](src/components/ui/Field.tsx) cablea la accesibilidad por contexto**: genera el id, lo enlaza al `<label>` y apunta `aria-describedby` a ayuda y error, y pone `aria-invalid`. `Input`, `Textarea` y `Select` lo consumen con `useFieldControl()`. Envolver siempre los controles en `Field`, así el enlace no se puede olvidar.
-- **`Checkbox` es la excepción**: no usa `Field` porque su layout es distinto; trae su propia etiqueta, error e id.
-- **`Dialog`** es siempre controlado desde fuera (`open`/`onOpenChange`), sin `Trigger` propio, porque cada sitio de uso ya decide cuándo abrirlo.
-- **Los tokens viven en dos sitios** que hay que mantener sincronizados: el bloque `:root` de [globals.css](src/app/globals.css) (para CSS crudo: FullCalendar, plantillas de correo) y `tailwind.config.ts` (para las utilidades). Los componentes usan solo las utilidades.
-- **El `<Toaster/>` de sonner ya está en el layout raíz**; para notificar, `import { toast } from "sonner"`.
+**Props en español** (`variante`, `tamano`, `tono`, `cargando`, `ayuda`, `opcional`), igual que el resto del producto.
 
----
+**Ningún hex suelto en componentes.** Los tokens del documento de marca viven en **dos sitios que hay que mantener sincronizados**: el bloque `:root` de `globals.css` (para CSS crudo: FullCalendar, plantillas de correo) y `tailwind.config.ts` (para las utilidades). Los componentes usan solo las utilidades.
 
-## Estadísticas del panel (`/admin/estadisticas`)
+**`cn()` de `src/lib/utils.ts`** para componer clases; usa `extendTailwindMerge` declarando nuestra escala tipográfica. **Si añades un tamaño a `fontSize`, añádelo también ahí**, o tailwind-merge descartará una de dos clases en silencio.
 
-**`GET /api/admin/stats` devuelve SOLO agregados.** Su `select` deja fuera `requesterName`, `requesterDocId` y `requesterEmail` a propósito: aunque la respuesta va detrás de sesión, un agregado no necesita saber de quién es cada fila, y lo que no se lee no se puede filtrar por accidente. **No ampliar ese `select` sin pensarlo.**
+**`Field` cablea la accesibilidad por contexto**: genera el id, lo enlaza al `<label>`, apunta `aria-describedby` a ayuda y error, y pone `aria-invalid`. Envolver siempre los controles en `Field` para que ese enlace no se pueda olvidar. `Checkbox` es la excepción, por layout.
 
-**Una sola consulta con `select` estrecho y la agregación en TypeScript** (`lib/stats.ts`), no ocho `groupBy`. La hora del día hay que calcularla en hora de **Bogotá** y `toBogota()` ya lo hace bien; en SQL exigiría `AT TIME ZONE` a mano. Además son dos consultas en total, secuenciales — con `connection_limit=1` un `Promise.all` está prohibido.
+Jerarquía visual: azul estructura · blanco respira · **naranja señala una sola cosa por vista** · gris acompaña. Texto sobre naranja `#F39200` siempre `#2E2E2E`, nunca blanco.
 
-**Qué cuenta cada bloque, y la interfaz lo dice:** `porHora` y `ocupacion` cuentan **solo `CONFIRMED`** (miden uso real); los rankings de cargo, actividad, programa y día cuentan **todas las solicitudes** (miden demanda). La tendencia de 12 meses **ignora el filtro de mes** a propósito. El filtro va sobre `startsAt`, no `createdAt`: responde a "cuánto se usó", no a "cuánto se pidió".
+⚠️ **El azul y el naranja de marca no valen como texto pequeño.** Ni `#007B99` ni `#C77700` llegan a 4.5:1 sobre nuestras superficies claras. Por eso existen `--azul-texto` (`#00647D`) y `--naranja-texto` (`#9A5C00`), y la regla es de una línea: **color de fondo, icono o borde → el token de marca; color de texto → el token `-texto`.** Igual con el gris: `#848585` se queda para gráficos, y el neutral de texto es `#6F7070`.
 
-**El índice de ocupación reutiliza `getOpeningRangesFor()`**, que ya descuenta fines de semana, festivos y el receso. No reimplementar esa aritmética: `stats.test.ts` fija que agosto de 2026 tiene 152 horas hábiles, y esa cifra sale de dos festivos de tipos distintos.
+⚠️ **`--texto-secundario` (#6F7070) tampoco pasa AA sobre el naranja suave `accent-soft`** (#FDE6C7): da 4,09. Ahí el texto pequeño va con `text-texto`.
 
-⚠️ **Nada de gráficos categóricos multicolor, y no es una preferencia.** El validador del skill `dataviz` reprueba la paleta de marca como paleta categórica: `#007B99` y `#2E7D5B` quedan en ΔE 9,9, por debajo del mínimo de 15 **incluso con visión normal de color**, y `#F39200` se queda en 2,29 de contraste. Por eso todos los rankings son **barras de una sola serie del mismo azul** —la longitud codifica, el color no— y **no hay ningún circular**. Antes de tocar un gráfico, cargar el skill `dataviz`.
+Los estados del calendario llevan **refuerzo no cromático** además del color (etiqueta, borde punteado, rayado diagonal, icono), por daltonismo.
 
-⚠️ **`--texto-secundario` (#6F7070) NO pasa AA sobre el naranja suave `accent-soft` (#FDE6C7)**: da 4,09. Sobre la tarjeta destacada el texto pequeño va con `text-texto`. Lo detectó axe sobre el build de producción, no se dedujo.
+**La rejilla del calendario no es operable por teclado** y se acepta así: FullCalendar no hace focusables las celdas. No incumple WCAG 2.1.1 porque el wizard es el camino equivalente y sí es navegable. **Si el wizard cambia, hay que volver a mirarlo.**
 
----
+Auditado con **axe-core sobre el build de producción** (no en `dev`) más recorridos de teclado. Ese es el método al añadir una pantalla.
 
-## Accesibilidad
+### Gráficos del dashboard
 
-Auditada con **axe-core sobre el build de producción** (no en `dev`) más recorridos de teclado con Playwright: 12 pantallas incluidas las del panel con sesión real, los tres pasos del wizard, el formulario con errores visibles, el diálogo abierto y una semana **con festivo** — esta última importa, porque la etiqueta "Festivo" tiene su propio color y una semana cualquiera no la muestra.
+⚠️ **Nada de gráficos categóricos multicolor, y no es una preferencia.** El validador del skill `dataviz` reprueba la paleta de marca como paleta categórica: `#007B99` y `#2E7D5B` quedan en ΔE 9,9, por debajo del mínimo de 15 **incluso con visión normal de color**. Por eso todos los rankings son **barras de una sola serie del mismo azul** —la longitud codifica, el color no— y **no hay ningún circular**. Antes de tocar un gráfico, cargar el skill `dataviz`.
 
-**El azul y el naranja de marca no valen como texto pequeño.** Ni `#007B99` ni `#C77700` llegan a 4.5:1 sobre nuestras superficies claras. Por eso hay dos tokens aparte, `--azul-texto` (`#00647D`) y `--naranja-texto` (`#9A5C00`), y una regla de una línea: **color de fondo, icono o borde → el token de marca; color de texto → el token `-texto`.** Los colores de marca no se tocaron.
-
-**`--texto-secundario` ya no es el gris de marca.** `#848585` se queda en `--color-gris` para gráficos, pero como texto daba 3.70 sobre blanco y 3.39 sobre `--superficie`. El neutral de texto es `#6F7070`, el más claro que pasa AA sobre ambos fondos conservando el matiz. Está replicado en `lib/mail/templates.ts`, que copia los tokens en hex porque un cliente de correo no resuelve variables CSS.
-
-**El hover del acento aclara en vez de oscurecer** (`#E08600`). Sobre naranja el texto va oscuro, así que oscurecer el fondo acerca los dos y hunde el contraste — con `#C77700` el botón principal caía a 3.92 al pasar el ratón.
-
-⚠️ **`.fc .fc-button { box-shadow: none !important }` borraba el anillo de foco global.** Tailwind dibuja `ring-*` con `box-shadow`, así que ese reset dejaba las flechas de navegación como los dos únicos controles de la app que se podían enfocar sin que se viera nada. Repuesto con `outline` en `:focus-visible`, no con box-shadow, para no depender de ganarle el `!important`.
-
-⚠️ **FullCalendar dibuja las flechas como `<span role="img">` sin nombre**, y no hay opción para cambiarlo. `RoomCalendar` lo corrige sobre el DOM montado (`aria-hidden` en el icono, `title` → `aria-label` en el botón) con un `MutationObserver`, porque la barra se vuelve a dibujar al cambiar de vista.
-
-⚠️ **`Dialog` restaura el foco por su cuenta.** Radix lo trae de serie, pero aquí no ocurría: al cerrar, el foco caía en `<body>` aunque el botón que abrió el diálogo siguiera en el DOM (comprobado marcando ese nodo). El componente anota el último elemento enfocado **fuera** de un diálogo y lo restaura en `onCloseAutoFocus`. No sirve leerlo al abrir: los efectos de Radix son hijos y ya movieron el foco antes.
-
-**La rejilla del calendario no es operable por teclado** y se acepta así: FullCalendar no hace focusables las celdas. No incumple WCAG 2.1.1 porque existe el camino equivalente —"Reservar espacio" → wizard, completamente navegable—. Si algún día el wizard dejara de cubrir ese caso, esto pasaría a ser un incumplimiento.
-
----
-
-## Identidad visual
-
-Los tokens del documento de marca se copian a `globals.css` y se mapean en `tailwind.config.ts`. **Ningún hex suelto en componentes.**
-
-Jerarquía: azul estructura · blanco respira · naranja señala **una sola cosa** por vista · gris acompaña. Un solo gesto gráfico protagonista por pantalla. Texto sobre naranja `#F39200` siempre `#2E2E2E`, nunca blanco. Fuentes vía `next/font/google`: Montserrat (display) + Inter (cuerpo); las oficiales son comerciales y no se incrustan sin licencia.
-
-Copy en voz de marca: cercana, activa, sentence case; los botones dicen qué hacen; los errores explican qué pasó y cómo resolverlo, sin dramatismo.
-
-Los estados del calendario llevan **refuerzo no cromático** además del color (etiqueta, borde punteado, rayado diagonal, icono) por daltonismo — la tabla está en el §8 del plan.
-
-**Grid del calendario:** token `--borde-calendario` en `globals.css` y **solo** ahí, no en `tailwind.config.ts`, porque es exclusivo de `--fc-border-color` y ningún componente lo usa como utilidad — no aplica la regla de espejar ambos archivos.
-
-### Los dos logos, y por qué no son intercambiables
-
-| Fichero | Qué es | Alfa | Para qué |
-|---------|--------|------|----------|
-| `logo-uclam.png` | horizontal, 427×118 | **No** — fondo blanco horneado | cabecera, pie, tarjeta de Open Graph |
-| `logo-uclam-escudo.png` | escudo, 78×118 | **Sí** | iconos de pestaña y de iOS |
-
-Que el horizontal **no** tenga transparencia está confirmado inspeccionando los chunks del PNG, no asumido. Por eso sobre superficies azules se envuelve en una tarjeta blanca: así el recorte se lee como decisión de diseño y no como un accidente de exportación. El escudo sí la tiene, y por eso es el que sirve como favicon.
-
-`src/app/icon.png`, `apple-icon.png` y `opengraph-image.png` (+ su `.alt.txt`) los **enlaza Next.js solo, por convención de nombre**, sin tocar `layout.tsx`. Se generan con [scripts/generar-imagenes-marca.mjs](scripts/generar-imagenes-marca.mjs), que necesita Playwright con `--no-save`. Es `.mjs` a propósito: `tsconfig.json` incluye `**/*.ts`, así que un `.ts` importando `playwright` rompería el typecheck en CI.
-
-⚠️ **`metadataBase` en `layout.tsx` es lo que hace que el Open Graph funcione.** Sin él, Next resuelve la URL de la imagen contra `localhost:3000` y ningún servicio externo puede descargarla.
-
-**QR imprimible (`/admin/qr`):** `QRCodeSVG` apuntando a `NEXT_PUBLIC_APP_URL`, con formato de impresión (`print:` de Tailwind oculta la barra del panel; `@page { size: letter }` en `globals.css`). Se probó incrustar el logo *dentro* del QR, pero a 40×40 px se veía borroso y era redundante con el que ya está encima; al quitarlo, el nivel de corrección de errores pudo bajar de `H` a `M`.
+**`GET /api/admin/stats` devuelve solo agregados.** Su `select` deja fuera nombre, documento y correo a propósito: lo que no se lee no se puede filtrar por accidente. **No ampliar ese `select` sin pensarlo.** La agregación vive en `lib/stats.ts` como función pura, y la hora del día se calcula en hora de **Bogotá**.
 
 ---
 
 ## Privacidad
 
-`GET /api/availability` es público y **nunca** devuelve datos personales: solo `startsAt`, `endsAt` y `status`. `GET /api/reservations/[code]` tampoco expone documento ni correo completo. El `.env` nunca se commitea; sí `.env.example`.
+`GET /api/availability` es público y **nunca** devuelve datos personales: solo `startsAt`, `endsAt` y `status`. Por eso el calendario del panel muestra la ocupación pero no de quién es cada reserva — para eso está la bandeja. `GET /api/reservations/[code]` tampoco expone documento ni correo completo. El `.env` nunca se commitea; `.env.example` sí.
 
 ---
 
 ## Stack: versiones fijadas a propósito
 
-Next `14.2.35` + React `18.3.1` + Tailwind `3.4.14`, sin `^` en `package.json`. **No actualizar a Next 15/16, React 19 ni Tailwind v4**: la elección es por madurez de documentación, no por descuido. Tampoco usar `shadcn/ui` (su CLI asume Tailwind v4) ni Turbopack.
+Next `14.2.35` + React `18.3.1` + Tailwind `3.4.14` + Prisma `5.22.0`, sin `^` en `package.json`. **No actualizar a Next 15/16, React 19 ni Tailwind v4**: la elección es por madurez, no por descuido. Tampoco `shadcn/ui` (su CLI asume Tailwind v4) ni Turbopack.
 
-Supabase se usa **solo como PostgreSQL alojado** — nada de su SDK, Auth ni Storage. El acceso a datos es Prisma `5.22.0`.
+Supabase se usa **solo como PostgreSQL alojado** — nada de su SDK, Auth ni Storage.
 
-Cuatro paquetes están por encima de lo que pedía el plan **por advisories de seguridad**, no por capricho: `next` (14.2.18 arrastraba el *Authorization Bypass in Middleware*, que es exactamente el mecanismo que protege `/admin/**`), `nodemailer` (4 advisories afectan a todo `>=6.5.0`; el parche solo existe en 9.x), `@types/nodemailer` y `postcss`. Ninguna API que usamos cambió.
+Node **22.x**, para paridad con Vercel (`engines`, `.nvmrc`). Vercel no tiene desplegable de versión: respeta `engines.node`.
 
-**Postura frente a `npm audit`: nunca quedará en cero, y no hay que perseguirlo.** Lo que queda son (a) la cadena de ESLint, dev-only, y (b) advisories de Next cuyo único "fix" es saltar a Next 16 — aplican a Server Actions, `next/image` remoto, rewrites e i18n de Pages Router, superficies que esta aplicación no tiene. **Antes de reaccionar a un audit, comprobar si la superficie afectada existe aquí.**
+**`npm audit` nunca quedará en cero, y no hay que perseguirlo.** Lo que queda es la cadena de ESLint (dev-only) y advisories de Next cuyo único "fix" es saltar a Next 16 — aplican a Server Actions, `next/image` remoto, rewrites e i18n de Pages Router, superficies que esta aplicación no tiene. **Antes de reaccionar a un audit, comprobar si la superficie afectada existe aquí.**
 
-**Las skills de agente no se versionan.** `.claude/skills/` y `.agents/skills/` están en `.gitignore`; lo versionado es `skills-lock.json`, que guarda de qué repo y con qué hash viene cada una. El árbol de ficheros es caché reinstalable, y además estaba duplicado: en esta máquina `.claude/skills/` son junctions hacia `.agents/skills/`, pero git no los sigue como enlaces y guardaba las dos copias.
-
----
-
-## Entorno local
-
-Node **22.23.2** vía nvm-windows, para paridad con Vercel (`engines: 22.x`, `.nvmrc`). Se subió desde 20.20.2 el 2026-08-11, antes de que Vercel retire Node 20 el **2026-10-01**. Fue un cambio de una línea en tres ficheros: ninguna dependencia lo notó, ni `@types/node` 22 produjo un solo error de tipos.
-
-⚠️ **`nvm use` falló históricamente en esta máquina** porque `NVM_HOME` contenía un espacio y el `elevate.cmd` de nvm-windows no entrecomilla la ruta; había que rehacer el enlace `C:\nvm4w\nodejs` con `mklink /D` elevado. **El usuario reinstaló nvm, npm y node desde cero el 2026-08-11 y el problema desapareció**, pero la ruta con espacio sigue siendo la causa: si reaparece al cambiar de versión, es eso y no otra cosa.
+**Las skills de agente no se versionan**: `.claude/skills/` y `.agents/skills/` están en `.gitignore`; lo versionado es `skills-lock.json`.
 
 ---
 
-## Despliegue (Vercel)
+## Los dos logos, y por qué no son intercambiables
 
-Proyecto `reservas-laboratorio-ueda` en la cuenta `juanalzate82212`. **Production Branch = `main`**; los PR generan despliegues de vista previa. Las 12 variables de entorno están cargadas en Production y Preview. `DATABASE_URL` en Vercel usa `connection_limit=1`.
+| Fichero | Qué es | Alfa | Para qué |
+|---------|--------|------|----------|
+| `logo-uclam.png` | horizontal, 427×118 | **Sí** (desde 2026-09-28) | cabecera, pie, tarjeta de Open Graph |
+| `logo-uclam-escudo.png` | escudo, 78×118 | **Sí** | iconos de pestaña y de iOS |
 
-- ⚠️ **El primer `vercel deploy` de un proyecto se asigna a producción SIEMPRE**, aunque no se pase `--prod`. Pasó de verdad: se corrió sin la bandera solo para inspeccionar el log y publicó el contenido local directo a la URL pública. **Nunca desplegar desde local para "arreglar" un despliegue que falta.**
-- **Vercel toma la rama por defecto del repo como Production Branch.** Como aquí es `develop`, quedó mal por defecto y hubo que corregirlo a mano en Settings → Git: la CLI no expone esa opción.
-- **`vercel env add --value` se cuelga indefinidamente con valores que contienen `<` o `>`** (le pasó a `MAIL_FROM`). Pasar el valor por stdin.
-- **No hay dropdown de versión de Node en el dashboard.** Vercel respeta `engines.node` de `package.json` directamente.
-- Los despliegues de vista previa están **detrás del muro de autenticación de Vercel**: `curl` a esa URL devuelve la página de login, no la app. Para verificar hay que usar producción o un build local.
+Los dos tienen alfa de verdad, confirmado decodificando los píxeles y no solo mirando la cabecera. El horizontal **no lo tuvo siempre**: hasta el 2026-09-28 llevaba el fondo blanco horneado, y se notaba como un rectángulo blanco sobre el gris del pie.
+
+⚠️ **Aun así, sobre superficies azules el horizontal se sigue envolviendo en una tarjeta blanca** (`variante="blanco"`: cabecera del panel y splash de login), y eso ya **no** es para disimular un recorte. Su tinta es azul y naranja oscuros, que sobre `#007B99` quedarían ilegibles. El documento de identidad pide ahí la versión del logo **en blanco** (§4.2), que no tenemos, y admite como alternativa la pestaña o tarjeta blanca (§4.3). **Quitar esa tarjeta rompe las dos pantallas azules.**
+
+`src/app/icon.png`, `apple-icon.png` y `opengraph-image.png` los **enlaza Next.js solo, por convención de nombre**, sin tocar `layout.tsx`. Se generan con [scripts/generar-imagenes-marca.mjs](scripts/generar-imagenes-marca.mjs).
+
+⚠️ **`metadataBase` en `layout.tsx` es lo que hace funcionar el Open Graph.** Sin él, Next resuelve la URL de la imagen contra `localhost:3000` y ningún servicio externo puede descargarla.
 
 ---
 
 ## Disciplina de trabajo
 
-- **`npm run build` debe pasar limpio** antes de dar por cerrado cualquier trabajo. No acumular deuda de tipos.
+- **`npm run build` debe pasar limpio** antes de dar por cerrado cualquier trabajo.
 - **Si una decisión de producto no está resuelta, preguntar en vez de inventar.**
 - El usuario pide **explicar el trabajo antes de construirlo** y un **resumen al terminarlo**: qué se construyó, qué archivos, en qué estado queda la app.
 - **No fusionar ningún PR sin confirmación explícita.**
-- **No afirmar que algo se probó si no se probó.** Ya pasó una vez que un mensaje de commit afirmaba una verificación que no se había hecho; se corrigió haciendo la prueba de verdad antes de dejar el commit.
+- **No afirmar que algo se probó si no se probó.** Ya pasó una vez que un mensaje de commit afirmaba una verificación que no se había hecho.

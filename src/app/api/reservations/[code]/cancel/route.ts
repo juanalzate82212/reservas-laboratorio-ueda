@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 
 import { errorResponse, validationErrorResponse } from "@/lib/api/http";
 import { prisma } from "@/lib/db";
-import { enviarCorreo, enviarCorreoAlLaboratorio } from "@/lib/mail/mailer";
+import {
+  enviarCorreo,
+  enviarCorreoAlLaboratorio,
+  type DescripcionInvitacion,
+} from "@/lib/mail/mailer";
 import { requesterCancelAdminTemplate, selfCancelTemplate } from "@/lib/mail/templates";
 import { normalizeReservationCode } from "@/lib/reservation-code";
 import { RESERVATION_STATUS_LABEL } from "@/lib/reservationStatus";
@@ -55,7 +59,8 @@ export async function POST(
       activityType: true,
       activityTypeOther: true,
       attendees: true,
-      room: { select: { name: true } },
+      roomId: true,
+      room: { select: { name: true, mailKey: true } },
     },
   });
 
@@ -103,6 +108,39 @@ export async function POST(
     );
   }
 
+  /*
+   * La invitación solo se retira si la reserva ESTABA CONFIRMADA. Aquí, a
+   * diferencia del panel, también se puede cancelar una PENDING —el
+   * updateMany de arriba acepta los dos estados—, y una pendiente nunca llegó
+   * a tener evento en ningún calendario: un CANCEL suyo no retiraría nada.
+   *
+   * ⚠️ `reservation.status` se leyó ANTES del compare-and-set, así que en la
+   * ventana en que el administrador confirma justo entre las dos operaciones,
+   * esto valdría PENDING y la cancelación no se enviaría. El evento quedaría
+   * en los calendarios hasta que alguien lo borre a mano. Es una ventana de
+   * milisegundos y la alternativa —mandar siempre el CANCEL— ensuciaría el
+   * buzón de todas las cancelaciones de solicitudes pendientes, que son las
+   * más frecuentes.
+   */
+  const invitacion: DescripcionInvitacion | undefined =
+    reservation.status === "CONFIRMED"
+      ? {
+          metodo: "CANCEL",
+          reserva: {
+            code: reservation.code,
+            roomName: reservation.room.name,
+            startsAt: reservation.startsAt,
+            endsAt: reservation.endsAt,
+            activityType: reservation.activityType,
+            activityTypeOther: reservation.activityTypeOther,
+          },
+          solicitante: {
+            nombre: reservation.requesterName,
+            correo: reservation.requesterEmail,
+          },
+        }
+      : undefined;
+
   const datosPlantilla = {
     code: reservation.code,
     roomName: reservation.room.name,
@@ -123,13 +161,19 @@ export async function POST(
   try {
     acuse = await enviarCorreo({
       reservationId: reservation.id,
+      roomId: reservation.roomId,
+      mailKey: reservation.room.mailKey,
       to: reservation.requesterEmail,
       ...selfCancelTemplate(datosPlantilla),
+      invitacion,
     });
 
     await enviarCorreoAlLaboratorio({
       reservationId: reservation.id,
+      roomId: reservation.roomId,
+      mailKey: reservation.room.mailKey,
       ...requesterCancelAdminTemplate(datosPlantilla),
+      invitacion,
     });
   } catch (error) {
     // enviarCorreo() ya atrapa los fallos de ENVÍO, pero el EmailLog.create de

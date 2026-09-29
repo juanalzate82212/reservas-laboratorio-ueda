@@ -102,7 +102,7 @@ export default async function ReservaPage({
         )}
       </main>
 
-      <Footer />
+      <Footer laboratorio={reservation ? { name: reservation.room.name } : null} />
     </div>
   );
 }

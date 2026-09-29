@@ -310,14 +310,20 @@ export function RoomCalendar({ room, soloLectura = false }: RoomCalendarProps) {
       if (!estado.reservable) return;
 
       // Un router.push() suelto no da ninguna señal: hasta que el servidor
-      // devuelve /reservar la pantalla se queda igual y el clic parece no
+      // devuelve la página la pantalla se queda igual y el clic parece no
       // haber hecho nada. Suele contestar rápido, pero con la red del campus
       // o el arranque en frío de una función serverless no siempre.
+      //
+      // El slug va en la URL y no como parámetro: reservar es siempre reservar
+      // EN un laboratorio, y sin él la página de destino tendría que adivinar
+      // cuál (ver el comentario de app/reservar/page.tsx).
       iniciarNavegacion(() => {
-        router.push(`/reservar?startsAt=${encodeURIComponent(inicio.toISOString())}`);
+        router.push(
+          `/laboratorio/${room.slug}/reservar?startsAt=${encodeURIComponent(inicio.toISOString())}`,
+        );
       });
     },
-    [reservas, bloqueos, router, navegando, iniciarNavegacion],
+    [reservas, bloqueos, room.slug, router, navegando, iniciarNavegacion],
   );
 
   // Clic en un evento en primer plano (reservado, en revisión o bloqueado):

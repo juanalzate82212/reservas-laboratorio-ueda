@@ -6,8 +6,10 @@
  * Vive separada del Route Handler a propósito. La aritmética de aquí —sobre
  * todo la hora del día en zona horaria de Bogotá y las horas hábiles de un
  * mes— es justo donde un error no se ve a simple vista: cuadraría en local y
- * saldría desplazado 5 h en producción, que es la trampa número 3 de
- * CLAUDE.md. Un test con literales la fija; mirar la pantalla, no.
+ * saldría desplazado 5 h en producción — el servidor corre en UTC y la app se
+ * presenta en America/Bogota, que es de las trampas documentadas en CLAUDE.md
+ * la que más veces ha mordido. Un test con literales la fija; mirar la
+ * pantalla, no.
  */
 
 import { BOOKING_CONFIG } from "@/config/booking";

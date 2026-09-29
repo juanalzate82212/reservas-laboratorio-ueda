@@ -4,9 +4,19 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { TimeBlockCard, type TimeBlock } from "@/components/admin/TimeBlockCard";
-import { TimeBlockConflictDialog, type TimeBlockConflict } from "@/components/admin/TimeBlockConflictDialog";
-import { TimeBlockForm, type TimeBlockFormValues } from "@/components/admin/TimeBlockForm";
+import { useSesionAdmin } from "@/components/admin/SesionAdminProvider";
+import {
+  TimeBlockCard,
+  type TimeBlock,
+} from "@/components/admin/TimeBlockCard";
+import {
+  TimeBlockConflictDialog,
+  type TimeBlockConflict,
+} from "@/components/admin/TimeBlockConflictDialog";
+import {
+  TimeBlockForm,
+  type TimeBlockFormValues,
+} from "@/components/admin/TimeBlockForm";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Dialog } from "@/components/ui/Dialog";
@@ -16,12 +26,18 @@ type Sala = { id: string; name: string };
 
 export default function AdminFranjasPage() {
   const router = useRouter();
+  const sesion = useSesionAdmin();
+  const esSuperAdmin = sesion.role === "SUPER_ADMIN";
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([]);
   const [rooms, setRooms] = useState<Sala[]>([]);
   const [cargando, setCargando] = useState(true);
   const [creando, setCreando] = useState(false);
-  const [conflictos, setConflictos] = useState<TimeBlockConflict[] | null>(null);
-  const [pendienteEliminar, setPendienteEliminar] = useState<string | null>(null);
+  const [conflictos, setConflictos] = useState<TimeBlockConflict[] | null>(
+    null,
+  );
+  const [pendienteEliminar, setPendienteEliminar] = useState<string | null>(
+    null,
+  );
   const [eliminando, setEliminando] = useState(false);
 
   const cargar = useCallback(async () => {
@@ -94,7 +110,9 @@ export default function AdminFranjasPage() {
     if (!pendienteEliminar) return;
     setEliminando(true);
     try {
-      const res = await fetch(`/api/admin/time-blocks/${pendienteEliminar}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/time-blocks/${pendienteEliminar}`, {
+        method: "DELETE",
+      });
 
       if (res.status === 401) {
         router.push("/admin/login");
@@ -120,16 +138,34 @@ export default function AdminFranjasPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <h1 className="font-display text-h1 font-semibold text-texto">Franjas</h1>
+        <h1 className="font-display text-h1 font-semibold text-texto">
+          Franjas
+        </h1>
         <p className="text-body text-texto-secundario">
-          Bloquea horarios (mantenimiento, jornadas institucionales) o marca avisos que siguen siendo reservables.
+          Bloquea horarios (mantenimiento, jornadas institucionales) o marca
+          avisos que siguen siendo reservables.
         </p>
       </div>
 
       <Card>
         <CardHeader titulo="Crear franja" />
         <CardBody>
-          <TimeBlockForm rooms={rooms} enviando={creando} onSubmit={crear} />
+          {/*
+            El desplegable solo ofrece lo que quien mira puede crear: su propio
+            laboratorio, o todos si es el administrador general. GET /api/rooms
+            es público y devuelve todos, así que el recorte se hace aquí — y el
+            servidor lo vuelve a comprobar con un 403.
+          */}
+          <TimeBlockForm
+            rooms={
+              esSuperAdmin
+                ? rooms
+                : rooms.filter((sala) => sala.id === sesion.roomId)
+            }
+            enviando={creando}
+            onSubmit={crear}
+            puedeCrearGlobales={esSuperAdmin}
+          />
         </CardBody>
       </Card>
 
@@ -147,12 +183,21 @@ export default function AdminFranjasPage() {
               key={timeBlock.id}
               timeBlock={timeBlock}
               onEliminar={setPendienteEliminar}
+              /*
+               * Una franja global (roomId null) se ve pero no se toca salvo
+               * que seas el administrador general: cierra calendarios de
+               * laboratorios que no administras.
+               */
+              puedeEliminar={esSuperAdmin || timeBlock.roomId === sesion.roomId}
             />
           ))}
         </div>
       )}
 
-      <TimeBlockConflictDialog conflicts={conflictos} onCerrar={() => setConflictos(null)} />
+      <TimeBlockConflictDialog
+        conflicts={conflictos}
+        onCerrar={() => setConflictos(null)}
+      />
 
       <Dialog
         open={pendienteEliminar !== null}
@@ -163,10 +208,20 @@ export default function AdminFranjasPage() {
         description="El horario vuelve a estar disponible de inmediato en el calendario público."
       >
         <div className="flex justify-end gap-3">
-          <Button type="button" variante="ghost" onClick={() => setPendienteEliminar(null)} disabled={eliminando}>
+          <Button
+            type="button"
+            variante="ghost"
+            onClick={() => setPendienteEliminar(null)}
+            disabled={eliminando}
+          >
             Volver
           </Button>
-          <Button type="button" variante="danger" cargando={eliminando} onClick={eliminar}>
+          <Button
+            type="button"
+            variante="danger"
+            cargando={eliminando}
+            onClick={eliminar}
+          >
             Eliminar franja
           </Button>
         </div>

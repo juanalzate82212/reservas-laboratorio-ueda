@@ -38,7 +38,7 @@ export function Header({
         <Link
           href="/"
           className="rounded"
-          aria-label="Ir al inicio de Reservas Laboratorio de Analítica de Datos e Inteligencia Artificial"
+          aria-label="Ir al inicio de Reservas de Laboratorios"
         >
           <Logo
             variante={enAzul ? "blanco" : "positivo"}

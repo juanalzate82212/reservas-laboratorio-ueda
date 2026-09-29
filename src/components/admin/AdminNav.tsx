@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 import { ADMIN_RESERVATIONS_CHANGED_EVENT } from "./adminEvents";
 
-/* Las seis secciones del panel. Todas existen como páginas. */
+/* Secciones del panel. Todas existen como páginas. */
 const ENLACES = [
   { href: "/admin", label: "Solicitudes" },
   { href: "/admin/calendario", label: "Calendario" },
@@ -18,7 +18,15 @@ const ENLACES = [
   { href: "/admin/qr", label: "QR" },
 ];
 
-export function AdminNav() {
+/*
+ * Gestionar administradores es transversal, así que solo se le ofrece al
+ * SUPER_ADMIN. Ocultarlo es cortesía, no seguridad: quien escriba la URL a
+ * mano se topa con el middleware, y quien llame a la API se topa con un 403 de
+ * los handlers, que releen el rol de la base.
+ */
+const ENLACE_USUARIOS = { href: "/admin/usuarios", label: "Usuarios" };
+
+export function AdminNav({ esSuperAdmin = false }: { esSuperAdmin?: boolean }) {
   const pathname = usePathname();
   const [pendientes, setPendientes] = useState<number | null>(null);
 
@@ -44,9 +52,11 @@ export function AdminNav() {
     };
   }, []);
 
+  const enlaces = esSuperAdmin ? [...ENLACES, ENLACE_USUARIOS] : ENLACES;
+
   return (
     <nav className="flex flex-wrap items-center gap-1">
-      {ENLACES.map((enlace) => {
+      {enlaces.map((enlace) => {
         const activo = pathname === enlace.href;
         return (
           <Link

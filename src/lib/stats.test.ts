@@ -13,9 +13,10 @@ import {
 
 /*
  * Lo que se fija aquí es la aritmética que NO se ve mirando la pantalla: la
- * hora del día en Bogotá (el servidor corre en UTC, y un error desplaza el
- * gráfico entero 5 h — la trampa nº 3 de CLAUDE.md), las horas hábiles de un
- * mes con festivos, y el comportamiento con datos que no encajan en la lista.
+ * hora del día en Bogotá (el servidor corre en UTC y un error desplaza el
+ * gráfico entero 5 h; ver "el servidor corre en UTC" en CLAUDE.md), las horas
+ * hábiles de un mes con festivos, y el comportamiento con datos que no encajan
+ * en la lista.
  */
 
 /** Reserva en hora LOCAL de Bogotá, convertida al instante UTC que le toca. */

@@ -23,9 +23,14 @@ const inter = Inter({
   display: "swap",
 });
 
-const TITULO = "Reservas Laboratorio de Analítica de Datos e Inteligencia Artificial";
+/*
+ * Metadata del PORTAL, que es lo que se ve en `/`. Cada laboratorio pisa
+ * título y descripción con su propio generateMetadata en
+ * /laboratorio/[slug], así que esto es el marco, no el contenido.
+ */
+const TITULO = "Reservas de Laboratorios — Universidad Católica Luis Amigó";
 const DESCRIPCION =
-  "Consulta la disponibilidad de las salas del Laboratorio de Analítica de Datos e Inteligencia Artificial y solicita tu reserva.";
+  "Consulta la disponibilidad de los laboratorios de la Universidad Católica Luis Amigó y solicita tu reserva.";
 
 export const metadata: Metadata = {
   /*
@@ -46,7 +51,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: TITULO,
     description: DESCRIPCION,
-    siteName: "Laboratorio de Analítica de Datos e Inteligencia Artificial",
+    siteName: "Reservas de Laboratorios — Universidad Católica Luis Amigó",
     locale: "es_CO",
     type: "website",
   },

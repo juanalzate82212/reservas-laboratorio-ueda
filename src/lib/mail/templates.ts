@@ -54,7 +54,23 @@ function tablaDatos(filas: Array<[string, string]>): string {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;">${celdas}</table>`;
 }
 
-function layout({ titulo, cuerpoHtml }: { titulo: string; cuerpoHtml: string }): string {
+/*
+ * ⚠️ `laboratorio` es un parámetro y no una constante desde que hay más de uno.
+ * Esta cabecera aparece en LOS SEIS correos, así que con el nombre incrustado
+ * un solicitante de Redes recibía un correo encabezado por Analítica.
+ *
+ * Con el modelo elegido (el laboratorio ES la sala) sale gratis: las plantillas
+ * ya recibían `roomName`, que ahora ES el nombre del laboratorio.
+ */
+function layout({
+  titulo,
+  cuerpoHtml,
+  laboratorio,
+}: {
+  titulo: string;
+  cuerpoHtml: string;
+  laboratorio: string;
+}): string {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   return `<!DOCTYPE html>
 <html lang="es">
@@ -65,7 +81,7 @@ function layout({ titulo, cuerpoHtml }: { titulo: string; cuerpoHtml: string }):
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:${COLOR.fondo};border-radius:8px;overflow:hidden;">
             <tr>
               <td style="background-color:${COLOR.primary};padding:24px 32px;">
-                <span style="color:#ffffff;font-size:20px;font-weight:700;font-family:Arial,Helvetica,sans-serif;">Laboratorio de Analítica de Datos e Inteligencia Artificial</span>
+                <span style="color:#ffffff;font-size:20px;font-weight:700;font-family:Arial,Helvetica,sans-serif;">${escapeHtml(laboratorio)}</span>
               </td>
             </tr>
             <tr>
@@ -119,40 +135,6 @@ function datosComunes(r: TemplateReservation): Array<[string, string]> {
   ];
 }
 
-/*
- * "20260914T140000Z" — el formato que pide Google Calendar en `dates`.
- *
- * ⚠️ Recibe el instante UTC real, tal como está en la BD. NO pasar por
- * toBogotaWallClockIso(): ese truco existe solo para el límite con
- * FullCalendar y aquí metería 5 h de desfase en el calendario de quien
- * pulse el botón.
- */
-function fechaParaGoogleCalendar(fecha: Date): string {
-  return fecha.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-}
-
-/*
- * Enlace de "añadir al calendario" de Google. El separador de `dates` va como
- * "/" literal y sin codificar —es lo que documenta Google y lo que aceptan
- * todos sus ejemplos—; el resto de valores sí se codifican para URL, y el
- * enlace entero se escapa después para meterlo en el href.
- */
-function enlaceGoogleCalendar(r: TemplateReservation): string {
-  const texto = `${actividadLegible(r)} — Laboratorio de Analítica de Datos e IA`;
-  const detalles = `Reserva ${r.code} · ${r.roomName}. Consulta su estado con el código en la página del laboratorio.`;
-  const lugar = `Universidad Católica Luis Amigó · ${r.roomName}`;
-
-  const parametros = [
-    "action=TEMPLATE",
-    `text=${encodeURIComponent(texto)}`,
-    `dates=${fechaParaGoogleCalendar(r.startsAt)}/${fechaParaGoogleCalendar(r.endsAt)}`,
-    `details=${encodeURIComponent(detalles)}`,
-    `location=${encodeURIComponent(lugar)}`,
-  ].join("&");
-
-  return `https://calendar.google.com/calendar/render?${parametros}`;
-}
-
 export function confirmTemplate(
   r: TemplateReservation,
   avisoEquipos?: string | null,
@@ -166,32 +148,40 @@ export function confirmTemplate(
       </div>`
     : "";
 
-  // Botón como <a> con estilos inline: en correo no hay hojas de estilo, y un
-  // <button> no navega desde un cliente de correo.
-  const botonCalendario = `
-    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 0;">
-      <tr>
-        <td style="border-radius:6px;background-color:${COLOR.primary};">
-          <a href="${escapeHtml(enlaceGoogleCalendar(r))}"
-             style="display:inline-block;padding:12px 20px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;font-family:Arial,Helvetica,sans-serif;">
-            Añadir a Google Calendar
-          </a>
-        </td>
-      </tr>
-    </table>`;
-
+  /*
+   * Aquí había un botón "Añadir a Google Calendar": un enlace
+   * `action=TEMPLATE` que abría un formulario prerrellenado y dejaba en manos
+   * del solicitante guardar el evento. Si no lo pulsaba, no quedaba nada en
+   * ningún calendario, y el laboratorio nunca se enteraba.
+   *
+   * Lo sustituye la invitación `.ics` que este mismo correo lleva adjunta
+   * (lib/mail/ics.ts): el cliente de correo la reconoce y ofrece responder,
+   * y el laboratorio recibe la suya. El botón sobraba y además competía con
+   * ella: dos formas de añadir lo mismo, una de las cuales creaba un evento
+   * suelto que la cancelación luego no podía retirar, porque no tenía el UID.
+   */
   const cuerpoHtml = `
     <p style="margin:0 0 8px;">Tu solicitud fue aprobada. El espacio queda reservado con estos datos:</p>
     ${tablaDatos(datosComunes(r))}
     ${aviso}
-    ${botonCalendario}
+    <p style="margin:20px 0 0;">Con este correo va una invitación de calendario: acéptala y la reserva queda en tu agenda.</p>
     <p style="margin:16px 0 0;color:${COLOR.textoSecundario};font-size:13px;">Guarda el código de tu reserva para consultarla más adelante.</p>
   `;
 
-  return { subject, html: layout({ titulo: "Reserva confirmada", cuerpoHtml }) };
+  return {
+    subject,
+    html: layout({
+      titulo: "Reserva confirmada",
+      cuerpoHtml,
+      laboratorio: r.roomName,
+    }),
+  };
 }
 
-export function rejectTemplate(r: TemplateReservation): { subject: string; html: string } {
+export function rejectTemplate(r: TemplateReservation): {
+  subject: string;
+  html: string;
+} {
   const subject = `Solicitud de reserva no aprobada — ${r.roomName}, ${formatRange(r.startsAt, r.endsAt)}`;
 
   const nota = r.adminNote
@@ -205,10 +195,20 @@ export function rejectTemplate(r: TemplateReservation): { subject: string; html:
     <p style="margin:16px 0 0;">Puedes revisar la disponibilidad y enviar una nueva solicitud para otro horario cuando quieras.</p>
   `;
 
-  return { subject, html: layout({ titulo: "Solicitud no aprobada", cuerpoHtml }) };
+  return {
+    subject,
+    html: layout({
+      titulo: "Solicitud no aprobada",
+      cuerpoHtml,
+      laboratorio: r.roomName,
+    }),
+  };
 }
 
-export function cancelTemplate(r: TemplateReservation): { subject: string; html: string } {
+export function cancelTemplate(r: TemplateReservation): {
+  subject: string;
+  html: string;
+} {
   const subject = `Reserva cancelada — ${r.roomName}, ${formatRange(r.startsAt, r.endsAt)}`;
 
   const nota = r.adminNote
@@ -222,7 +222,14 @@ export function cancelTemplate(r: TemplateReservation): { subject: string; html:
     <p style="margin:16px 0 0;">Puedes solicitar otro horario disponible cuando lo necesites.</p>
   `;
 
-  return { subject, html: layout({ titulo: "Reserva cancelada", cuerpoHtml }) };
+  return {
+    subject,
+    html: layout({
+      titulo: "Reserva cancelada",
+      cuerpoHtml,
+      laboratorio: r.roomName,
+    }),
+  };
 }
 
 /*
@@ -244,7 +251,14 @@ export function selfCancelTemplate(r: TemplateReservation): {
     <p style="margin:16px 0 0;">Si no fuiste tú, escríbenos cuanto antes: todavía estamos a tiempo de recuperar el horario.</p>
   `;
 
-  return { subject, html: layout({ titulo: "Reserva cancelada", cuerpoHtml }) };
+  return {
+    subject,
+    html: layout({
+      titulo: "Reserva cancelada",
+      cuerpoHtml,
+      laboratorio: r.roomName,
+    }),
+  };
 }
 
 /*
@@ -273,7 +287,14 @@ export function newRequestAdminTemplate(
     <p style="margin:16px 0 0;color:${COLOR.textoSecundario};font-size:13px;">Si nadie la revisa antes de que pase su horario, la solicitud se marca como vencida.</p>
   `;
 
-  return { subject, html: layout({ titulo: "Nueva solicitud de reserva", cuerpoHtml }) };
+  return {
+    subject,
+    html: layout({
+      titulo: "Nueva solicitud de reserva",
+      cuerpoHtml,
+      laboratorio: r.roomName,
+    }),
+  };
 }
 
 /** Aviso interno al laboratorio: una franja se liberó sin que el admin actuara. */
@@ -289,5 +310,79 @@ export function requesterCancelAdminTemplate(r: TemplateReservation): {
     <p style="margin:16px 0 0;color:${COLOR.textoSecundario};font-size:13px;">No hay nada que hacer en el panel: la franja ya se liberó sola.</p>
   `;
 
-  return { subject, html: layout({ titulo: "Cancelación del solicitante", cuerpoHtml }) };
+  return {
+    subject,
+    html: layout({
+      titulo: "Cancelación del solicitante",
+      cuerpoHtml,
+      laboratorio: r.roomName,
+    }),
+  };
+}
+
+/*
+ * La copia de la invitación que va al buzón del laboratorio cuando se
+ * confirma una reserva.
+ *
+ * ⚠️ Existe por una razón concreta, no para avisar al admin de algo que acaba
+ * de hacer él mismo: una invitación de calendario solo entra en la agenda de
+ * quien RECIBE el correo. Listar al laboratorio como ATTENDEE en la copia del
+ * solicitante no le entrega nada. Sin este segundo correo, el calendario del
+ * laboratorio se queda vacío y se pierde la mitad del requerimiento.
+ *
+ * Por eso el texto habla de la invitación y no de la decisión: lo que aporta
+ * es el adjunto.
+ */
+export function confirmAdminTemplate(r: TemplateReservation): {
+  subject: string;
+  html: string;
+} {
+  const subject = `Invitación de calendario — ${r.code}, ${formatRange(r.startsAt, r.endsAt)}`;
+
+  const cuerpoHtml = `
+    <p style="margin:0 0 8px;">Esta reserva quedó confirmada. La invitación adjunta la deja en el calendario del laboratorio:</p>
+    ${tablaDatos(datosComunes(r))}
+    <p style="margin:16px 0 0;color:${COLOR.textoSecundario};font-size:13px;">Si la reserva se cancela, llegará otro correo que retira el evento del calendario.</p>
+  `;
+
+  return {
+    subject,
+    html: layout({
+      titulo: "Reserva confirmada",
+      cuerpoHtml,
+      laboratorio: r.roomName,
+    }),
+  };
+}
+
+/*
+ * La contraparte de confirmAdminTemplate cuando el administrador cancela una
+ * reserva ya confirmada: retira el evento del calendario del laboratorio.
+ *
+ * No se reutiliza cancelTemplate para esto, aunque el adjunto sea el mismo.
+ * Aquella empieza por "Lamentamos informarte que TU reserva fue cancelada":
+ * está escrita para el solicitante, que sufre la cancelación, y mandársela a
+ * quien acaba de decidirla la convierte en una disculpa dirigida a sí mismo.
+ * Mismo criterio que separa selfCancelTemplate de cancelTemplate.
+ */
+export function cancelAdminTemplate(r: TemplateReservation): {
+  subject: string;
+  html: string;
+} {
+  const subject = `Reserva cancelada — ${r.code}, ${formatRange(r.startsAt, r.endsAt)}`;
+
+  const cuerpoHtml = `
+    <p style="margin:0 0 8px;">Esta reserva se canceló desde el panel. El adjunto retira el evento del calendario del laboratorio:</p>
+    ${tablaDatos(datosComunes(r))}
+    <p style="margin:16px 0 0;color:${COLOR.textoSecundario};font-size:13px;">El horario vuelve a estar disponible para nuevas solicitudes.</p>
+  `;
+
+  return {
+    subject,
+    html: layout({
+      titulo: "Reserva cancelada",
+      cuerpoHtml,
+      laboratorio: r.roomName,
+    }),
+  };
 }

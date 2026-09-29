@@ -2,11 +2,13 @@
 
 import { LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { RoomCalendar } from "@/components/calendar/RoomCalendar";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Field } from "@/components/ui/Field";
+import { Select } from "@/components/ui/Select";
 import type { ActiveRoom } from "@/lib/rooms";
 
 /*
@@ -19,14 +21,20 @@ import type { ActiveRoom } from "@/lib/rooms";
  * bandeja de Solicitudes. Fue una decisión explícita del usuario, y evita
  * abrir una segunda ruta que exponga nombres.
  *
- * Client Component como el resto del panel, y no Server Component: así la
- * sala se pide desde el navegador y esta página no puede caer en la trampa
- * del pre-renderizado en build time (ver CLAUDE.md) ni necesita
+ * Client Component como el resto del panel, y no Server Component: así los
+ * laboratorios se piden desde el navegador y esta página no puede caer en la
+ * trampa del pre-renderizado en build time (ver CLAUDE.md) ni necesita
  * `force-dynamic`.
+ *
+ * ⚠️ Antes esto hacía `setRoom(salas[0])`, que era el mismo acoplamiento a "un
+ * solo laboratorio" que getActiveRoom() y que con dos mostraba uno en silencio.
+ * En la fase 3, cuando cada administrador tenga el suyo, la lista llegará ya
+ * acotada por el servidor y el selector solo aparecerá a quien tenga varios.
  */
 export default function AdminCalendarioPage() {
   const router = useRouter();
-  const [room, setRoom] = useState<ActiveRoom | null>(null);
+  const [laboratorios, setLaboratorios] = useState<ActiveRoom[]>([]);
+  const [seleccionadoId, setSeleccionadoId] = useState<string>("");
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
@@ -40,11 +48,14 @@ export default function AdminCalendarioPage() {
           return;
         }
         if (!res.ok) {
-          toast.error("No se pudo cargar la sala.");
+          toast.error("No se pudieron cargar los laboratorios.");
           return;
         }
         const salas: ActiveRoom[] = await res.json();
-        if (!cancelado) setRoom(salas[0] ?? null);
+        if (!cancelado) {
+          setLaboratorios(salas);
+          setSeleccionadoId(salas[0]?.id ?? "");
+        }
       } catch {
         if (!cancelado) toast.error("No se pudo conectar con el servidor.");
       } finally {
@@ -57,6 +68,11 @@ export default function AdminCalendarioPage() {
     };
   }, [router]);
 
+  const seleccionado = useMemo(
+    () => laboratorios.find((sala) => sala.id === seleccionadoId) ?? null,
+    [laboratorios, seleccionadoId],
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
@@ -66,6 +82,24 @@ export default function AdminCalendarioPage() {
           solicitud, ve a Solicitudes.
         </p>
       </div>
+
+      {/* Con un solo laboratorio el selector no decide nada: no se pinta. */}
+      {laboratorios.length > 1 && (
+        <div className="max-w-sm">
+          <Field label="Laboratorio">
+            <Select
+              value={seleccionadoId}
+              onChange={(e) => setSeleccionadoId(e.target.value)}
+            >
+              {laboratorios.map((sala) => (
+                <option key={sala.id} value={sala.id}>
+                  {sala.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+      )}
 
       {cargando ? (
         <div
@@ -77,12 +111,19 @@ export default function AdminCalendarioPage() {
             Cargando el calendario…
           </span>
         </div>
-      ) : room ? (
-        <RoomCalendar room={room} soloLectura />
+      ) : seleccionado ? (
+        /*
+         * `key` fuerza a remontar al cambiar de laboratorio. RoomCalendar
+         * guarda el último rango pedido en un ref (`ultimoRangoRef`) para
+         * cortar el bucle de `datesSet`; sin remontar, ese ref sobreviviría al
+         * cambio y el calendario se quedaría con los datos del anterior,
+         * porque el rango visible no habría cambiado.
+         */
+        <RoomCalendar key={seleccionado.id} room={seleccionado} soloLectura />
       ) : (
         <EmptyState
-          titulo="No hay ninguna sala activa"
-          descripcion="Sin una sala activa no hay disponibilidad que mostrar. Actívala en la base de datos y vuelve a esta página."
+          titulo="No hay ningún laboratorio activo"
+          descripcion="Sin un laboratorio activo no hay disponibilidad que mostrar. Actívalo en la base de datos y vuelve a esta página."
         />
       )}
     </div>

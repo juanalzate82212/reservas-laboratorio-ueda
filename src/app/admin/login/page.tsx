@@ -5,18 +5,23 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { z } from "zod";
 
 import { ArcoDecorativo } from "@/components/brand/ArcoDecorativo";
 import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
+import { z } from "zod";
 
-const loginSchema = z.object({
-  password: z.string().min(1, "Ingresa la contraseña."),
-});
-type LoginInput = z.infer<typeof loginSchema>;
+import { loginSchema } from "@/lib/validation/adminUser";
+
+/*
+ * `z.input` y no `z.infer`: el esquema normaliza el correo con un `.transform()`
+ * (recorta y pasa a minúsculas), así que el tipo de SALIDA es el que ve el
+ * servidor y el de ENTRADA el que escribe la persona. El formulario trabaja con
+ * el de entrada.
+ */
+type LoginInput = z.input<typeof loginSchema>;
 
 /*
  * Patrón "splash/login" del §6-7 del documento de marca: fondo azul pleno,
@@ -35,7 +40,7 @@ export default function AdminLoginPage() {
     formState: { errors },
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { password: "" },
+    defaultValues: { email: "", password: "" },
   });
 
   async function onSubmit(data: LoginInput) {
@@ -84,7 +89,7 @@ export default function AdminLoginPage() {
               Acceso de administrador
             </h1>
             <p className="text-caption text-texto-secundario">
-              Laboratorio de Analítica de Datos e Inteligencia Artificial
+              Universidad Católica Luis Amigó
             </p>
           </div>
 
@@ -93,10 +98,19 @@ export default function AdminLoginPage() {
             className="flex flex-col gap-4"
             noValidate
           >
+            <Field label="Correo" error={errors.email?.message}>
+              <Input
+                type="email"
+                autoFocus
+                autoComplete="username"
+                inputMode="email"
+                {...register("email")}
+              />
+            </Field>
+
             <Field label="Contraseña" error={errors.password?.message}>
               <Input
                 type="password"
-                autoFocus
                 autoComplete="current-password"
                 {...register("password")}
               />
