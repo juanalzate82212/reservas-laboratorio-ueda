@@ -6,7 +6,7 @@
 
 **La aplicación está en producción** con el MVP completo y el panel de administración.
 
-⚠️ **Lo multi-laboratorio está terminado en `develop`, pero `main` todavía sirve la versión de un solo laboratorio.** El portal, las rutas por laboratorio, los administradores con rol, el correo por buzón y la invitación de calendario no han llegado a producción. Los pasos, en orden y con las comprobaciones de después, en [README.md](README.md#este-despliegue-llevar-develop-a-main).
+**Desplegado el 2026-09-29:** portal, rutas por laboratorio, administradores con rol y aislamiento, correo por buzón e invitación de calendario están en producción, verificados con una reserva de punta a punta en cada laboratorio.
 
 ---
 
@@ -18,15 +18,17 @@
 
 ---
 
-## Antes de que Redes reciba reservas de verdad
+## Pendiente tras el despliegue del 2026-09-29
+
+⚠️ **Rotar la contraseña de la base de datos de producción.** La cadena de conexión del rol `postgres` —acceso completo a la base— se pegó en una conversación con el asistente durante el despliegue. No hay indicio de que se haya usado, pero la higiene manda: Supabase → Settings → Database → *Reset database password*, y actualizar `DATABASE_URL` y `DIRECT_URL` en Vercel. **Las dos**, o la aplicación se queda sin base.
 
 **Confirmar el aforo y el correo de contacto del Laboratorio de Redes e Infraestructura.** Se sembró con aforo **25 copiado de Analítica** y `contactEmail` en `null`, ambos provisionales y ya visibles al público. El aforo no es decorativo: es el tope que valida `POST /api/reservations` contra `Room.capacity`. Sin `contactEmail`, el pie de sus páginas no ofrece a quién escribir.
 
-**Poner su buzón real en `MAIL_TO_ADMIN_REDES`.** Es a donde le llegan los avisos, quién va como **asistente** en la invitación de calendario y el `Reply-To` de los correos a sus solicitantes. Sin él cae al buzón global y sus reservas terminan en el calendario equivocado.
+**Crear al encargado de Redes** desde `/admin/usuarios`, con rol `LAB_ADMIN`. Hasta que exista, sus solicitudes solo las ve el administrador general.
 
-⚠️ **Ya no hace falta pedirle a Redes una contraseña de aplicación.** Todo el correo sale de una sola cuenta institucional; lo único propio de cada laboratorio son su nombre visible y su buzón. Ese pendiente se cerró solo.
+**Revisar `connection_limit` en la `DATABASE_URL` de producción.** La cadena que se usó durante el despliegue traía `connection_limit=5`. En Vercel lo correcto es **1**: cada invocación serverless abre la suya, y con 5 se agota antes el cupo compartido del pooler. Conviene comprobar si ese valor es el que está de verdad en la variable de Vercel.
 
-**Crear a su encargado** desde `/admin/usuarios`, con rol `LAB_ADMIN`.
+⚠️ **El remitente del correo ya no se puede cambiar a la ligera.** Desde que salió la primera invitación de calendario, las cancelaciones se emparejan con su invitación por `UID` **y** organizador. Cambiar la cuenta remitente dejaría sin poder retirar los eventos ya enviados.
 
 ---
 

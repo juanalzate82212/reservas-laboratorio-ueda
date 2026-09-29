@@ -8,8 +8,6 @@ Guía para trabajar en este repositorio. Contiene **lo que no se puede deducir l
 
 Sistema de reserva de los **laboratorios** de la Universidad Católica Luis Amigó: https://reservas-laboratorio-ueda.vercel.app
 
-> ⚠️ **Al 2026-09-29, `main` —producción— todavía sirve la versión de UN SOLO laboratorio.** Lo que sigue describe `develop`, donde esperan el portal, las rutas por laboratorio, los administradores con rol y aislamiento, el correo por buzón y la invitación de calendario. Sale todo de golpe en la primera fusión a `main`, y antes hay **tres pasos obligatorios en este orden**: aplicar las migraciones con `DIRECT_URL`, `npm run crear-admin` (si no, el panel se queda sin nadie que pueda entrar) y cargar las variables de correo en Vercel. La lista completa, con las comprobaciones de después, está en [README.md](README.md#este-despliegue-llevar-develop-a-main). **Borrar este aviso y esa sección cuando esté desplegado.**
-
 El público llega por un código QR impreso → cae en el **portal** (`/`), que presenta los laboratorios → entra en el suyo, ve la disponibilidad y solicita una franja. Todo el texto visible va en español.
 
 **Cada laboratorio ES una fila de `Room`.** No hay un modelo `Lab` aparte: fue una decisión explícita del usuario. Dar de alta uno nuevo es insertar una fila más sus variables de correo, sin migración. El precio, asumido: el día que UN laboratorio necesite DOS espacios reservables distintos, eso sí es una migración de modelo.
