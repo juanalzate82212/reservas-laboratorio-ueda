@@ -28,6 +28,25 @@
 
 **Revisar `connection_limit` en la `DATABASE_URL` de producción.** La cadena que se usó durante el despliegue traía `connection_limit=5`. En Vercel lo correcto es **1**: cada invocación serverless abre la suya, y con 5 se agota antes el cupo compartido del pooler. Conviene comprobar si ese valor es el que está de verdad en la variable de Vercel.
 
+**El desplegable de laboratorios ofrece los ajenos a un `LAB_ADMIN`.** No es una fuga —los handlers acotan igual y `GET /api/availability` nunca devuelve datos personales—, pero ofrece elegir algo de lo que esa persona no es responsable, y en el calendario además **arranca en el laboratorio equivocado**.
+
+Está a medias: dos pantallas ya lo hacen bien y dos no.
+
+| Pantalla | Estado |
+|---|---|
+| `franjas` | ✅ filtra con `rooms.filter((sala) => sala.id === sesion.roomId)` |
+| `estadisticas` | ✅ ni siquiera llama a `/api/rooms` si no es `SUPER_ADMIN` |
+| **`(protected)/page.tsx`** (Solicitudes) | ❌ vuelca `/api/rooms` entero en el desplegable |
+| **`calendario/page.tsx`** | ❌ igual, y además hace `setSeleccionadoId(salas[0]?.id)` |
+
+**El patrón a copiar ya existe en `franjas/page.tsx`**, comentario incluido: `GET /api/rooms` es público y devuelve todos, así que el recorte se hace en el cliente y el servidor lo vuelve a comprobar. Para el calendario hay que arreglar además la preselección, no solo la lista.
+
+Lo razonable es que, con un solo laboratorio a la vista, el desplegable **no se pinte** en lugar de mostrar una única opción.
+
+**Las solicitudes se ordenan por fecha de la franja, no por cuándo llegaron.** `GET /api/admin/reservations` usa `orderBy: { startsAt: "asc" }`, así que arriba queda la reserva que ocurre antes. **Pedido: la más reciente primero**, o sea `createdAt: "desc"`.
+
+⚠️ Al cambiarlo se pierde algo, y conviene decidirlo a sabiendas: con `startsAt` ascendente, lo que encabeza la bandeja es lo más **urgente de decidir** —la actividad que se celebra antes—. Con `createdAt` descendente, una solicitud pedida hoy para dentro de un mes queda por encima de una pedida ayer para mañana. Si eso molesta, la salida es ordenar por llegada pero **destacar visualmente** las que ocurren pronto, no volver atrás.
+
 ⚠️ **El remitente del correo ya no se puede cambiar a la ligera.** Desde que salió la primera invitación de calendario, las cancelaciones se emparejan con su invitación por `UID` **y** organizador. Cambiar la cuenta remitente dejaría sin poder retirar los eventos ya enviados.
 
 ---
