@@ -4,7 +4,7 @@ Sistema de reserva de los laboratorios de la **Universidad Católica Luis Amigó
 
 Cualquier persona de la comunidad universitaria escanea un código QR, elige laboratorio en el portal, consulta su disponibilidad en un calendario y solicita una franja horaria. El encargado de ese laboratorio revisa las solicitudes, las aprueba o rechaza, y gestiona bloqueos de horario. El solicitante recibe un correo automático con la decisión, enviado desde la cuenta de ese laboratorio; si se aprueba, ese correo lleva una invitación de calendario que también llega al buzón del laboratorio.
 
-**Laboratorios activos:** Analítica de Datos e Inteligencia Artificial, y Redes e Infraestructura. Cada uno tiene su calendario, su encargado y su remitente de correo; una reserva en uno no afecta al otro.
+**Laboratorios activos:** Analítica de Datos e Inteligencia Artificial, y Redes e Infraestructura. Cada uno tiene su calendario, su encargado y su buzón de contacto; una reserva en uno no afecta al otro.
 
 **En producción:** https://reservas-laboratorio-ueda.vercel.app
 
@@ -122,18 +122,20 @@ Todas están documentadas en [`.env.example`](.env.example). Resumen:
 | `ADMIN_PASSWORD` | Contraseña **inicial** del primer administrador. La aplicación ya no la lee: solo la usan la semilla y `npm run crear-admin` |
 | `AUTH_SECRET` | Clave para firmar el JWT de sesión. Generar con `openssl rand -base64 32` |
 | `NEXT_PUBLIC_APP_URL` | URL pública de la app. **Es lo que codifica el QR** y la base de la URL absoluta de la imagen de Open Graph; un valor incorrecto rompe la función principal y deja el enlace compartido sin vista previa |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASSWORD` | Credenciales de envío de correo |
-| `MAIL_FROM` | Remitente, en formato `Nombre <correo>`. Debe coincidir con `SMTP_USER` o ser un alias suyo |
-| `MAIL_TO_ADMIN` | Buzón interno donde caen los **avisos** al laboratorio: solicitud nueva por revisar, y cancelación hecha por el solicitante. Si se deja vacía, esos avisos no se mandan y solo queda constancia en consola |
-| `SMTP_*_<CLAVE>`, `MAIL_FROM_<CLAVE>`, `MAIL_TO_ADMIN_<CLAVE>` | **Buzón propio de un laboratorio.** `<CLAVE>` es su `Room.mailKey` (`ANALITICA`, `REDES`). Si un laboratorio no tiene la suya, se usa la variable global sin sufijo |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASSWORD` | Credenciales de la **única** cuenta desde la que sale todo el correo |
+| `MAIL_FROM` | Remitente, en formato `Nombre <correo>`. La **dirección** debe ser `SMTP_USER` o un alias suyo; el **nombre** es libre, y es lo que cambia por laboratorio |
+| `MAIL_TO_ADMIN` | Buzón del laboratorio por defecto: recibe los **avisos** (solicitud nueva, cancelación del solicitante), va como **asistente** en la invitación de calendario y es el **`Reply-To`** de los correos al solicitante. Si se deja vacía, esos avisos no se mandan y solo queda constancia en consola |
+| `MAIL_FROM_<CLAVE>`, `MAIL_TO_ADMIN_<CLAVE>` | Lo propio de cada laboratorio: su **nombre visible** como remitente y su **buzón**. `<CLAVE>` es su `Room.mailKey` (`ANALITICA`, `REDES`); lo que no declare cae a la variable global sin sufijo |
 
 **Las dos URLs de base de datos no son intercambiables** y ambas deben estar declaradas. Omitir `DIRECT_URL` produce errores de *"prepared statement already exists"* que típicamente solo aparecen después de desplegar.
 
-**Sin `SMTP_PASSWORD`, la aplicación sigue funcionando:** el mailer escribe los correos en consola y los registra con estado `LOGGED` en vez de fallar, de modo que todo el flujo es desarrollable y demostrable sin credenciales. Se evalúa **por buzón**: un laboratorio sin credenciales cae en `LOGGED` sin arrastrar a los demás.
+**Sin `SMTP_PASSWORD`, la aplicación sigue funcionando:** el mailer escribe los correos en consola y los registra con estado `LOGGED` en vez de fallar, de modo que todo el flujo es desarrollable y demostrable sin credenciales.
 
-> ⚠️ El sufijo de las variables por laboratorio es `Room.mailKey`, **no el `slug`**. Van aparte a propósito: el slug es parte de la URL pública y algún día alguien lo renombrará; si las credenciales colgaran de él, ese cambio dejaría al laboratorio **sin SMTP en silencio**.
+> ⚠️ **Todo el correo sale de una sola cuenta, y eso es deliberado.** Un cliente de calendario no le entrega el evento a quien figura como organizador de la invitación, así que mientras cada laboratorio envió desde su propio buzón, ese buzón era a la vez remitente y destinatario y **el laboratorio se quedaba sin sus reservas en el calendario**, sin dar un solo error. Las variables `SMTP_*_<CLAVE>` siguen existiendo, pero **no deben usarse**: `MAIL_TO_ADMIN_<CLAVE>` nunca puede ser la dirección de `MAIL_FROM`, y el mailer avisa por consola si coinciden.
 
-**Dar de alta un laboratorio nuevo** = insertar su fila en `Room` (con su `mailKey`) y añadir sus variables de correo. No hace falta ninguna migración.
+> ⚠️ El sufijo de las variables por laboratorio es `Room.mailKey`, **no el `slug`**. Van aparte a propósito: el slug es parte de la URL pública y algún día alguien lo renombrará; si la configuración colgara de él, ese cambio dejaría al laboratorio **sin buzón en silencio**.
+
+**Dar de alta un laboratorio nuevo** = insertar su fila en `Room` (con su `mailKey`) y añadir sus dos variables de correo. No hace falta ninguna migración.
 
 ### Cómo obtener la contraseña de correo
 
@@ -143,7 +145,7 @@ El correo institucional corre sobre **Google Workspace**, así que aplican las r
 
 **Hay que repetir esto por cada laboratorio**, con su propia cuenta: Gmail solo deja enviar con un `From` que sea la cuenta autenticada, y de ahí que cada uno necesite sus credenciales.
 
-Con la cuenta del laboratorio iniciada:
+Con la cuenta remitente iniciada (una sola para toda la aplicación):
 
 1. En [myaccount.google.com/security](https://myaccount.google.com/security), activar la **verificación en 2 pasos**. Es requisito: sin ella la opción de contraseñas de aplicación **ni siquiera aparece**.
 2. Ir a [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) y crear una con un nombre reconocible.
@@ -151,7 +153,7 @@ Con la cuenta del laboratorio iniciada:
 
 **Si `/apppasswords` da error o no carga**, el administrador de Google Workspace de la universidad tiene la función deshabilitada para el dominio — es una restricción común en instituciones. Hay que pedir a TI que la habiliten para esa cuenta, o que faciliten un relay SMTP institucional.
 
-> `MAIL_FROM` debe ser la dirección de `SMTP_USER` o un alias suyo: Gmail rechaza remitentes arbitrarios, y un `no-responder@…` inexistente hace fallar el envío. El límite de Google Workspace ronda los 2 000 destinatarios diarios, de sobra para este sistema.
+> La dirección de `MAIL_FROM` debe ser `SMTP_USER` o un alias suyo: Gmail rechaza remitentes arbitrarios, y un `no-responder@…` inexistente hace fallar el envío. El límite de Google Workspace ronda los 2 000 destinatarios diarios; al salir ahora todo por una cuenta el cupo es compartido, y aun así sobra para este sistema.
 
 Para desarrollar sin credenciales, además del modo consola descrito arriba, [Ethereal](https://ethereal.email) genera credenciales SMTP falsas al instante: los correos no se entregan a nadie pero se ven renderizados en su web, útil para revisar el HTML de las plantillas.
 
