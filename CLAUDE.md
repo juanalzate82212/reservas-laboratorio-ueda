@@ -8,7 +8,7 @@ Guía para trabajar en este repositorio. Contiene **lo que no se puede deducir l
 
 Sistema de reserva de los **laboratorios** de la Universidad Católica Luis Amigó: https://reservas-laboratorio-ueda.vercel.app
 
-> ⚠️ **Al 2026-09-11, todo lo multi-laboratorio vive en `develop`. `main` —producción— todavía sirve la versión de UN SOLO laboratorio.** Lo que sigue describe `develop`. Antes de fusionar a `main` hay tres pasos obligatorios, en orden: aplicar las migraciones, `npm run crear-admin` (si no, el panel se queda sin acceso) y cargar las variables de correo de cada laboratorio. **Borrar este aviso cuando esté desplegado.**
+> ⚠️ **Al 2026-09-29, `main` —producción— todavía sirve la versión de UN SOLO laboratorio.** Lo que sigue describe `develop`, donde esperan el portal, las rutas por laboratorio, los administradores con rol y aislamiento, el correo por buzón y la invitación de calendario. Sale todo de golpe en la primera fusión a `main`, y antes hay **tres pasos obligatorios en este orden**: aplicar las migraciones con `DIRECT_URL`, `npm run crear-admin` (si no, el panel se queda sin nadie que pueda entrar) y cargar las variables de correo en Vercel. La lista completa, con las comprobaciones de después, está en [README.md](README.md#este-despliegue-llevar-develop-a-main). **Borrar este aviso y esa sección cuando esté desplegado.**
 
 El público llega por un código QR impreso → cae en el **portal** (`/`), que presenta los laboratorios → entra en el suyo, ve la disponibilidad y solicita una franja. Todo el texto visible va en español.
 
@@ -100,6 +100,7 @@ Para bugs de interfaz y auditorías de accesibilidad, **Playwright y axe-core in
 
 [ci.yml](.github/workflows/ci.yml) corre lint + typecheck + test + build en cada PR; es el status check obligatorio. **No corre en `main`**, a propósito.
 
+- ⚠️ **El CI falla de vez en cuando por Google Fonts, no por el código.** `next/font` descarga Montserrat e Inter durante `next build`, así que un tropiezo de red en el runner tumba el build con `TypeError: Cannot read properties of null (reading '1')` dentro de `@next/font/dist/google/loader.js`. No es un error tuyo: **relanzar el job** (`gh run rerun <id> --failed`) y comprobar. Si falla dos veces seguidas con el mismo commit, entonces sí mirar el código.
 - **Nunca fusionar un PR sin confirmación explícita del usuario.**
 - ⚠️ **Un merge a `main` puede no desplegar, y nada avisa.** Ya pasó: el PR se fusionó, Vercel no creó el despliegue y la app quedó atrasada ~12 h en silencio, porque el CI no corre en `main` y Vercel no marca error. **Tras fusionar a `main`, comprobar producción con una petición real** a una ruta cuyo contenido haya cambiado.
 - **Nunca desplegar desde local** para "arreglar" un despliegue que falta.
