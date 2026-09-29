@@ -23,7 +23,21 @@ import { labelForActivityType } from "@/config/reservationOptions";
  * es el criterio de CLAUDE.md para que algo entre en Vitest.
  */
 
-export type MetodoIcs = "REQUEST" | "CANCEL";
+/*
+ * REQUEST invita y pide respuesta; PUBLISH solo entrega el evento; CANCEL lo
+ * retira.
+ *
+ * ⚠️ PUBLISH existe por una limitación de iMIP, no por gusto: una invitación
+ * por correo NO puede poner el evento en la agenda de quien la ORGANIZA. El
+ * protocolo da por hecho que el organizador ya lo tiene, porque normalmente lo
+ * creó él en su calendario. Aquí no existe en ninguna parte, así que la copia
+ * del laboratorio —que es el organizador— no tenía dónde aterrizar: Gmail la
+ * descartaba entera, sin botones y sin evento. Comprobado con un envío real.
+ *
+ * Por eso cada copia lleva lo que le corresponde: REQUEST al solicitante, que
+ * sí es invitado, y PUBLISH al laboratorio, que no se invita a sí mismo.
+ */
+export type MetodoIcs = "REQUEST" | "PUBLISH" | "CANCEL";
 
 export interface PersonaIcs {
   nombre?: string | null;
@@ -78,7 +92,7 @@ export function uidDeReserva(code: string): string {
  * separado para que no puedan discrepar.
  */
 export function metodoDelIcs(ics: string): MetodoIcs | null {
-  const encontrado = /^METHOD:(REQUEST|CANCEL)$/m.exec(ics);
+  const encontrado = /^METHOD:(REQUEST|PUBLISH|CANCEL)$/m.exec(ics);
   return encontrado ? (encontrado[1] as MetodoIcs) : null;
 }
 
@@ -162,6 +176,14 @@ export function construirIcs({
 }: InvitacionIcs): string {
   const cancelacion = metodo === "CANCEL";
 
+  /*
+   * ⚠️ Un PUBLISH no lleva ATTENDEE, y no es una simplificación: el §3.2.1 del
+   * RFC 5546 lo prohíbe. Tiene sentido — no hay relación de agenda que
+   * establecer, nadie tiene que responder nada. Quién reservó viaja igual en
+   * el cuerpo HTML del correo, que el laboratorio recibe al lado del botón.
+   */
+  const conInvitados = metodo !== "PUBLISH";
+
   const descripcion = cancelacion
     ? `La reserva ${reserva.code} del ${reserva.roomName} fue cancelada.`
     : `Reserva ${reserva.code} · ${reserva.roomName}. Consulta su estado con el código en la página del laboratorio.`;
@@ -192,15 +214,17 @@ export function construirIcs({
      * RSVP=TRUE solo en la invitación. En una cancelación no hay nada que
      * responder, y pedirlo hace que algunos clientes pinten botones inútiles.
      */
-    ...invitados.map((i) =>
-      persona(
-        "ATTENDEE",
-        i,
-        cancelacion
-          ? ";ROLE=REQ-PARTICIPANT;PARTSTAT=DECLINED"
-          : ";ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE",
-      ),
-    ),
+    ...(conInvitados
+      ? invitados.map((i) =>
+          persona(
+            "ATTENDEE",
+            i,
+            cancelacion
+              ? ";ROLE=REQ-PARTICIPANT;PARTSTAT=DECLINED"
+              : ";ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE",
+          ),
+        )
+      : []),
     "END:VEVENT",
     "END:VCALENDAR",
   ];

@@ -97,6 +97,50 @@ describe("construirIcs", () => {
     expect(propiedad(ics, "ATTENDEE")).toContain("PARTSTAT=DECLINED");
   });
 
+  /*
+   * La copia del laboratorio. Lo que se comprueba aquí es por qué Gmail
+   * descartaba la anterior: al laboratorio le llegaba un REQUEST en el que
+   * figuraba como ORGANIZER, y una invitación no puede aterrizar en la agenda
+   * de quien la organiza.
+   */
+  it("la copia del organizador se publica, no se invita", () => {
+    const ics = construirIcs({ metodo: "PUBLISH", ...BASE });
+
+    expect(propiedad(ics, "METHOD:")).toBe("METHOD:PUBLISH");
+    expect(propiedad(ics, "STATUS:")).toBe("STATUS:CONFIRMED");
+    // Es la primera versión del evento, igual que un REQUEST.
+    expect(propiedad(ics, "SEQUENCE:")).toBe("SEQUENCE:0");
+    // El organizador SÍ va: el §3.2.1 lo exige también en un PUBLISH.
+    expect(propiedad(ics, "ORGANIZER")).toBe(
+      "ORGANIZER:mailto:lab.redes@amigo.edu.co",
+    );
+  });
+
+  /*
+   * El §3.2.1 del RFC 5546 prohíbe ATTENDEE en un PUBLISH: no hay relación de
+   * agenda que establecer. Dejarlos convertiría el evento en una invitación a
+   * medias y es justo lo que se está arreglando.
+   */
+  it("un PUBLISH no lleva invitados", () => {
+    const ics = construirIcs({ metodo: "PUBLISH", ...BASE });
+
+    expect(desplegar(ics).filter((l) => l.startsWith("ATTENDEE"))).toEqual([]);
+    expect(ics).not.toContain("RSVP=TRUE");
+  });
+
+  /*
+   * Las dos copias describen EL MISMO evento. Si el UID no coincidiera, la
+   * cancelación —que se manda igual a los dos— solo retiraría el del
+   * solicitante y el del laboratorio se quedaría pegado para siempre.
+   */
+  it("publicación, invitación y cancelación comparten UID", () => {
+    const uid = `UID:${uidDeReserva(RESERVA.code)}`;
+
+    expect(propiedad(construirIcs({ metodo: "REQUEST", ...BASE }), "UID:")).toBe(uid);
+    expect(propiedad(construirIcs({ metodo: "PUBLISH", ...BASE }), "UID:")).toBe(uid);
+    expect(propiedad(construirIcs({ metodo: "CANCEL", ...BASE }), "UID:")).toBe(uid);
+  });
+
   it("el UID no depende de nada que cambie entre entornos", () => {
     // Si esto se rompe, las cancelaciones dejan de casar con las invitaciones
     // YA ENVIADAS. Cambiar el valor esperado no es arreglar el test.
@@ -180,6 +224,17 @@ describe("metodoDelIcs", () => {
     );
     expect(metodoDelIcs(construirIcs({ metodo: "CANCEL", ...BASE }))).toBe(
       "CANCEL",
+    );
+  });
+
+  /*
+   * Si no lo reconociera, adjuntoIcs() se quedaría sin `method` y nodemailer
+   * mandaría el `.ics` como fichero suelto: exactamente el síntoma que este
+   * cambio viene a quitar.
+   */
+  it("reconoce PUBLISH", () => {
+    expect(metodoDelIcs(construirIcs({ metodo: "PUBLISH", ...BASE }))).toBe(
+      "PUBLISH",
     );
   });
 

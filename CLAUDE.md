@@ -187,7 +187,22 @@ Al **confirmar**, el correo lleva adjunta una invitación iCalendar (`METHOD:REQ
 
 Lo que esto NO hace, y conviene no prometerlo: el evento no se crea solo en el calendario del laboratorio, sino que cada destinatario acepta una invitación, y **la aplicación nunca se entera de si la aceptaron**. No hay estado que consultar; lo que sabemos es que la invitación salió.
 
-⚠️ **Al confirmar salen DOS correos con la MISMA invitación**, uno al solicitante y otro al buzón del laboratorio (`confirmAdminTemplate`). No es redundancia: una invitación solo entra en la agenda de quien **recibe** el correo, así que listar al laboratorio como `ATTENDEE` en la copia del solicitante no le entrega nada. Sin el segundo correo, el calendario del laboratorio se queda vacío.
+⚠️ **Al confirmar salen DOS correos, y cada uno lleva una invitación DISTINTA.** No es redundancia ni descuido:
+
+| Quién recibe | `METHOD` | Por qué |
+|---|---|---|
+| Solicitante | `REQUEST` | Es un invitado de verdad: Gmail le pinta los botones de respuesta |
+| Buzón del laboratorio (`confirmAdminTemplate`) | `PUBLISH` | Es el **organizador**, y a un organizador no se le invita |
+
+Hacen falta los dos correos porque una invitación solo entra en la agenda de quien **recibe** el mensaje: listar al laboratorio como `ATTENDEE` en la copia del solicitante no le entrega nada.
+
+⚠️ **Y hacen falta dos MÉTODOS porque iMIP no puede poner un evento en la agenda de quien lo organiza.** El protocolo da por hecho que el organizador ya lo tiene, porque normalmente lo creó él en su calendario; aquí no existe en ninguna parte. Mientras las dos copias fueron un `REQUEST` idéntico, **Gmail descartaba entera la del laboratorio**: ni botones, ni evento, solo el `.ics` como fichero adjunto. Se confirmó con envíos reales — la copia del solicitante funcionaba perfectamente y la del laboratorio no aparecía en su calendario. Con `PUBLISH` se le entrega el evento en vez de invitarlo, y Gmail lo ofrece con "Añadir al calendario".
+
+⚠️ **Un `PUBLISH` no lleva `ATTENDEE`**: lo prohíbe el §3.2.1 del RFC 5546, porque no hay relación de agenda que establecer. Quién reservó viaja en el cuerpo HTML del correo, que el laboratorio recibe al lado del botón.
+
+⚠️ **La cancelación NO se convierte a `PUBLISH`.** Un `CANCEL` tiene que llegar igual a los dos con el mismo `UID` que la invitación que anula; convertirlo volvería a publicar el evento en vez de retirarlo. **Pendiente de comprobar con un envío real** si Google aplica el `CANCEL` sobre un evento que el laboratorio añadió desde un `PUBLISH`: el laboratorio sigue siendo el organizador, así que podría ignorarlo igual que ignoraba el `REQUEST`. Si lo ignora, al laboratorio le quedan reservas canceladas pegadas en la agenda — molesto, pero el panel sigue siendo la fuente de verdad y el correo de cancelación llega igual.
+
+⚠️ **El reintento reproduce la forma que le tocaba a esa copia**, deducida de `EmailLog.to`: si era el buzón de avisos, `PUBLISH`. Sin eso, reintentar el aviso del laboratorio le reenviaría el `REQUEST` que Gmail ya descartó.
 
 ⚠️ **El `UID` (`lib/mail/ics.ts`) no puede cambiar nunca.** Es lo único que ata la cancelación a la invitación que la precedió; si cambia, el `CANCEL` se ignora y la reserva cancelada se queda pegada en los calendarios para siempre, sin un solo error. Por eso el dominio del UID es una constante literal y **no** `NEXT_PUBLIC_APP_URL`, que cambia entre entornos. Hay un test que lo fija.
 

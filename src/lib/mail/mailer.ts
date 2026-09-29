@@ -218,6 +218,33 @@ export async function enviarCorreo({
  * preferible a inventar un destinatario. Devuelve null en ese caso, para que
  * quien llama pueda distinguir "no configurado" de "falló el envío".
  */
+/**
+ * La misma invitación, pero en la forma que sirve para la copia DEL
+ * LABORATORIO.
+ *
+ * ⚠️ Esto arregla un fallo que no daba ningún error. Al laboratorio le llegaba
+ * el mismo REQUEST que al solicitante, y Gmail lo descartaba entero: ni
+ * botones, ni evento, solo el `.ics` como fichero adjunto. La causa no es
+ * Gmail sino iMIP — una invitación por correo NO puede poner el evento en la
+ * agenda de quien la ORGANIZA, porque el protocolo da por hecho que el
+ * organizador ya lo tiene. Y el organizador es el buzón del laboratorio.
+ *
+ * Con PUBLISH no se le invita: se le entrega el evento para que lo guarde, que
+ * es lo que de verdad queremos. Gmail lo pinta con "Añadir al calendario" en
+ * lugar de los botones de respuesta.
+ *
+ * La CANCELACIÓN no se toca. Un CANCEL tiene que llegar igual a los dos, con
+ * el mismo UID que la invitación que anula; convertirlo en PUBLISH volvería a
+ * publicar el evento en vez de retirarlo.
+ */
+function paraElOrganizador(
+  invitacion: DescripcionInvitacion,
+): DescripcionInvitacion {
+  return invitacion.metodo === "REQUEST"
+    ? { ...invitacion, metodo: "PUBLISH" }
+    : invitacion;
+}
+
 export async function enviarCorreoAlLaboratorio(
   input: Omit<EnviarCorreoInput, "to">,
 ): Promise<MailStatus | null> {
@@ -228,7 +255,13 @@ export async function enviarCorreoAlLaboratorio(
     );
     return null;
   }
-  return enviarCorreo({ ...input, to: destino });
+  return enviarCorreo({
+    ...input,
+    to: destino,
+    invitacion: input.invitacion
+      ? paraElOrganizador(input.invitacion)
+      : undefined,
+  });
 }
 
 /*
@@ -335,7 +368,23 @@ export async function reintentarCorreo(id: string): Promise<MailStatus | null> {
 
   // Tercera consulta seguida, nunca en Promise.all: connection_limit=1.
   const invitacion = await invitacionDeReserva(log.reservationId);
-  const ics = invitacion ? armarIcs(buzon, invitacion) : undefined;
+  /*
+   * El reintento tiene que reproducir la MISMA forma de invitación que el
+   * envío original, y eso depende de a quién iba. `log.to` lo dice: si es el
+   * buzón de avisos, era la copia del laboratorio y le toca PUBLISH. Sin esto,
+   * reintentar el aviso del laboratorio le mandaría el REQUEST que Gmail ya
+   * descartó una vez.
+   *
+   * La comparación directa vale porque ese `to` se escribió desde este mismo
+   * `avisosA` en el envío original.
+   */
+  const paraElLaboratorio = log.to === buzon.avisosA;
+  const ics = invitacion
+    ? armarIcs(
+        buzon,
+        paraElLaboratorio ? paraElOrganizador(invitacion) : invitacion,
+      )
+    : undefined;
 
   if (!buzonConfigurado(buzon)) {
     console.log(
