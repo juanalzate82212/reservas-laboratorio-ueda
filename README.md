@@ -262,6 +262,52 @@ Para desplegar desde cero:
 
    En producción el administrador general es **p3.sistemas@amigo.edu.co**. El script es idempotente e imprime a qué proyecto de Supabase apunta antes de escribir. Los demás administradores se crean ya desde `/admin/usuarios`.
 
+### Este despliegue: llevar `develop` a `main`
+
+> Sección temporal. **Borrarla cuando esté hecho.**
+
+Producción todavía sirve la versión de **un solo laboratorio**. En `develop` esperan el portal, las rutas por laboratorio, los administradores con rol y aislamiento, el correo por buzón y la invitación de calendario. Todo eso sale de golpe con la primera fusión a `main`, así que el orden importa.
+
+**Antes de fusionar nada:**
+
+1. **Aplicar las migraciones.** Con la cadena directa, nunca con el pooler:
+
+   ```bash
+   DATABASE_URL="$DIRECT_URL" npx prisma migrate deploy
+   ```
+
+   Aplica dos: `20260904151250_multi_laboratorio` y `20260904154205_activar_laboratorio_redes`. Son **aditivas** —columnas nullable y una tabla nueva—, así que el código viejo sigue funcionando mientras tanto; por eso van antes y no después.
+
+   > Entre este paso y la fusión, producción sirve el código de un laboratorio contra el esquema nuevo. **Es seguro:** el viejo `getActiveRoom()` toma la primera sala por slug ascendente, y `analitica-datos-ia` ordena antes que `redes-infraestructura`, así que el público sigue viendo Analítica. Lo que sí cambia de inmediato es el **nombre** de la sala, que pasa al nombre completo del laboratorio.
+
+2. **Crear el administrador general.** `AdminUser` nace vacía y **sin esto nadie puede entrar al panel**:
+
+   ```bash
+   ADMIN_EMAIL=p3.sistemas@amigo.edu.co ADMIN_PASSWORD="..."    ADMIN_NAME="Administrador general" ADMIN_ROLE=SUPER_ADMIN npm run crear-admin
+   ```
+
+3. **Cargar las variables de correo en Vercel**, solo en **Production** (ver [Variables de entorno](#variables-de-entorno)). Lo que no puede fallar:
+   - Un único remitente, `p3.sistemas@amigo.edu.co`, con su contraseña de aplicación.
+   - `MAIL_TO_ADMIN_<CLAVE>` de cada laboratorio **distinta** de la dirección de `MAIL_FROM`. Si coinciden, ese laboratorio no recibe las reservas en su calendario.
+   - **Ninguna** `SMTP_*_<CLAVE>`: darle SMTP propio a un laboratorio es justo lo que rompe la invitación.
+   - En **Preview**, dejar `SMTP_PASSWORD` vacía para que una vista previa no pueda mandar correo real.
+
+**Fusionar y comprobar:**
+
+4. Fusionar `develop` → `main`.
+5. **Comprobar producción con una petición real.** El CI no corre en `main` y ya pasó una vez que Vercel no creó el despliegue sin avisar:
+
+   ```bash
+   curl -s https://reservas-laboratorio-ueda.vercel.app/ | grep -o "<title>[^<]*"
+   ```
+
+   Debe responder el **portal** con los dos laboratorios, no el calendario de Analítica.
+
+6. Entrar al panel con la cuenta del paso 2 y **crear el `LAB_ADMIN` de Redes** desde `/admin/usuarios`.
+7. Hacer **una reserva de prueba de punta a punta** en cada laboratorio: confirmarla, verificar que al solicitante le llegan los botones de respuesta y que el evento aparece en el calendario del laboratorio, y cancelarla para verificar que desaparece.
+
+> ⚠️ **Una vez enviada la primera invitación, no cambiar el remitente.** Las cancelaciones se emparejan con la invitación original por `UID` **y** organizador, así que cambiar la cuenta dejaría sin poder retirar los eventos ya enviados.
+
 > **Vercel no tiene desplegable de versión de Node**: respeta `engines.node` de `package.json`. El repo declara `22.x` desde el 2026-08-11, así que la retirada de Node 20 del 2026-10-01 ya no afecta.
 
 ### Flujo de ramas

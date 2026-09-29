@@ -6,7 +6,7 @@
 
 **La aplicación está en producción** con el MVP completo y el panel de administración.
 
-⚠️ **Lo multi-laboratorio está terminado en `develop`, pero `main` todavía sirve la versión de un solo laboratorio.** El portal, las rutas por laboratorio, los administradores con rol y el correo por buzón no han llegado a producción. Ver los pasos de despliegue en [README.md](README.md#despliegue).
+⚠️ **Lo multi-laboratorio está terminado en `develop`, pero `main` todavía sirve la versión de un solo laboratorio.** El portal, las rutas por laboratorio, los administradores con rol, el correo por buzón y la invitación de calendario no han llegado a producción. Los pasos, en orden y con las comprobaciones de después, en [README.md](README.md#este-despliegue-llevar-develop-a-main).
 
 ---
 
@@ -22,7 +22,9 @@
 
 **Confirmar el aforo y el correo de contacto del Laboratorio de Redes e Infraestructura.** Se sembró con aforo **25 copiado de Analítica** y `contactEmail` en `null`, ambos provisionales y ya visibles al público. El aforo no es decorativo: es el tope que valida `POST /api/reservations` contra `Room.capacity`. Sin `contactEmail`, el pie de sus páginas no ofrece a quién escribir.
 
-**Dar de alta su buzón de correo.** Sin las variables `SMTP_*_REDES` / `MAIL_FROM_REDES` / `MAIL_TO_ADMIN_REDES`, sus correos salen por el buzón global — hoy, el de Analítica. Funciona, pero no es lo que se buscó.
+**Poner su buzón real en `MAIL_TO_ADMIN_REDES`.** Es a donde le llegan los avisos, quién va como **asistente** en la invitación de calendario y el `Reply-To` de los correos a sus solicitantes. Sin él cae al buzón global y sus reservas terminan en el calendario equivocado.
+
+⚠️ **Ya no hace falta pedirle a Redes una contraseña de aplicación.** Todo el correo sale de una sola cuenta institucional; lo único propio de cada laboratorio son su nombre visible y su buzón. Ese pendiente se cerró solo.
 
 **Crear a su encargado** desde `/admin/usuarios`, con rol `LAB_ADMIN`.
 
@@ -34,11 +36,15 @@
 
 **Evaluar un transporte de correo más moderno — sin urgencia.** Nodemailer no es el problema: está mantenida y es el estándar de Node. Lo anticuado es la **credencial**: una contraseña de aplicación de Google, estática y que Google desincentiva, sobre un buzón humano usado como servicio de envío.
 
-Lo que ganaría el diseño: hoy cada laboratorio necesita **sus propias credenciales** porque Gmail obliga a que el `From` sea la cuenta autenticada. Con un dominio verificado (Resend, Postmark, SES) o con la **API de Gmail y delegación en todo el dominio**, una sola credencial enviaría como cualquier dirección `@amigo.edu.co`: `buzones.ts` dejaría de gestionar secretos y añadir un laboratorio sería una fila en `Room`. De paso desaparecería el `runtime = "nodejs"` de los handlers de correo.
+Lo que ganaría el diseño: con un dominio verificado (Resend, Postmark, SES) cada laboratorio podría **volver a enviar desde su propia dirección** sin necesitar credenciales propias, porque el remitente dejaría de estar atado a la cuenta autenticada. Hoy eso no se puede y por eso todo sale de una sola cuenta. De paso desaparecería el `runtime = "nodejs"` de los handlers de correo.
+
+⚠️ **Ojo si algún día se cambia el transporte: el remitente no se puede mover a la ligera.** Las cancelaciones se emparejan con la invitación original por `UID` **y** organizador, así que cambiar la cuenta remitente deja sin poder retirar los eventos ya enviados.
 
 Está preparado para migrar barato: todo el envío pasa por `enviarCorreo()` y `resolverBuzon()`, así que cambiar de transporte toca **un archivo**.
 
 ⚠️ **GCP no tiene servicio propio de correo transaccional** y bloquea el puerto 25 de salida; su documentación remite a terceros. La vía Google es la API de Gmail con cuenta de servicio, que exige que un superadministrador de Workspace conceda la delegación.
+
+⚠️ **La delegación en todo el dominio se pidió y la NEGARON** (2026-09). Es lo que descartó crear los eventos con la API oficial de Google Calendar y obligó a la invitación por correo. **No volver a proponerla** salvo que el usuario diga que cambió la respuesta.
 
 **Disparadores para retomarlo:** que Google endurezca las contraseñas de aplicación; que empiece a importar saber si un correo llegó; que aparezca un tercer o cuarto laboratorio; o que el equipo obtenga su proyecto de GCP.
 
