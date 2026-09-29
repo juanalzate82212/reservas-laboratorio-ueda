@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { buzonConfigurado, resolverBuzon } from "./buzones";
+import { buzonConfigurado, direccionDelBuzon, resolverBuzon } from "./buzones";
 
 /*
  * Función de sus argumentos y del entorno, sin Prisma ni petición: entra en
@@ -134,5 +134,70 @@ describe("buzonConfigurado", () => {
 
     process.env.SMTP_PASSWORD_REDES = "clave";
     expect(buzonConfigurado(resolverBuzon("REDES"))).toBe(true);
+  });
+});
+
+describe("direccionDelBuzon", () => {
+  /*
+   * El ORGANIZER de la invitación de calendario va en formato mailto: y no
+   * admite el nombre delante.
+   */
+  it("saca la dirección de un remitente con nombre", () => {
+    process.env.MAIL_FROM_REDES =
+      "Laboratorio de Redes e Infraestructura <lab.redes@amigo.edu.co>";
+
+    expect(direccionDelBuzon(resolverBuzon("REDES"))).toBe(
+      "lab.redes@amigo.edu.co",
+    );
+  });
+
+  it("acepta un remitente que ya viene desnudo", () => {
+    process.env.MAIL_FROM_REDES = "  lab.redes@amigo.edu.co  ";
+
+    expect(direccionDelBuzon(resolverBuzon("REDES"))).toBe(
+      "lab.redes@amigo.edu.co",
+    );
+  });
+
+  /*
+   * ⚠️ Esto es lo que sostiene el diseño de remitente único, no un detalle.
+   *
+   * Todos los laboratorios envían desde la MISMA cuenta institucional para que
+   * el ORGANIZER no coincida nunca con ningún destinatario —si coincidiera, ese
+   * destinatario no recibiría el evento—, pero cada uno conserva su NOMBRE
+   * visible en el remitente. Las dos cosas conviven porque la dirección se lee
+   * de entre los ángulos y el nombre se ignora.
+   *
+   * Si alguien "arregla" esto para que devuelva el remitente entero, los dos
+   * laboratorios pasan a tener organizadores distintos y las invitaciones
+   * dejan de salir.
+   */
+  it("dos laboratorios con nombres distintos comparten organizador", () => {
+    process.env.MAIL_FROM_REDES =
+      "Laboratorio de Redes e Infraestructura <p3.sistemas@amigo.edu.co>";
+    process.env.MAIL_FROM_ANALITICA =
+      "Laboratorio de Analítica de Datos e IA <p3.sistemas@amigo.edu.co>";
+
+    expect(direccionDelBuzon(resolverBuzon("REDES"))).toBe(
+      "p3.sistemas@amigo.edu.co",
+    );
+    expect(direccionDelBuzon(resolverBuzon("ANALITICA"))).toBe(
+      "p3.sistemas@amigo.edu.co",
+    );
+  });
+
+  /*
+   * Sin dirección utilizable no se manda invitación: una con ORGANIZER roto es
+   * peor que ninguna, porque el cliente la degrada a fichero adjunto y el
+   * solicitante recibe algo que no sabe abrir.
+   */
+  it("devuelve undefined si no hay remitente o no parece una dirección", () => {
+    expect(direccionDelBuzon(resolverBuzon("REDES"))).toBeUndefined();
+
+    process.env.MAIL_FROM_REDES = "Laboratorio de Redes";
+    expect(direccionDelBuzon(resolverBuzon("REDES"))).toBeUndefined();
+
+    process.env.MAIL_FROM_REDES = "Redes <no-es-una-direccion>";
+    expect(direccionDelBuzon(resolverBuzon("REDES"))).toBeUndefined();
   });
 });

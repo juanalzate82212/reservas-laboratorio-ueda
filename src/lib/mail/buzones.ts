@@ -93,3 +93,25 @@ export function resolverBuzon(mailKey: string): Buzon {
 export function buzonConfigurado(buzon: Buzon): boolean {
   return Boolean(buzon.host && buzon.pass);
 }
+
+/**
+ * La dirección desnuda del remitente: `"Nombre <a@b.co>"` → `"a@b.co"`.
+ *
+ * La necesita el ORGANIZER de la invitación de calendario, que va en formato
+ * `mailto:` y no admite el nombre delante. Y tiene que ser exactamente la
+ * cuenta que envía: si el ORGANIZER no coincide con el remitente del correo,
+ * Gmail marca la invitación como sospechosa y deja de ofrecer los botones de
+ * respuesta.
+ *
+ * Devuelve `undefined` si el buzón no tiene `MAIL_FROM` o si lo que hay no
+ * parece una dirección. Sin remitente no se puede organizar nada, así que
+ * quien llama se queda sin invitación en vez de mandar una rota.
+ */
+export function direccionDelBuzon(buzon: Buzon): string | undefined {
+  if (!buzon.from) return undefined;
+
+  const entreAngulos = /<([^>]+)>/.exec(buzon.from);
+  const candidata = (entreAngulos ? entreAngulos[1] : buzon.from).trim();
+
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidata) ? candidata : undefined;
+}

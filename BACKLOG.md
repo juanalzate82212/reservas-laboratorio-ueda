@@ -59,7 +59,7 @@ Está preparado para migrar barato: todo el envío pasa por `enviarCorreo()` y `
 - Reservas recurrentes o series.
 - Gestión de inventario de equipos de cómputo.
 - **Exportar** las estadísticas (CSV, Excel, PDF). El dashboard de agregados sí se construyó; sacarlas del panel, no.
-- Recordatorios previos y adjunto `.ics` para Outlook. El enlace "Añadir a Google Calendar" del correo de confirmación **sí** existe.
+- Recordatorios previos a la reserva. El **adjunto `.ics` sí se construyó**: el correo de confirmación lleva una invitación de calendario y el de cancelación la retira (ver CLAUDE.md). El botón "Añadir a Google Calendar" se retiró al llegar.
 - **Correo de acuse de recibo al solicitante** al enviar la solicitud: se decidió que solo se envía correo en la decisión, y la pantalla de éxito con el código cumple esa función. Ojo con el matiz — el aviso al **laboratorio** cuando entra una solicitud nueva es otra cosa y sí se construyó (`MAIL_TO_ADMIN`).
 - **Edición** de una reserva ya creada por el solicitante. La **cancelación** por el solicitante es distinta y sí existe (`POST /api/reservations/[code]/cancel`).
 
