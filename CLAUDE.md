@@ -169,6 +169,10 @@ Se descartó Vercel Cron porque en plan Hobby solo permite **una ejecución al d
 
 **El remitente se resuelve POR LABORATORIO** en `lib/mail/buzones.ts`: `SMTP_<CLAVE>_*`, `MAIL_FROM_<CLAVE>` y `MAIL_TO_ADMIN_<CLAVE>`, con reserva a la variable global sin sufijo si el laboratorio no tiene la suya. Una variable vacía cuenta como no configurada.
 
+⚠️ **Ese mecanismo sigue existiendo, pero HOY NO SE USA para el SMTP: todos los laboratorios envían desde una única cuenta institucional** (`p3.sistemas@amigo.edu.co`), configurada en las variables globales, y ninguno declara `SMTP_*_<CLAVE>`. **No "arreglarlo" devolviéndole a cada laboratorio su propia cuenta**: la invitación de calendario depende de que el remitente no sea ninguno de los destinatarios (ver más abajo). Lo que sí es por laboratorio son `MAIL_FROM_<CLAVE>` —solo para el **nombre visible**, la dirección es la misma— y `MAIL_TO_ADMIN_<CLAVE>`.
+
+**`Reply-To` apunta al buzón del laboratorio.** Es la contrapartida del remitente único: sin él, un estudiante que pulse Responder le escribiría al administrador de sistemas en vez de al laboratorio. No se pone cuando el destinatario ya es ese buzón.
+
 ⚠️ **La clave es `Room.mailKey`, NO el `slug`**, y van aparte a propósito: el slug es parte de la URL pública, o sea cosmético y renombrable, y si las credenciales colgaran de él, renombrarlo dejaría al laboratorio **sin SMTP en silencio** — el mailer caería en modo `LOGGED` y los correos dejarían de salir sin un solo error.
 
 ⚠️ **`smtpConfigurado()` se evalúa por buzón**: un laboratorio sin credenciales cae en `LOGGED` sin arrastrar al otro.
@@ -181,28 +185,31 @@ Se descartó Vercel Cron porque en plan Hobby solo permite **una ejecución al d
 
 #### La invitación de calendario
 
-Al **confirmar**, el correo lleva adjunta una invitación iCalendar (`METHOD:REQUEST`) que construye `lib/mail/ics.ts`; al **cancelar** una reserva que estaba confirmada, un `METHOD:CANCEL` que la retira.
+Al **confirmar**, el correo lleva adjunta una invitación iCalendar (`METHOD:REQUEST`) que construye `lib/mail/ics.ts`; al **cancelar** una reserva que estaba confirmada, un `METHOD:CANCEL` que la retira. Siempre `REQUEST`, nunca otra cosa.
 
 **No se usa la API de Google Calendar, y no por pereza.** Una cuenta de servicio responde `403 forbiddenForServiceAccounts` en cuanto el evento lleva `attendees`; la única salida es la delegación de autoridad para todo el dominio, que concede un superadministrador de Workspace de `amigo.edu.co`. **Se pidió y no la conceden.** Si algún día la conceden, esto se puede sustituir — pero mientras tanto no volver a proponerlo.
 
-Lo que esto NO hace, y conviene no prometerlo: el evento no se crea solo en el calendario del laboratorio, sino que cada destinatario acepta una invitación, y **la aplicación nunca se entera de si la aceptaron**. No hay estado que consultar; lo que sabemos es que la invitación salió.
+##### ⚠️ La regla que explica todo este diseño
 
-⚠️ **Al confirmar salen DOS correos, y cada uno lleva una invitación DISTINTA.** No es redundancia ni descuido:
+**Quien figura como `ORGANIZER` nunca recibe el evento.** Un cliente de calendario no le entrega a nadie algo de lo que ya es dueño: iMIP da por hecho que el organizador lo tiene en su agenda porque lo creó él. Aquí no existe en ninguna parte, así que su copia no aterriza en ningún sitio.
 
-| Quién recibe | `METHOD` | Por qué |
-|---|---|---|
-| Solicitante | `REQUEST` | Es un invitado de verdad: Gmail le pinta los botones de respuesta |
-| Buzón del laboratorio (`confirmAdminTemplate`) | `PUBLISH` | Es el **organizador**, y a un organizador no se le invita |
+Esto **costó tres intentos y dos hipótesis equivocadas**, comprobadas con envíos reales:
 
-Hacen falta los dos correos porque una invitación solo entra en la agenda de quien **recibe** el mensaje: listar al laboratorio como `ATTENDEE` en la copia del solicitante no le entrega nada.
+1. Las dos copias con el mismo `REQUEST`, organizador = buzón del laboratorio → **al laboratorio no le llegaba nada**, solo el `.ics` como fichero adjunto.
+2. La copia del laboratorio como `METHOD:PUBLISH` → **tampoco**. No hay método que salve la coincidencia.
+3. **Separar el remitente de los destinatarios** → es lo que hay hoy.
 
-⚠️ **Y hacen falta dos MÉTODOS porque iMIP no puede poner un evento en la agenda de quien lo organiza.** El protocolo da por hecho que el organizador ya lo tiene, porque normalmente lo creó él en su calendario; aquí no existe en ninguna parte. Mientras las dos copias fueron un `REQUEST` idéntico, **Gmail descartaba entera la del laboratorio**: ni botones, ni evento, solo el `.ics` como fichero adjunto. Se confirmó con envíos reales — la copia del solicitante funcionaba perfectamente y la del laboratorio no aparecía en su calendario. Con `PUBLISH` se le entrega el evento en vez de invitarlo, y Gmail lo ofrece con "Añadir al calendario".
+Por eso **todos los correos salen de `p3.sistemas@amigo.edu.co`**, que no es el buzón de ningún laboratorio ni de ningún solicitante. Los asistentes son el **solicitante** y el **buzón del laboratorio** (`MAIL_TO_ADMIN_<CLAVE>`), los dos invitados de verdad, los dos con botones de respuesta.
 
-⚠️ **Un `PUBLISH` no lleva `ATTENDEE`**: lo prohíbe el §3.2.1 del RFC 5546, porque no hay relación de agenda que establecer. Quién reservó viaja en el cuerpo HTML del correo, que el laboratorio recibe al lado del botón.
+⚠️ **Por eso el remitente NO puede volver a ser la cuenta del laboratorio.** Y por eso `armarIcs()` **avisa por consola** si `MAIL_TO_ADMIN_<CLAVE>` coincide con el remitente: ese laboratorio se quedará sin evento, y la primera vez el fallo no dio ni un error.
 
-⚠️ **La cancelación NO se convierte a `PUBLISH`.** Un `CANCEL` tiene que llegar igual a los dos con el mismo `UID` que la invitación que anula; convertirlo volvería a publicar el evento en vez de retirarlo. **Pendiente de comprobar con un envío real** si Google aplica el `CANCEL` sobre un evento que el laboratorio añadió desde un `PUBLISH`: el laboratorio sigue siendo el organizador, así que podría ignorarlo igual que ignoraba el `REQUEST`. Si lo ignora, al laboratorio le quedan reservas canceladas pegadas en la agenda — molesto, pero el panel sigue siendo la fuente de verdad y el correo de cancelación llega igual.
+⚠️ **Ojo con las cuentas de administrador.** Si alguien crea un `AdminUser` con la dirección del remitente, no rompe nada *hoy* —el admin no es asistente, solo lo son el solicitante y el buzón del laboratorio—, pero es la clase de coincidencia que reintroduce el problema si algún día se añade al admin a la lista.
 
-⚠️ **El reintento reproduce la forma que le tocaba a esa copia**, deducida de `EmailLog.to`: si era el buzón de avisos, `PUBLISH`. Sin eso, reintentar el aviso del laboratorio le reenviaría el `REQUEST` que Gmail ya descartó.
+##### El resto de las trampas
+
+Lo que esto NO hace, y conviene no prometerlo: el evento no se crea solo en el calendario, sino que cada destinatario acepta una invitación, y **la aplicación nunca se entera de si la aceptaron**. No hay estado que consultar; lo que sabemos es que la invitación salió.
+
+⚠️ **Al confirmar salen DOS correos con la MISMA invitación**, uno al solicitante y otro al buzón del laboratorio (`confirmAdminTemplate`). No es redundancia: una invitación solo entra en la agenda de quien **recibe** el correo, así que listar al laboratorio como `ATTENDEE` en la copia del solicitante no le entrega nada. Sin el segundo correo, el calendario del laboratorio se queda vacío.
 
 ⚠️ **El `UID` (`lib/mail/ics.ts`) no puede cambiar nunca.** Es lo único que ata la cancelación a la invitación que la precedió; si cambia, el `CANCEL` se ignora y la reserva cancelada se queda pegada en los calendarios para siempre, sin un solo error. Por eso el dominio del UID es una constante literal y **no** `NEXT_PUBLIC_APP_URL`, que cambia entre entornos. Hay un test que lo fija.
 

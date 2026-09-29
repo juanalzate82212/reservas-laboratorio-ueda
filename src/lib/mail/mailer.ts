@@ -111,6 +111,24 @@ function armarIcs(
     },
   ];
   if (buzon.avisosA && buzon.avisosA !== invitacion.solicitante.correo) {
+    /*
+     * ⚠️ La colisión que costó tres intentos. Si el buzón de avisos es la
+     * MISMA dirección que el remitente, el laboratorio figura a la vez como
+     * ORGANIZER y como ATTENDEE, y entonces no recibe nada: un cliente de
+     * calendario no le entrega a nadie un evento del que ya es dueño. No es
+     * una rareza de Gmail, es cómo está pensado iMIP —el organizador ya
+     * debería tenerlo—, y se comprobó con envíos reales que no hay método que
+     * lo salve: ni REQUEST ni PUBLISH.
+     *
+     * Se avisa y se sigue: el invitado se añade igual porque la copia del
+     * SOLICITANTE sí es válida, y quitarlo no arreglaría la del laboratorio.
+     * Lo que no puede es volver a pasar en silencio.
+     */
+    if (buzon.avisosA === organizador) {
+      console.warn(
+        `[correo] MAIL_TO_ADMIN de «${buzon.mailKey}» es la misma dirección que el remitente (${organizador}): el laboratorio NO recibirá el evento en su calendario. Apúntalo a una dirección distinta.`,
+      );
+    }
     invitados.push({ nombre: null, correo: buzon.avisosA });
   }
 
@@ -120,6 +138,24 @@ function armarIcs(
     organizador: { correo: organizador },
     invitados,
   });
+}
+
+/**
+ * A dónde va la respuesta si el destinatario pulsa Responder.
+ *
+ * Existe porque el remitente dejó de ser el laboratorio: todos los correos
+ * salen de una única cuenta institucional para que el ORGANIZER de las
+ * invitaciones no coincida nunca con ningún destinatario. Sin `Reply-To`, un
+ * estudiante que responda a su confirmación le escribiría al administrador de
+ * sistemas en lugar de al laboratorio que le atiende.
+ *
+ * No se pone cuando el destinatario ES el buzón del laboratorio: pedirle que
+ * se responda a sí mismo no aporta nada.
+ */
+function responderA(buzon: Buzon, destinatario: string) {
+  return buzon.avisosA && buzon.avisosA !== destinatario
+    ? { replyTo: buzon.avisosA }
+    : {};
 }
 
 /*
@@ -171,6 +207,7 @@ export async function enviarCorreo({
     await crearTransporte(buzon).sendMail({
       from: buzon.from,
       to,
+      ...responderA(buzon, to),
       subject,
       html,
       ...adjuntoIcs(ics),
@@ -218,33 +255,6 @@ export async function enviarCorreo({
  * preferible a inventar un destinatario. Devuelve null en ese caso, para que
  * quien llama pueda distinguir "no configurado" de "falló el envío".
  */
-/**
- * La misma invitación, pero en la forma que sirve para la copia DEL
- * LABORATORIO.
- *
- * ⚠️ Esto arregla un fallo que no daba ningún error. Al laboratorio le llegaba
- * el mismo REQUEST que al solicitante, y Gmail lo descartaba entero: ni
- * botones, ni evento, solo el `.ics` como fichero adjunto. La causa no es
- * Gmail sino iMIP — una invitación por correo NO puede poner el evento en la
- * agenda de quien la ORGANIZA, porque el protocolo da por hecho que el
- * organizador ya lo tiene. Y el organizador es el buzón del laboratorio.
- *
- * Con PUBLISH no se le invita: se le entrega el evento para que lo guarde, que
- * es lo que de verdad queremos. Gmail lo pinta con "Añadir al calendario" en
- * lugar de los botones de respuesta.
- *
- * La CANCELACIÓN no se toca. Un CANCEL tiene que llegar igual a los dos, con
- * el mismo UID que la invitación que anula; convertirlo en PUBLISH volvería a
- * publicar el evento en vez de retirarlo.
- */
-function paraElOrganizador(
-  invitacion: DescripcionInvitacion,
-): DescripcionInvitacion {
-  return invitacion.metodo === "REQUEST"
-    ? { ...invitacion, metodo: "PUBLISH" }
-    : invitacion;
-}
-
 export async function enviarCorreoAlLaboratorio(
   input: Omit<EnviarCorreoInput, "to">,
 ): Promise<MailStatus | null> {
@@ -255,13 +265,7 @@ export async function enviarCorreoAlLaboratorio(
     );
     return null;
   }
-  return enviarCorreo({
-    ...input,
-    to: destino,
-    invitacion: input.invitacion
-      ? paraElOrganizador(input.invitacion)
-      : undefined,
-  });
+  return enviarCorreo({ ...input, to: destino });
 }
 
 /*
@@ -368,23 +372,7 @@ export async function reintentarCorreo(id: string): Promise<MailStatus | null> {
 
   // Tercera consulta seguida, nunca en Promise.all: connection_limit=1.
   const invitacion = await invitacionDeReserva(log.reservationId);
-  /*
-   * El reintento tiene que reproducir la MISMA forma de invitación que el
-   * envío original, y eso depende de a quién iba. `log.to` lo dice: si es el
-   * buzón de avisos, era la copia del laboratorio y le toca PUBLISH. Sin esto,
-   * reintentar el aviso del laboratorio le mandaría el REQUEST que Gmail ya
-   * descartó una vez.
-   *
-   * La comparación directa vale porque ese `to` se escribió desde este mismo
-   * `avisosA` en el envío original.
-   */
-  const paraElLaboratorio = log.to === buzon.avisosA;
-  const ics = invitacion
-    ? armarIcs(
-        buzon,
-        paraElLaboratorio ? paraElOrganizador(invitacion) : invitacion,
-      )
-    : undefined;
+  const ics = invitacion ? armarIcs(buzon, invitacion) : undefined;
 
   if (!buzonConfigurado(buzon)) {
     console.log(
@@ -401,6 +389,7 @@ export async function reintentarCorreo(id: string): Promise<MailStatus | null> {
     await crearTransporte(buzon).sendMail({
       from: buzon.from,
       to: log.to,
+      ...responderA(buzon, log.to),
       subject: log.subject,
       html: log.body,
       ...adjuntoIcs(ics),

@@ -140,8 +140,7 @@ describe("buzonConfigurado", () => {
 describe("direccionDelBuzon", () => {
   /*
    * El ORGANIZER de la invitación de calendario va en formato mailto: y no
-   * admite el nombre delante. Si no coincide EXACTAMENTE con la cuenta que
-   * envía, Gmail deja de ofrecer los botones de respuesta.
+   * admite el nombre delante.
    */
   it("saca la dirección de un remitente con nombre", () => {
     process.env.MAIL_FROM_REDES =
@@ -157,6 +156,33 @@ describe("direccionDelBuzon", () => {
 
     expect(direccionDelBuzon(resolverBuzon("REDES"))).toBe(
       "lab.redes@amigo.edu.co",
+    );
+  });
+
+  /*
+   * ⚠️ Esto es lo que sostiene el diseño de remitente único, no un detalle.
+   *
+   * Todos los laboratorios envían desde la MISMA cuenta institucional para que
+   * el ORGANIZER no coincida nunca con ningún destinatario —si coincidiera, ese
+   * destinatario no recibiría el evento—, pero cada uno conserva su NOMBRE
+   * visible en el remitente. Las dos cosas conviven porque la dirección se lee
+   * de entre los ángulos y el nombre se ignora.
+   *
+   * Si alguien "arregla" esto para que devuelva el remitente entero, los dos
+   * laboratorios pasan a tener organizadores distintos y las invitaciones
+   * dejan de salir.
+   */
+  it("dos laboratorios con nombres distintos comparten organizador", () => {
+    process.env.MAIL_FROM_REDES =
+      "Laboratorio de Redes e Infraestructura <p3.sistemas@amigo.edu.co>";
+    process.env.MAIL_FROM_ANALITICA =
+      "Laboratorio de Analítica de Datos e IA <p3.sistemas@amigo.edu.co>";
+
+    expect(direccionDelBuzon(resolverBuzon("REDES"))).toBe(
+      "p3.sistemas@amigo.edu.co",
+    );
+    expect(direccionDelBuzon(resolverBuzon("ANALITICA"))).toBe(
+      "p3.sistemas@amigo.edu.co",
     );
   });
 
