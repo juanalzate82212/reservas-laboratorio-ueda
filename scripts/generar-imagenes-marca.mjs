@@ -9,9 +9,14 @@
  * así el despliegue no depende de nada. Pero se generan CON ESTE SCRIPT en vez
  * de a mano, para que se puedan rehacer si cambia el logo o el texto.
  *
- * Fuentes: src/components/brand/logo-uclam.png (horizontal, SIN canal alfa —
- * lleva su fondo blanco horneado) y logo-uclam-escudo.png (el escudo, este SÍ
- * con alfa, por eso sirve para el icono de pestaña sin recorte visible).
+ * Fuentes: src/components/brand/logo-uclam.png (horizontal) y
+ * logo-uclam-escudo.png (el escudo). Los dos con canal alfa — el horizontal
+ * lo ganó el 2026-09-28, antes llevaba el fondo blanco horneado.
+ *
+ * ⚠️ Si regeneras la tarjeta de Open Graph después de ese cambio, mírala: el
+ * logo va dentro de una tarjeta blanca explícita (más abajo), así que la
+ * transparencia no debería notarse, pero es justo la pieza que nadie vuelve a
+ * abrir y la que ven los servicios externos al compartir el enlace.
  *
  * Cómo ejecutarlo (Playwright NO es dependencia del proyecto, se instala solo
  * para esto y se revierte después, igual que para las pruebas de interfaz):

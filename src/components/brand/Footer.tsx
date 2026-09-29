@@ -88,8 +88,8 @@ export function Footer({ laboratorio, className }: FooterProps) {
             style={{ height: 40, width: 40 }}
           />
           <p className="text-center text-caption text-texto-secundario">
-            © {anio} — Aplicación desarrollada por la Unidad de Estrategia del
-            Dato y Analítica.
+            © {anio} — Respaldado por la Unidad de Estrategia del Dato y
+            Analítica.
           </p>
         </div>
       </div>

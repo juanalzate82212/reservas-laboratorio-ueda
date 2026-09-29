@@ -309,10 +309,12 @@ Node **22.x**, para paridad con Vercel (`engines`, `.nvmrc`). Vercel no tiene de
 
 | Fichero | Qué es | Alfa | Para qué |
 |---------|--------|------|----------|
-| `logo-uclam.png` | horizontal, 427×118 | **No** — fondo blanco horneado | cabecera, pie, tarjeta de Open Graph |
+| `logo-uclam.png` | horizontal, 427×118 | **Sí** (desde 2026-09-28) | cabecera, pie, tarjeta de Open Graph |
 | `logo-uclam-escudo.png` | escudo, 78×118 | **Sí** | iconos de pestaña y de iOS |
 
-Que el horizontal no tenga transparencia está confirmado inspeccionando los chunks del PNG. Por eso sobre superficies azules se envuelve en una tarjeta blanca: así el recorte se lee como decisión de diseño y no como un accidente. El escudo sí la tiene, y por eso sirve de favicon.
+Los dos tienen alfa de verdad, confirmado decodificando los píxeles y no solo mirando la cabecera. El horizontal **no lo tuvo siempre**: hasta el 2026-09-28 llevaba el fondo blanco horneado, y se notaba como un rectángulo blanco sobre el gris del pie.
+
+⚠️ **Aun así, sobre superficies azules el horizontal se sigue envolviendo en una tarjeta blanca** (`variante="blanco"`: cabecera del panel y splash de login), y eso ya **no** es para disimular un recorte. Su tinta es azul y naranja oscuros, que sobre `#007B99` quedarían ilegibles. El documento de identidad pide ahí la versión del logo **en blanco** (§4.2), que no tenemos, y admite como alternativa la pestaña o tarjeta blanca (§4.3). **Quitar esa tarjeta rompe las dos pantallas azules.**
 
 `src/app/icon.png`, `apple-icon.png` y `opengraph-image.png` los **enlaza Next.js solo, por convención de nombre**, sin tocar `layout.tsx`. Se generan con [scripts/generar-imagenes-marca.mjs](scripts/generar-imagenes-marca.mjs).
 
